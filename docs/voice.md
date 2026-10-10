@@ -98,6 +98,17 @@ Notes:
 - Prefer a Twilio API key (SID and secret) over the account token if you have one.
 - No Twilio? A SIP trunk from another carrier also works with ElevenLabs, but this repo's `voice-setup` only imports Twilio numbers.
 
+## Phoning the on-call person
+
+The model decides what to do about a case. **Code** decides whether and how to phone, and this feature is entirely code-driven: there is no tool for it and the model cannot ask for it.
+
+- **When:** a case ends with a hazard found by the code checks, or with priority P0. Priority P1 alone does not trigger it, and neither does a routine case. A crashed case (the automatic fallback) is briefed only if the code found a hazard.
+- **Who:** only the number in `oncall_number` (env `LETTABLE_ONCALL_NUMBER`). It is never taken from a case or from the model. Empty means the feature is off.
+- **What is said:** a short briefing built by code, with no model call: the case, the property, what was found (the matched hazard phrase, or the first sentence of the reason), and what has already been done, stated only if true ("safety advice was sent to the tenant", "an escalation ticket is open", otherwise "nothing has been sent yet"). The words come through the same cleaning as other spoken text (no emails, links, numbers or amounts from the case). The phone agent knows it is briefing staff because the code sets `audience` to `staff` for this call; case text and the model cannot set it. It reads the briefing, asks "Can you confirm you have this?", takes a yes or no, repeats once if asked, and hangs up.
+- **Safety rules:** dry run records the briefing as a call action and dials nothing. A live briefing is dialled **only if the number is on the allow-list** (`call_allowlist`, env `LETTABLE_CALL_ALLOWLIST`, comma separated); an empty list means a live briefing is held. Calling hours do not apply (an emergency can be phoned at night); the run's call cap and the once-per-case rule do. If it cannot be placed (not on the list, cap reached, the call fails) the decision is unchanged and a person is told through the usual blocked entry and ticket note.
+- **Result:** the acknowledgement comes back with `calls collect` (or at the start of the next live run) on the action as `call_result`, and `ANSWER.md` lists the call as "On-call briefing call". The briefing is not shown to later decisions as contact with a party of the case, so it does not use up the case's own call limit.
+- **Allow-list for every live call:** when `call_allowlist` is set, any other live call to a number that is not on it is held too. With an empty list ordinary calls behave as before. Set the list for the demo and for the Reality Test.
+
 ## Demo call
 
 Use a phone you control and say so to whoever answers. Keep the number out of every committed file (`DEMO_CALL_NUMBER` in your own `.env` is a reminder, the code does not read it), build a case whose provider's phone number is that number, run with `--calls elevenlabs`, then `calls collect`. Synthetic case numbers (07700 900xxx) are unreachable test numbers.

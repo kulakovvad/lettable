@@ -20,7 +20,9 @@ from typing import Any, Callable, Dict, List, Optional
 from agent.config import Config
 from agent.report import atomic_write, write_case
 from agent.timeline import Case, Event
-from agent.voice import CALL_RECORD_TAG, CallRequest, CallResult, Dialer
+import os
+
+from agent.voice import CALL_RECORD_TAG, ONCALL_PURPOSE, STAFF_PARTY, CallRequest, CallResult, Dialer
 
 _NAMES = {"provider": "Contractor", "landlord": "Landlord", "tenant": "Tenant"}
 _UNSAFE = re.compile(r"[^A-Za-z0-9_.-]")
@@ -44,6 +46,13 @@ def _in_hours(cfg: Config, now: datetime) -> bool:
     from zoneinfo import ZoneInfo
 
     return cfg.call_hours[0] <= now.astimezone(ZoneInfo("Europe/London")).hour < cfg.call_hours[1]
+
+
+def allowlist(cfg: Config) -> tuple:
+    """Numbers a live call may dial: the config list, else LETTABLE_CALL_ALLOWLIST (comma separated). Empty = no list."""
+    if cfg.call_allowlist:
+        return tuple(cfg.call_allowlist)
+    return tuple(n.strip() for n in os.environ.get("LETTABLE_CALL_ALLOWLIST", "").split(",") if n.strip())
 
 
 def _tell_a_person(decision: Dict[str, Any], action: Dict[str, Any], code: str, why: str) -> None:
@@ -75,20 +84,54 @@ def _record_failure(decision: Dict[str, Any], action: Dict[str, Any]) -> None:
         action.get("to"), action.get("call_detail")))
 
 
+def _canonical_number(number: Any) -> str:
+    """'+' and digits, so '+44 7700 900555' and '447700900555' are the same number."""
+    digits = re.sub(r"\D", "", str(number or ""))
+    return "+" + digits if digits else ""
+
+
+def _on_list(number: Any, allowed: tuple) -> bool:
+    want = _canonical_number(number)
+    return bool(want) and want in {_canonical_number(n) for n in allowed}
+
+
+def _not_allowed(action: Dict[str, Any], cfg: Config) -> bool:
+    """A live call to a number off the allow-list is held. The list is optional for ordinary calls (empty = no list),
+    but an on-call briefing is only ever dialled to a number that is on it."""
+    allowed = allowlist(cfg)
+    if action.get("purpose") == ONCALL_PURPOSE:
+        return not _on_list(action.get("number"), allowed)
+    return bool(allowed) and not _on_list(action.get("number"), allowed)
+
+
+def _already_placed(previous: List[Dict[str, Any]], action: Dict[str, Any], cfg: Config) -> Optional[Dict[str, Any]]:
+    """An earlier run already placed this call. One on-call briefing per case, even if its old key included events_seen."""
+    for p in previous:
+        cid = p.get("conversation_id")
+        if not cid or (cfg.call_backend != "dry_run" and str(cid).startswith("dryrun-")):
+            continue
+        same_key = p.get("idempotency_key") == action.get("idempotency_key")
+        same_briefing = action.get("purpose") == ONCALL_PURPOSE and p.get("purpose") == ONCALL_PURPOSE
+        if same_key or same_briefing:
+            return p
+    return None
+
+
 def place_pending(decision: Dict[str, Any], get_dialer: Callable[[], Dialer], cfg: Config, budget: CallBudget,
                   previous: List[Dict[str, Any]], now: datetime) -> None:
     """Place each committed call that is still pending. Mutates the decision; never raises."""
     for a in decision.get("actions", []):
         if a.get("kind") != "call" or a.get("state") != "committed" or a.get("call_status") != "pending":
             continue
-        earlier = next((p for p in previous if p.get("idempotency_key") == a["idempotency_key"] and p.get("conversation_id")
-                        and (cfg.call_backend == "dry_run" or not str(p["conversation_id"]).startswith("dryrun-"))), None)
+        earlier = _already_placed(previous, a, cfg)
         if earlier:  # the same call was already placed by an earlier run: never dial twice
             for k in ("call_status", "conversation_id", "call_detail", "call_result"):
                 if k in earlier:
                     a[k] = earlier[k]
             a["note"] = "Already placed by an earlier run."
-        elif cfg.call_backend != "dry_run" and not _in_hours(cfg, now):
+        elif cfg.call_backend != "dry_run" and _not_allowed(a, cfg):
+            _hold(decision, a, "the number is not on the call allow-list.")
+        elif cfg.call_backend != "dry_run" and a.get("purpose") != ONCALL_PURPOSE and not _in_hours(cfg, now):
             _hold(decision, a, "outside UK calling hours (%02d:00 to %02d:00)." % cfg.call_hours)
         elif not budget.take():
             _hold(decision, a, "the run's call limit (%d) is reached." % cfg.max_calls_per_run)
@@ -173,8 +216,8 @@ def with_call_events(case: Case, case_out: Path) -> Case:
             r = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        if r.get("dry_run") or r.get("status") not in ("done", "failed"):
-            continue
+        if r.get("dry_run") or r.get("status") not in ("done", "failed") or r.get("party") == STAFF_PARTY:
+            continue  # a briefing to our own on-call person is not contact with a party of the case
         excerpt = " / ".join("%s: %s" % ("Agency" if t["role"] == "agent" else "Other party", t["message"]) for t in r.get("transcript", [])[:8])
         data = "; ".join("%s=%s" % kv for kv in (r.get("data") or {}).items())
         body = CALL_RECORD_TAG + ", untrusted third-party speech] Call to the %s%s. Outcome: %s. Summary: %s%s Excerpt: %s" % (

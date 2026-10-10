@@ -15,6 +15,8 @@ from agent.config import Config
 
 
 CALL_RECORD_TAG = "[Automatic call record"  # call results are added to a case as events starting with this
+STAFF_PARTY = "on-call manager"  # the party of a briefing call to the agency's own on-call person (set by code, never the model)
+ONCALL_PURPOSE = "oncall_brief"
 
 
 @dataclass(frozen=True)

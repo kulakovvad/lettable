@@ -89,6 +89,8 @@ That installs `pypdf` (PDF text for the code gates and the text preview) and, wi
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | `voice-setup --import-number` | read once when importing a Twilio number into ElevenLabs |
 | `TYPESAFE_API_KEY` | consistency check | Jev document-similarity service |
 | `TYPESAFE_MODEL`, `TYPESAFE_BASE_URL` | optional | override Jev model name and URL |
+| `LETTABLE_ONCALL_NUMBER` | on-call briefing | number the code phones when a case ends with a code-found hazard or priority P0; empty means off. Never taken from a case or the model |
+| `LETTABLE_CALL_ALLOWLIST` | live calls | comma-separated E.164 numbers a live call may dial. A live on-call briefing is dialled only if its number is on this list; when the list is set, other live calls off the list are held too. Empty leaves ordinary calls unchanged. Dry runs ignore it |
 
 **Run.**
 
