@@ -64,6 +64,9 @@ class Config:
     # Input caps
     max_file_bytes: int = 2_000_000
     pdf_chars: int = 3000
+    attachment_chars: int = 4000  # preloaded .txt/.csv/.json/.eml/.md text
+    image_max_bytes: int = 1_500_000  # PNG/JPG/GIF/WEBP inlined for Claude, each
+    max_images: int = 4
 
     # Reality Test command (agent/reality.py): extra passes over fallbacks while the deadline allows,
     # and the least time left that is still worth starting one.
