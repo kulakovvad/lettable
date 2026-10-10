@@ -4,7 +4,7 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
-from lettable.timeline import load_case, parse_history, render_case
+from agent.timeline import load_case, parse_history, render_case
 from tests.helpers import WAITING_LANDLORD, make_case
 
 

@@ -4,8 +4,8 @@ import time
 import unittest
 from pathlib import Path
 
-from lettable.config import Config
-from lettable.runner import run_all
+from agent.config import Config
+from agent.runner import run_all
 from tests.helpers import WAITING_LANDLORD, make_case
 
 CHAOS = "tests.chaos_backend:ChaosBackend"

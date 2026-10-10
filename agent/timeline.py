@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from lettable.config import Config
+from agent.config import Config
 
 _EVENT_RE = re.compile(
     r"^## (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) UTC\s*[\u2014-]+\s*event (\d+)\s*$", re.M

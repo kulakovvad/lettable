@@ -1,4 +1,4 @@
-"""python3 -m lettable run INPUT_DIR OUT_DIR [options]"""
+"""python3 -m agent run INPUT_DIR OUT_DIR [options]"""
 
 from __future__ import annotations
 
@@ -9,12 +9,12 @@ import os
 import sys
 from pathlib import Path
 
-from lettable.config import Config
-from lettable.runner import run_all
+from agent.config import Config
+from agent.runner import run_all
 
 
 def main(argv=None) -> int:
-    p = argparse.ArgumentParser(prog="lettable")
+    p = argparse.ArgumentParser(prog="agent")
     sub = p.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run", help="decide the next step for every case folder in INPUT_DIR")
     r.add_argument("input_dir")

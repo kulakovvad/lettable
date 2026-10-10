@@ -10,15 +10,15 @@ import re
 from datetime import datetime
 from typing import List, Optional
 
-from lettable.config import Config
-from lettable.schema import (
+from agent.config import Config
+from agent.schema import (
     MAX_TEXT,
     NEEDS_MESSAGE,
     Decision,
     Proposal,
     idempotency_key,
 )
-from lettable.timeline import Case, WaitState
+from agent.timeline import Case, WaitState
 
 _DONE_RE = re.compile(r"\b(completed|all done|job complete|works? complete|finished the work)\b", re.I)
 _SPEND_OK = ("ROUTE_FOR_APPROVAL", "ESCALATE")

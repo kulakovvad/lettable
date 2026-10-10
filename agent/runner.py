@@ -17,13 +17,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from lettable.config import Config
-from lettable.decide import decide
-from lettable.fallback import fallback_decision
-from lettable.llm import make_backend
-from lettable.report import atomic_write, write_case
-from lettable.schema import ACTIONS
-from lettable.timeline import load_case
+from agent.config import Config
+from agent.decide import decide
+from agent.fallback import fallback_decision
+from agent.llm import make_backend
+from agent.report import atomic_write, write_case
+from agent.schema import ACTIONS
+from agent.timeline import load_case
 
 
 def parse_now(value: Optional[str]) -> datetime:

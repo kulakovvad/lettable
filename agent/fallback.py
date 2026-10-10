@@ -5,10 +5,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from lettable.config import Config
-from lettable.gates import find_hazard, wait_days
-from lettable.schema import Decision, idempotency_key
-from lettable.timeline import Case
+from agent.config import Config
+from agent.gates import find_hazard, wait_days
+from agent.schema import Decision, idempotency_key
+from agent.timeline import Case
 
 
 def fallback_decision(

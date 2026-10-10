@@ -3,10 +3,10 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from lettable import gates
-from lettable.config import Config
-from lettable.schema import Proposal
-from lettable.timeline import load_case
+from agent import gates
+from agent.config import Config
+from agent.schema import Proposal
+from agent.timeline import load_case
 from tests.helpers import WAITING_LANDLORD, make_case
 
 CFG = Config()

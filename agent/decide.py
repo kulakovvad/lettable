@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from lettable import gates
-from lettable.config import Config
-from lettable.llm import Backend
-from lettable.schema import Decision, Proposal
-from lettable.timeline import Case
+from agent import gates
+from agent.config import Config
+from agent.llm import Backend
+from agent.schema import Decision, Proposal
+from agent.timeline import Case
 
 
 def decide(case: Case, backend: Backend, cfg: Config, now: datetime) -> Decision:
