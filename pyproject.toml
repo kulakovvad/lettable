@@ -1,0 +1,14 @@
+[project]
+name = "lettable"
+version = "0.1.0"
+description = "Decide the next step on property-management cases: the model proposes, code decides."
+requires-python = ">=3.9"
+dependencies = []
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.40"]
+pdf = ["pypdf>=5.0"]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
