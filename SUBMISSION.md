@@ -8,7 +8,7 @@ Fill in the empty values at the end. After the 17:15 code freeze only this file,
 | 2 | Team name | Lettable |
 | 3 | Track | Property Management |
 | 4 | Names of all team members | Vikkash Sureshkumar, Vadim Kulakov, Daria Kulakova |
-| 5 | Commit hash at the 17:15 freeze | `7b56ab24300e2f87a37710dee9a48b89a90ec2f5` |
+| 5 | Commit hash at the 17:15 freeze | `11b69a8c75d4cec8cb64bded1f88b81782c991d4` |
 | 6 | Reality Test results | `ANSWERS/` |
 | 7 | Path to the demo video inside the repo | `demo/lettable-demo-60s.mp4` |
 | 8 | LinkedIn post URL | https://lnkd.in/p/erUyACbQ |
