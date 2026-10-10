@@ -14,7 +14,7 @@ from agent import __main__ as cli
 from agent.config import Config
 from agent.voice import CallRequest
 from agent.voice_elevenlabs import ElevenLabsDialer
-from agent.voice_prompt import PROMPT, VARIABLES, dynamic_variables
+from agent.voice_prompt import FIRST_MESSAGE, PROMPT, VARIABLES, dynamic_variables
 from agent.voice_setup import create_agent, import_twilio_number
 
 ENV = {"ELEVENLABS_API_KEY": "key-123", "ELEVENLABS_AGENT_ID": "agent-1", "ELEVENLABS_PHONE_NUMBER_ID": "pn-1"}
@@ -170,7 +170,7 @@ class DialerTests(unittest.TestCase):
 
 class PromptAndSetupTests(unittest.TestCase):
     def test_every_placeholder_in_the_prompt_is_supplied(self):
-        names = set(re.findall(r"\{\{(\w+)\}\}", PROMPT))
+        names = set(re.findall(r"\{\{(\w+)\}\}", PROMPT + FIRST_MESSAGE))
         self.assertTrue(names <= set(dynamic_variables(CallRequest("c", "tenant", "+441", "o", {}, "k"))))
         self.assertTrue(set(VARIABLES) >= names)
 
