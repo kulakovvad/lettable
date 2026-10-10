@@ -14,6 +14,7 @@ Source of truth: `Decision` in `agent/schema.py`, staged actions in `agent/tools
     decision.json       # authoritative; written last, so its presence means the case finished
     ANSWER.md
     REASONING.md
+    calls/<conversation_id>.json   # only after `python -m agent calls collect`
 ```
 
 `<case_id>` is the case folder name, for example `003`. It is not prefixed with the dataset name.
@@ -129,9 +130,9 @@ Common keys:
 | Field | Type | Meaning |
 |---|---|---|
 | `id` | string | `<kind>-<n>`, such as `message-1` |
-| `kind` | `message` \| `approval_request` \| `followup` \| `escalation` \| `closure` | |
+| `kind` | `message` \| `call` \| `approval_request` \| `followup` \| `escalation` \| `closure` | |
 | `idempotency_key` | string | 12 hex chars |
-| `state` | `committed` \| `held_for_review` | Items are `staged` during the run. Finished output has only these two |
+| `state` | `committed` \| `held_for_review` \| `call_failed` | Items are `staged` during the run. Finished output has only these. `call_failed` is only for a `call` the dialer could not place |
 | `note` | string | Why it is in that state |
 
 Only the staged item that matches the final action is `committed` (for example the chase message for `CHASE_LANDLORD`, the follow-up for `WAIT`, the closure for `CLOSE`). Escalations always commit. A `safety_advice` message commits only when it goes to the tenant and code found an open hazard. Everything else is `held_for_review`, including every message when the loop ran out of budget or the final action is `ESCALATE`. If the final action is `ESCALATE` and the model staged no escalation, code adds one with note `Created automatically because the final decision is an escalation.`
@@ -141,12 +142,24 @@ Per-kind keys:
 | `kind` | Extra keys |
 |---|---|
 | `message` | `to` (`tenant`, `landlord`, `provider`), `purpose` (`chase`, `request_info`, `reminder`, `update`, `safety_advice`, `instruct_provider`), `priority`, `body`, `evidence_refs` |
+| `call` | `to` (`tenant`, `landlord`, `provider`), `purpose` (`chase`, `request_info`, `instruct_provider`, `update`, `safety_advice`), `priority`, `number` (E.164, taken from the case, never from the model), `objective`, `facts` (short strings the caller may rely on), `body` (`Phone call: <objective>`), `evidence_refs`, and after placing: `call_status` (`pending` \| `dry_run` \| `started` \| `failed` \| `not_placed`), `conversation_id`, `call_detail`, and after `calls collect`: `call_result` (`status`, `success`, `summary`, `data`) |
 | `approval_request` | `to` (`landlord`), `amount_gbp`, `scope`, `body`, `evidence_refs`, `above_limit` (amount over `approval_limit_gbp`, default 300) |
 | `followup` | `review_at`, `waiting_on` (`tenant`, `landlord`, `provider`, `internal`), `reason` |
 | `escalation` | `priority`, `route` (`on_call_emergency`, `property_manager`, `accounts`, `complaints`), `summary`, `known`, `unknowns`, `tried`, `options`, `evidence_refs` |
 | `closure` | `completion_refs` (events where a provider, tenant or landlord says the job is done), `invoice_status` (`sent_to_landlord`, `landlord_pays_directly`, `no_charge`), `invoice_refs`, `keys_status` (`returned`, `not_applicable`), `key_refs`, `reason` |
 
+### Phone calls
+
+A call is staged like a message and can stand in for it on `CHASE_*`, `ASK_TENANT` and `INSTRUCT_PROVIDER`. It follows the same commit rule. After the final checks the runner places each committed call once (`call_backend`: `dry_run` records it and dials nothing, `elevenlabs` places it). Nothing waits for the call to finish. A call to the tenant with purpose `safety_advice` commits on a code-found hazard, like safety advice by message.
+
+- `call_status` `not_placed` with state `held_for_review`: the run's call limit (`max_calls_per_run`) was reached, or a live call fell outside UK calling hours (`call_hours`).
+- `call_failed`: the dialer raised or returned `failed`. The decision stays; `blocked` gets a `call_failed` item and a ticket (or the existing escalation's `unknowns`) tells a person the call did not happen.
+- The same `idempotency_key` found in an earlier `decision.json` is never dialled again; the earlier `conversation_id` is reused (note `Already placed by an earlier run.`).
+- `python -m agent calls collect <out_dir>` fetches finished calls, writes `calls/<conversation_id>.json` (`transcript`, `summary`, `success`, `data`, `dry_run`), fills `call_result` and re-renders `ANSWER.md`. Calls still in progress are listed under `pending`. Re-running the case adds each finished, non-dry-run call as an automatic `Call` event from `Agency / system` (a record of our contact, not a reply, so a voicemail never clears the wait).
+
 ## Blocked calls
+
+Despite the name, this section is about tool calls a gate refused (not phone calls).
 
 Each item in `blocked` is a tool call a gate refused. The model saw the reason and could adapt. A non-empty list does not mean the case failed. Shape, with illustrative values:
 
@@ -159,6 +172,8 @@ Each item in `blocked` is a tool call a gate refused. The model saw the reason a
 | `empty_message`, `unknown_party`, `unverified_detail`, `wrong_purpose`, `nothing_to_chase`, `already_replied`, `too_early`, `no_landlord_approval`, `no_appointment` | `send_message` |
 | `amount_not_in_case`, `unknown_party`, `unverified_detail`, `already_approved` | `route_for_approval` |
 | `no_confirmation`, `possibly_reopened`, `invoice_unknown`, `invoice_unverified`, `keys_unknown`, `keys_unverified` | `close_case` |
+| `empty_objective`, `unknown_party`, `unverified_detail`, `no_hazard`, `hazard_escalate`, `call_limit`, `too_early`, `already_replied`, `nothing_to_chase`, `wrong_purpose`, `no_landlord_approval`, `no_number` | `place_call` |
+| `call_failed` | added by the runner when a call could not be placed |
 | `action_not_staged` | `submit_decision` |
 
 ## Trace
@@ -183,7 +198,8 @@ There is no status field. These groupings come from the fields above.
 | Needs a person | `action == "ESCALATE"`, then sort by `priority` and `hazard` |
 | Gates overrode the model | `proposed_action != null` |
 | Waiting | `action == "WAIT"`. Next review is the `followup` action's `review_at` |
-| Outbound queued | Any `actions[].state == "committed"` with `kind` `message` or `approval_request` |
+| Outbound queued | Any `actions[].state == "committed"` with `kind` `message`, `call` or `approval_request` |
+| Call failed | Any `actions[].state == "call_failed"` |
 | Held | Any `actions[].state == "held_for_review"` |
 
 ## Examples
