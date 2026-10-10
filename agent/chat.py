@@ -170,8 +170,15 @@ class AnthropicChat(ChatBackend):
         for entry in transcript:
             if entry["role"] == "user":
                 images = entry.get("images") or []
-                if images:
+                documents = entry.get("documents") or []
+                if images or documents:
                     blocks: List[Dict[str, Any]] = [{"type": "text", "text": entry.get("text") or ""}]
+                    for doc in documents:
+                        block: Dict[str, Any] = {"type": "document", "source": {
+                            "type": "base64", "media_type": doc["media_type"], "data": doc["data"]}}
+                        if doc.get("name"):
+                            block["title"] = doc["name"]
+                        blocks.append(block)
                     for img in images:
                         blocks.append({"type": "image", "source": {
                             "type": "base64", "media_type": img["media_type"], "data": img["data"]}})
