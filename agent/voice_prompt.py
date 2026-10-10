@@ -6,7 +6,6 @@ dialer supplies every name in VARIABLES, so no placeholder is ever left empty.
 
 from __future__ import annotations
 
-import re
 from typing import Any, Dict
 
 from agent.voice import CallRequest
@@ -68,12 +67,17 @@ DATA_COLLECTION: Dict[str, Dict[str, str]] = {
 }
 
 
-def _job(facts: Dict[str, str], objective: str) -> str:
-    """What the call is about, in a few words: the 'job' fact, else the start of the objective."""
-    if facts.get("job"):
-        return facts["job"]
-    first = re.split(r"(?<=[.!?])\s", objective.strip(), maxsplit=1)[0].rstrip(".!?")
-    return first[:80] or "a job"
+JOB_WORDS = 80
+DEFAULT_JOB = "a maintenance job"  # spoken when the case supplies no short description of the job
+
+
+def _job(facts: Dict[str, str]) -> str:
+    """What the call is about, in a few words. Only the 'job' fact is used: the objective is an instruction
+    ("Confirm a visit date...") and does not read as a topic when spoken."""
+    job = " ".join(facts.get("job", "").split())
+    if len(job) > JOB_WORDS:
+        job = job[:JOB_WORDS].rsplit(" ", 1)[0]
+    return job or DEFAULT_JOB
 
 
 def dynamic_variables(req: CallRequest) -> Dict[str, Any]:
@@ -81,10 +85,10 @@ def dynamic_variables(req: CallRequest) -> Dict[str, Any]:
     facts = {str(k): str(v) for k, v in req.facts.items()}
     out: Dict[str, Any] = dict(facts)
     out.update({
-        "agency_name": facts.get("agency_name", "the agency"),
+        "agency_name": facts.get("agency_name") or "the agency",
         "party": req.party,
-        "job": _job(facts, req.objective),
-        "objective": req.objective,
+        "job": _job(facts),
+        "objective": req.objective or "Find out where the job stands.",
         "known_facts": "; ".join("%s: %s" % (k, v) for k, v in facts.items()) or "nothing further",
         "case_id": req.case_id,
     })

@@ -34,13 +34,24 @@ class WhatTheAgentSaysTests(unittest.TestCase):
         self.assertEqual(said, "Hello, this is an automated assistant calling for Northbridge Lettings about the dishwasher repair. "
                                "This call is recorded.")
 
-    def test_job_falls_back_to_the_start_of_the_objective_and_agency_to_a_neutral_name(self):
+    def test_unknown_job_and_agency_fall_back_to_neutral_words_not_to_the_instruction(self):
         bare = CallRequest("c1", "tenant", "+447000000001", "Confirm the Monday visit works for you. Then say thanks.", {}, "k")
         v = dynamic_variables(bare)
-        self.assertEqual(v["job"], "Confirm the Monday visit works for you")
+        self.assertEqual(v["job"], "a maintenance job")  # the objective is an instruction, not a topic
         self.assertEqual(v["agency_name"], "the agency")
-        long = CallRequest("c1", "tenant", "+447000000001", "x" * 300, {}, "k")
-        self.assertLessEqual(len(dynamic_variables(long)["job"]), 80)
+        said = FIRST_MESSAGE
+        for k, val in v.items():
+            said = said.replace("{{%s}}" % k, val)
+        self.assertEqual(said, "Hello, this is an automated assistant calling for the agency about a maintenance job. This call is recorded.")
+
+    def test_a_long_job_is_cut_at_a_word_and_empty_values_do_not_leave_blanks(self):
+        long = CallRequest("c1", "tenant", "+447000000001", "x", {"job": "word " * 60, "agency_name": ""}, "k")
+        v = dynamic_variables(long)
+        self.assertLessEqual(len(v["job"]), 80)
+        self.assertFalse(v["job"].endswith(" "))
+        self.assertEqual(v["agency_name"], "the agency")
+        empty = dynamic_variables(CallRequest("c1", "tenant", "+447000000001", "", {"job": "   "}, "k"))
+        self.assertEqual((empty["job"], bool(empty["objective"])), ("a maintenance job", True))
 
     def test_prompt_keeps_every_safety_rule_and_the_new_manners(self):
         text = PROMPT.lower()
