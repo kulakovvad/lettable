@@ -22,14 +22,31 @@ from agent.timeline import Case, WaitState
 
 _DONE_RE = re.compile(r"\b(completed|all done|job complete|works? complete|finished the work)\b", re.I)
 _NEGATION_RE = re.compile(r"\b(not|never|no|yet to|still|incomplete|unfinished)\b|n't", re.I)
+# A tenant message after a completion only keeps CLOSE open if it is short, clearly
+# positive, and has no problem or negation words. Anything else escalates.
+_HARMLESS_RE = re.compile(
+    r"\b(thank(?:s| you)|all (?:fixed|good|fine|sorted|done)|fixed|resolved|sorted|working (?:now|fine|well)|"
+    r"works (?:now|fine)|perfect|great|happy with)\b",
+    re.I,
+)
+_PROBLEM_RE = re.compile(
+    r"\b(again|back|still|leak\w*|broken|damp|mould|smell\w*|noise|wrong|issue|problem|"
+    r"worse|another|but|however|why|when|update|chase)\b|\?|n't|\bnot\b|\bno\b",
+    re.I,
+)
 _SPEND_OK = ("ROUTE_FOR_APPROVAL", "ESCALATE")
+
+
+def _is_harmless(body: str) -> bool:
+    return len(body) <= 200 and bool(_HARMLESS_RE.search(body)) and not _PROBLEM_RE.search(body)
 
 
 def confirmed_completion(case: Case) -> Optional[int]:
     """Position of the latest event that reports the job done, or None.
 
     A mention does not count when it is negated ("not completed") or when the
-    tenant wrote again afterwards (the job was reopened).
+    tenant wrote again afterwards with anything other than a short, clearly
+    positive reply (the job may have been reopened).
     """
     events = case.events
     for i in range(len(events) - 1, -1, -1):
@@ -37,7 +54,9 @@ def confirmed_completion(case: Case) -> Optional[int]:
             before = re.split(r"[.!?\n]", events[i].body[: m.start()])[-1][-40:]
             if _NEGATION_RE.search(before):
                 continue
-            reopened = any("tenant" in later.sender.lower() for later in events[i + 1:])
+            reopened = any(
+                "tenant" in later.sender.lower() and not _is_harmless(later.body) for later in events[i + 1:]
+            )
             return None if reopened else i
     return None
 
@@ -118,7 +137,7 @@ def apply(case: Case, proposal: Proposal, cfg: Config, now: datetime) -> Decisio
             stricter("WAIT", "waiting on the %s for %.1f days; chase after %.1f" % (party, days, cfg.chase_after_days))
 
     if action == "CLOSE" and confirmed_completion(case) is None:
-        stricter("ESCALATE", "close proposed but no confirmed completion (missing, negated, or reopened by the tenant)")
+        stricter("ESCALATE", "close proposed but no confirmed completion (missing, negated, or a tenant follow-up that is not a clear all-clear)")
 
     if (
         proposal.amount_gbp is not None

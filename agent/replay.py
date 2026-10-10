@@ -1,88 +1,165 @@
-"""Replay public cases from a point in their history.
+"""Replay: test the loop on finished cases without an answer key.
 
-For each case, cut the history after event N, drop the summary/outcome from
-index.md and keep only attachments already referenced, then let the agent decide.
-What the agency actually did next is written to expected.json for comparison.
-That reference is one acceptable answer, not the only one.
+For a chosen point in a case's history, the agent gets only the events up to
+that point (the clock is set to the moment the next event happened). Its
+proposed action is then compared with what the agency actually did next.
+
+The "what happened next" label is a rough rule on the next event, so the result
+is an agreement rate to read, not an accuracy score. A different action is not
+automatically wrong; disagreements are listed for reading by hand.
 """
 
 from __future__ import annotations
 
 import json
 import re
-import shutil
+import time
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
-from agent.timeline import parse_history
-from agent.tools import role_of
+from agent.config import Config
+from agent.report import atomic_write
+from agent.runner import list_cases, run_isolated
+from agent.timeline import Event, load_case
 
-_EVENT_SPLIT_RE = re.compile(r"(?=^<a id=\"event-\d+\"></a>\s*$)", re.M)
-_SECTION_RE = re.compile(r"^## (Overview|Outcome|Summary|Resolution)\b.*?(?=^## |\Z)", re.M | re.S | re.I)
-_STATUS_RE = re.compile(r"^- \*\*(Status|Updated|Completed):\*\*.*\n", re.M)
+_QUOTE = re.compile(r"\b(quote|quotation|estimate|invoice|approv\w*)\b", re.I)
+_BOOKING = re.compile(r"\b(appointment|scheduled|reminder|booked|booking|visit)\b", re.I)
+_CLOSE = re.compile(r"\b(closed|case closed|request closed|all done|completed)\b", re.I)
+_WAIT = re.compile(r"waiting for|on hold|put on hold", re.I)
+_INTERNAL = ("agency", "northbridge", "system")
 
 
-def next_agency_step(events, after: int) -> Optional[Dict[str, Any]]:
-    for e in events:
-        if e.index <= after:
+def _is_internal(sender: str) -> bool:
+    low = sender.lower()
+    return any(t in low for t in _INTERNAL)
+
+
+def label_next(e: Event) -> str:
+    """What the agency did at this event, in the agent's own action names."""
+    if _is_internal(e.sender):
+        to = e.recipient.lower()
+        if e.channel in ("Email", "SMS", "Call"):
+            if "landlord" in to:
+                return "ROUTE_FOR_APPROVAL" if _QUOTE.search(e.body) else "CHASE_LANDLORD"
+            if any(t in to for t in ("contractor", "provider", "supplier")):
+                return "CHASE_PROVIDER"
+            if "tenant" in to:
+                return "SEND_REMINDER" if _BOOKING.search(e.body) else "ASK_TENANT"
+        if e.channel in ("Hold", "Update") and _WAIT.search(e.body):
+            return "WAIT"
+        if e.channel == "Update" and _CLOSE.search(e.body):
+            return "CLOSE"
+        return "OTHER"
+    return "WAIT"  # the other side moved first; the agency had nothing to do before that
+
+
+def decision_points(n_events: int, points: int) -> List[int]:
+    """Cut sizes k (events visible) with a next event to compare to, evenly spaced, k >= 2."""
+    candidates = list(range(2, n_events))
+    if len(candidates) <= points:
+        return candidates
+    step = (len(candidates) - 1) / float(max(1, points - 1)) if points > 1 else 0
+    return sorted({candidates[int(round(i * step))] for i in range(points)})
+
+
+def _compare(proposed: str, real: str) -> str:
+    if real == "OTHER":
+        return "unscored"
+    if proposed == real:
+        return "agree"
+    if proposed == "ESCALATE":
+        return "escalated"
+    return "differ"
+
+
+def replay(
+    input_dir: Path,
+    out_dir: Path,
+    cfg: Config,
+    backend: str = "fake",
+    points: int = 3,
+    max_calls: Optional[int] = None,
+) -> Dict[str, Any]:
+    input_dir, out_dir = Path(input_dir), Path(out_dir)
+    tasks: List[Tuple[Path, int, Event, Event]] = []
+    for path in list_cases(input_dir):
+        try:
+            full = load_case(path, cfg)
+        except Exception:
             continue
-        if role_of(e.sender) == "agency" and role_of(e.recipient) in ("tenant", "landlord", "provider"):
-            return {"event": e.index, "to": role_of(e.recipient), "text": e.body[:400]}
-        if e.channel.lower() == "hold" or "completed" in e.body.lower() or "closed" in e.body.lower():
-            return {"event": e.index, "to": "internal", "text": e.body[:400]}
-    return None
+        for k in decision_points(len(full.events), points):
+            nxt = full.events[k]
+            now_ev = full.events[k - 1]
+            if nxt.ts is None or now_ev.ts is None:
+                continue
+            tasks.append((path, k, nxt, now_ev))
+    if max_calls is not None:
+        tasks = tasks[:max_calls]
+
+    started = time.monotonic()
+
+    def one(task: Tuple[Path, int, Event, Event]) -> Dict[str, Any]:
+        path, k, nxt, _ = task
+        kind, payload = run_isolated(path, cfg, backend, nxt.ts.isoformat(), cfg.case_timeout_s, cut=k)
+        real = label_next(nxt)
+        if kind == "ok":
+            proposed, notes, reason = payload["action"], payload.get("gate_notes", []), payload["reason"]
+            model_action = payload.get("proposed_action") or payload["action"]
+        else:
+            proposed, notes, reason, model_action = "FALLBACK", [], "%s: %s" % (kind, payload), "FALLBACK"
+        return {
+            "case_id": path.name,
+            "events_visible": k,
+            "now": nxt.ts.isoformat(),
+            "proposed": proposed,
+            "model_proposed": model_action,
+            "real_next": real,
+            "real_next_text": nxt.body[:160].replace("\n", " "),
+            "result": "fallback" if kind != "ok" else _compare(proposed, real),
+            "gate_notes": notes,
+            "reason": reason[:300],
+        }
+
+    with ThreadPoolExecutor(max_workers=max(1, cfg.concurrency)) as pool:
+        rows = list(pool.map(one, tasks))
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    atomic_write(out_dir / "rows.jsonl", "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
+    results = Counter(r["result"] for r in rows)
+    scored = sum(v for k, v in results.items() if k != "unscored")
+    summary = {
+        "points": len(rows),
+        "results": dict(results),
+        "agreement_rate": round(results["agree"] / scored, 3) if scored else None,
+        "agree_or_escalated_rate": round((results["agree"] + results["escalated"]) / scored, 3) if scored else None,
+        "by_real_next": {k: dict(Counter(r["result"] for r in rows if r["real_next"] == k))
+                         for k in sorted({r["real_next"] for r in rows})},
+        "seconds": round(time.monotonic() - started, 2),
+        "backend": backend,
+    }
+    atomic_write(out_dir / "summary.json", json.dumps(summary, indent=2) + "\n")
+    atomic_write(out_dir / "report.md", _report(summary, rows))
+    return summary
 
 
-def decision_points(events, count: int) -> List[int]:
-    """Cut right after an inbound message from a party: the agency must respond to something."""
-    points = [e.index for e in events[:-1] if role_of(e.sender) in ("tenant", "landlord", "provider")]
-    if not points:
-        return []
-    step = max(1, len(points) // count)
-    return points[::step][:count]
-
-
-def cut_case(src: Path, dst: Path, through: int) -> None:
-    dst.mkdir(parents=True, exist_ok=True)
-    history = (src / "history.md").read_text(encoding="utf-8")
-    parts = _EVENT_SPLIT_RE.split(history)
-    kept = [parts[0]] + [p for p in parts[1:] if int(re.search(r"event-(\d+)", p).group(1)) <= through]
-    text = "".join(kept)
-    index = _STATUS_RE.sub("", _SECTION_RE.sub("", (src / "index.md").read_text(encoding="utf-8")))
-    # Attachments that only appear later in the history would reveal the ending (e.g. an invoice).
-    index = "\n".join(line for line in index.splitlines()
-                      if not (line.startswith("- [") and "attachments/" in line and Path(line.split("](")[-1].rstrip(")")).name not in text))
-    (dst / "index.md").write_text(index + "\n", encoding="utf-8")
-    (dst / "history.md").write_text(re.sub(r"Total events: \d+", "Total events: %d" % through, text), encoding="utf-8")
-    if (src / "attachments").is_dir():
-        for f in (src / "attachments").iterdir():
-            if f.name in text:
-                (dst / "attachments").mkdir(exist_ok=True)
-                shutil.copy2(f, dst / "attachments" / f.name)
-
-
-def build(cases_dir: Path, out_dir: Path, points: int = 2, only: Optional[List[str]] = None) -> List[Dict[str, Any]]:
-    rows = []
-    for src in sorted(p for p in Path(cases_dir).iterdir() if p.is_dir()):
-        if only and src.name not in only:
-            continue
-        events, _ = parse_history((src / "history.md").read_text(encoding="utf-8"))
-        for n in decision_points(events, points):
-            cid = "%s-at-%03d" % (src.name, n)
-            cut_case(src, Path(out_dir) / cid, n)
-            row = {"case_id": cid, "source": src.name, "through_event": n, "next_step": next_agency_step(events, n)}
-            (Path(out_dir) / cid / "expected.json").write_text(json.dumps(row, indent=2), encoding="utf-8")
-            rows.append(row)
-    return rows
-
-
-def compare(replay_dir: Path, out_dir: Path) -> List[Dict[str, Any]]:
-    rows = []
-    for exp in sorted(Path(replay_dir).glob("*/expected.json")):
-        row = json.loads(exp.read_text(encoding="utf-8"))
-        dec = Path(out_dir) / row["case_id"] / "decision.json"
-        d = json.loads(dec.read_text(encoding="utf-8")) if dec.is_file() else {}
-        nxt = row.get("next_step") or {}
-        rows.append({"case": row["case_id"], "agent": d.get("action"), "priority": d.get("priority"),
-                     "agency_next_to": nxt.get("to"), "agency_next": (nxt.get("text") or "").replace("\n", " ")[:140]})
-    return rows
+def _report(summary: Dict[str, Any], rows: List[Dict[str, Any]]) -> str:
+    out = ["# Replay report", "",
+           "Backend: `%s`. Decision points: %d." % (summary["backend"], summary["points"]), "",
+           "| Result | Count |", "|---|---|"]
+    out += ["| %s | %d |" % (k, v) for k, v in sorted(summary["results"].items())]
+    out += ["", "Agreement rate (agree / scored): %s" % summary["agreement_rate"],
+            "Agree or escalated: %s" % summary["agree_or_escalated_rate"], "",
+            "`escalated` means the agent handed the case to a person where the agency carried on. "
+            "`unscored` means the next event had no clear action label. "
+            "The label comes from a rule on the next event, so read the disagreements before changing anything.", "",
+            "## Disagreements to read", ""]
+    diffs = [r for r in rows if r["result"] in ("differ", "fallback")]
+    if not diffs:
+        out.append("None.")
+    for r in diffs:
+        out += ["- **%s** after %d events: proposed `%s`, agency did `%s` (\"%s\"). Gates: %s. Reason: %s"
+                % (r["case_id"], r["events_visible"], r["proposed"], r["real_next"], r["real_next_text"],
+                   "; ".join(r["gate_notes"]) or "none", r["reason"])]
+    return "\n".join(out) + "\n"

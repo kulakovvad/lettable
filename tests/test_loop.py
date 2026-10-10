@@ -158,6 +158,19 @@ class LoopRunnerTests(unittest.TestCase):
             self.assertEqual(summary["by_action"], {"ESCALATE": 2})
 
 
+    def test_replay_cut_hides_files_and_uses_the_replay_clock(self):
+        from agent.runner import run_isolated
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = make_case(Path(tmp), "001", WAITING_LANDLORD + [
+                ("2026-01-05 09:00:00", "Email", "Landlord", "Agency", "FUTURE-SECRET yes go ahead")])
+            kind, d = run_isolated(folder, Config(case_timeout_s=30), "tests.loop_backends:LeakProbeChat",
+                                   "2026-01-03T09:00:00+00:00", 30, cut=3)
+            self.assertEqual(kind, "ok")
+            self.assertEqual(d["trace"][0]["result"]["status"], "error")
+            self.assertNotIn("FUTURE-SECRET", json.dumps(d))
+            self.assertTrue(d["as_of"].startswith("2026-01-03T09:00"))
+
+
 class WaitParsingTests(unittest.TestCase):
     def test_hold_wording_variants(self):
         with tempfile.TemporaryDirectory() as tmp:

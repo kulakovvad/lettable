@@ -28,13 +28,14 @@ python3 -m agent run "<cases folder>" out/ --backend claude     # or: openai, au
 
 `claude`/`anthropic`, `openai` and `auto` run the bounded tool loop (`agent/loop.py`). `anthropic-single` is the original one-call backend. Model names come from `ANTHROPIC_MODEL` / `OPENAI_MODEL` or `agent/config.py`. The real model is only used when you ask for it by name; a key in the environment never turns on spending by itself.
 
-### Replay public cases at a decision point
+### Replay (testing without an answer key)
 
 ```
-python3 -m agent replay "<public Property Management>" replay/ --points 2   # cut after inbound messages, hide the ending
-python3 -m agent run replay/ out/ --backend claude
-python3 -m agent compare replay/ out/                                        # agent action vs what the agency did next
+python3 -m agent replay "<cases folder>" out-replay/ --points 4
+python3 -m agent replay "<cases folder>" out-replay/ --points 2 --backend claude   # tool loop, capped at 30 points
 ```
+
+Cuts each finished case at a few points, shows the agent only the events up to that point (clock set to when the next event happened), and compares its proposed action with what the agency actually did next. Writes `rows.jsonl`, `summary.json` and `report.md` (with the disagreements to read by hand). The "what happened next" label is a rough rule on the next event, so treat the numbers as agreement, not accuracy. Attachments are left out of a cut case, because they cannot be tied to a point in time. A paid backend is capped at 30 points unless you pass `--max-calls`.
 
 ## How it stays reliable
 
@@ -46,16 +47,21 @@ python3 -m agent compare replay/ out/                                        # a
 ## Layout
 
 - `agent/timeline.py`: parse a case into events and a waiting state
-- `agent/llm.py`: backends (`fake`, `anthropic`, or `module:Class`)
+- `agent/llm.py`: backends (`fake`, `claude`/`anthropic`, `openai`, `auto`, `anthropic-single`, or `module:Class`)
 - `agent/gates.py`: code checks on a proposal
 - `agent/fallback.py`: escalation when anything fails
 - `agent/runner.py`: isolation, time limits, concurrency, resume
 - `agent/report.py`: atomic output files
+- `agent/replay.py`: cut-and-compare check on finished cases
+- `agent/chat.py`: Claude/OpenAI tool-calling clients
+- `agent/loop.py`: bounded tool loop, final gates, commit or hold staged actions
+- `agent/tools.py`: read tools and gated action tools
+- `agent/policy.py`: trusted operating policy for the model
 - `tests/`: unit and failure-injection tests
 
 ## Known limits
 
-- Actions are not executed yet (no tools are defined).
+- Actions are staged and committed to a local outbox only; no external messaging, CRM or ticketing system is connected.
 - PDFs are read only when `pypdf` is installed; scanned or image-only files are listed as "content not available".
 - Thresholds in `agent/config.py` are starting values, not tuned.
 - The real model path has not been run end to end.

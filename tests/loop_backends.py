@@ -29,3 +29,13 @@ class SilentChat(ScriptedChat):
     """Never calls submit_decision."""
     def __init__(self):
         super().__init__([Turn(calls=[call("case_facts", i)]) for i in range(1, 40)])
+
+
+class LeakProbeChat(ScriptedChat):
+    """Tries to read the raw history file, then waits."""
+    def __init__(self):
+        super().__init__([
+            Turn(calls=[call("read_case_file", 1, path="history.md")]),
+            Turn(calls=[call("schedule_followup", 2, after_hours=24, waiting_on="landlord", reason="probe")]),
+            Turn(calls=[submit("WAIT")]),
+        ])
