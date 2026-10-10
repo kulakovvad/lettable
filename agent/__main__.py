@@ -13,6 +13,32 @@ from agent.config import Config
 from agent.runner import run_all
 
 
+def _voice_setup(args) -> int:
+    from agent.voice_setup import create_agent, import_twilio_number
+
+    steps = (["create the phone agent (prompt, first message, data collection)"] if args.create_agent else []) + (
+        ["import Twilio number %s" % args.import_number] if args.import_number else [])
+    if not steps:
+        print("nothing to do: pass --create-agent and/or --import-number")
+        return 2
+    print("Will " + " and ".join(steps) + " on the ElevenLabs account." + ("" if args.yes else " Dry run: add --yes to do it."))
+    if not args.yes:
+        return 0
+    key = os.environ.get("ELEVENLABS_API_KEY")
+    if not key:
+        print("ELEVENLABS_API_KEY is not set", file=sys.stderr)
+        return 2
+    if args.create_agent:
+        print("ELEVENLABS_AGENT_ID=%s" % create_agent(key))
+    if args.import_number:
+        sid, token = os.environ.get("TWILIO_ACCOUNT_SID"), os.environ.get("TWILIO_AUTH_TOKEN")
+        if not (sid and token):
+            print("TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN are required", file=sys.stderr)
+            return 2
+        print("ELEVENLABS_PHONE_NUMBER_ID=%s" % import_twilio_number(key, args.import_number, sid, token))
+    return 0
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="agent")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -38,7 +64,13 @@ def main(argv=None) -> int:
     rp.add_argument("--timeout", type=float)
     rp.add_argument("--concurrency", type=int)
     rp.add_argument("--config")
+    vs = sub.add_parser("voice-setup", help="create the ElevenLabs phone agent and/or import a Twilio number")
+    vs.add_argument("--create-agent", action="store_true")
+    vs.add_argument("--import-number", metavar="E164", help="Twilio number to import (uses TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN)")
+    vs.add_argument("--yes", action="store_true", help="actually call the API; without it only describe")
     args = p.parse_args(argv)
+    if args.cmd == "voice-setup":
+        return _voice_setup(args)
 
     if not Path(args.input_dir).is_dir():
         print("input directory not found: %s" % args.input_dir, file=sys.stderr)
