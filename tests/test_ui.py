@@ -67,6 +67,34 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(x["steps"][1], {"step": 1, "thought": "Looking at the invoice."})
         self.assertEqual(x["steps"][2]["arg"], "ESCALATE · P2 · conf 0.80")
 
+    def test_view_exposes_property_handover_and_red_flags(self):
+        ticket = {"id": "escalation-1", "kind": "escalation", "state": "committed", "priority": "P1", "route": "accounts",
+                  "respond_by": "2025-01-12T13:37:00+00:00", "summary": "Suspected new payee.",
+                  "known": ["Title: Front Door Repair (index)", "Property: Flat 2, 1 Test Road (index)", 7],
+                  "tried": ["Checked the events"], "failed": None, "recommended": "Recommended: Call accounts",
+                  "conflicts": [{"field": "payee", "values": [{"value": "Keystone", "refs": ["event-010"]},
+                                                              {"value": "Meadow", "refs": ["event-029"]}]}, "junk"]}
+        flags = [{"category": "payment", "force": True, "ref": "event-029", "excerpt": "Direct Debit",
+                  "guidance": "Escalate to accounts.", "route": "accounts", "priority": "P1"}, "junk"]
+        out = make_run(self.root, [decision("015", actions=[ticket], red_flags=flags, answer="Do not pay.")])
+        view = case_view(out, "015")
+        x = view["derived"]
+        self.assertEqual(x["property"], "Flat 2, 1 Test Road")
+        e = x["escalation"]
+        self.assertEqual((e["respond_by"], e["recommended"]), ("2025-01-12T13:37:00+00:00", "Recommended: Call accounts"))
+        self.assertEqual(e["known"][-1], "7")
+        self.assertEqual(e["failed"], [])
+        self.assertEqual(e["conflicts"], [{"field": "payee", "values": [{"value": "Keystone", "refs": ["event-010"]},
+                                                                         {"value": "Meadow", "refs": ["event-029"]}]}])
+        self.assertEqual(len(x["red_flags"]), 1)
+        self.assertTrue(x["red_flags"][0]["force"])
+        self.assertEqual(view["decision"]["answer"], "Do not pay.")
+
+    def test_property_field_wins_over_ticket_line(self):
+        ticket = {"kind": "escalation", "known": ["Property: Old address (index)"]}
+        out = make_run(self.root, [decision("015", property="Flat 9, 3 New Street", actions=[ticket])])
+        self.assertEqual(case_view(out, "015")["derived"]["property"], "Flat 9, 3 New Street")
+
     def test_skipped_followup_is_flagged(self):
         trace = [{"step": 3, "tool": "schedule_followup", "args": {"after_hours": 72, "waiting_on": "tenant"},
                   "result": {"status": "skipped", "error": "decision already submitted"}}]

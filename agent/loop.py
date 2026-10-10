@@ -364,7 +364,7 @@ def finalize(case: Case, box: Toolbox, cfg: Config, as_of: datetime, trace, step
                     gate_notes=decision.gate_notes, proposed=proposal.action, flags=decision.red_flags,
                     consistency_report=consistency_report, hazard=decision.hazard,
                 )
-    decision.title, decision.request = case.title, case.request
+    decision.title, decision.request, decision.property = case.title, case.request, case.property
     decision.as_of = as_of.isoformat()
     decision.model, decision.steps, decision.tokens = model, steps, tokens
     decision.evidence_refs = d["evidence_refs"]

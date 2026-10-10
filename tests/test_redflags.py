@@ -321,6 +321,7 @@ class FallbackHandoverTests(unittest.TestCase):
             d = fallback_decision("001", "error", "RuntimeError: model exploded", NOW, case, Config())
         self.assertEqual(d.title, "Dishwasher repair")
         self.assertIn("Dishwasher leaks", d.request)
+        self.assertEqual(d.property, "Flat 1, 2 Test Road")
         self.assertEqual(d.action, "ESCALATE")
         self.assertEqual(len(d.actions), 1)
         ticket = d.actions[0]

@@ -104,6 +104,7 @@ class Decision:
     priority: Optional[str] = None
     title: str = ""
     request: str = ""
+    property: str = ""
     as_of: str = ""
     model: str = ""
     steps: int = 0

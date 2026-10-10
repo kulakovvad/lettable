@@ -85,6 +85,7 @@ def fallback_decision(
         priority=priority,
         title=case.title if case is not None else "",
         request=case.request if case is not None else "",
+        property=case.property if case is not None else "",
         actions=[ticket],
         red_flags=flags,
     )

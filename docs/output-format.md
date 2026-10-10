@@ -118,6 +118,7 @@ These are filled only by the `claude`, `anthropic`, `openai` and `auto` backends
 | `priority` | `P0`–`P3` or null | Model priority. A hazard or a forcing red flag raises a lower priority. Fallback sets P1 on a hazard, otherwise P2, then applies the same floor |
 | `title` | string | Case title from `index.md` |
 | `request` | string | Initial request |
+| `property` | string | Property from the `Property:` line of `index.md`. Empty when the index has none. Also set on fallback |
 | `as_of` | string | Decision time. `--as-of last_event` (default): the case's latest event; `now`: the wall clock or `--now` (an explicit `--now` implies this); `later`: whichever is later |
 | `model` | string | Model name |
 | `steps` | integer | Model turns used, max `loop_max_steps` (12) |
