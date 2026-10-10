@@ -52,6 +52,12 @@ class Config:
     collect_calls: bool = True  # at the start of a live run, fetch the results of calls placed earlier
     max_calls_per_case: int = 1
     max_calls_per_run: int = 10
+    # Code-driven briefing call to the agency's own on-call person when a case ends urgently (see agent/oncall.py).
+    # Empty = off. The number is never taken from a case or from the model. Env: LETTABLE_ONCALL_NUMBER.
+    oncall_number: str = ""
+    # E.164 numbers a live call may dial. Empty keeps the old behaviour for ordinary calls; the on-call briefing always
+    # needs its number on this list to be dialled live. Env: LETTABLE_CALL_ALLOWLIST (comma separated).
+    call_allowlist: Tuple[str, ...] = ()
 
     # Document consistency check (agent/consistency.py): one extraction call, then Jev scores fields whose
     # values differ. Scores are normalised to 0..1. Below jev_min_confidence a mismatch is only flagged.
@@ -112,7 +118,7 @@ class Config:
     def from_dict(cls, data: Dict[str, Any]) -> "Config":
         known = {f.name for f in fields(cls)}
         clean = {k: v for k, v in data.items() if k in known}
-        for name in ("hazard_patterns", "call_hours"):
+        for name in ("hazard_patterns", "call_hours", "call_allowlist"):
             if name in clean:
                 clean[name] = tuple(clean[name])
         return cls(**clean)

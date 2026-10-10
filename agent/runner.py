@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from agent import calls
+from agent import calls, oncall
 from agent.config import Config
 from agent.decide import decide
 from agent.fallback import fallback_decision
@@ -176,11 +176,11 @@ def run_all(
                 kind, payload = run_isolated(path, cfg, backend, now_iso, limit, case_out=out_dir / case_id)
             except Exception as exc:  # could not even start a worker
                 kind, payload = "runner", "%s: %s" % (type(exc).__name__, exc)
+        before = _previous_actions(out_dir, case_id)  # read before write_case overwrites it
         if kind == "ok":
             decision = payload
             with lock:
                 spent[0] += int(decision.get("tokens") or 0)
-            before = _previous_actions(out_dir, case_id)  # read before write_case overwrites it
             calls.place_pending(decision, get_dialer, cfg, budget, before, datetime.now(timezone.utc))
         else:
             try:
@@ -188,6 +188,10 @@ def run_all(
             except Exception:
                 case = None
             decision = fallback_decision(case_id, kind, str(payload), parse_now(now_iso), case, cfg).to_dict()
+        # An urgent case (hazard found by code, or P0) also gets a briefing call to the on-call number from the config.
+        # Code decides this, never the model; the same dialer, cap, allow-list and dry-run rules apply.
+        if oncall.add_briefing(decision, path, cfg):
+            calls.place_pending(decision, get_dialer, cfg, budget, before, datetime.now(timezone.utc))
         try:
             write_case(out_dir, decision)
         except Exception as exc:
