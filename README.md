@@ -1,82 +1,164 @@
 # lettable
 
-Decides the next step on property-management cases. The model proposes an action; plain code checks it; anything that fails or cannot be approved becomes an escalation to a person. Design: [docs/design.md](docs/design.md) (once merged).
+An agent that works property-management cases. Each case is a timeline of emails, calls, texts and holds. The agent decides the next step, writes down why, and hands anything unsafe, unclear or unapproved to a person.
 
-Status: core loop only. The real task output format and tools are not known yet, so actions are recorded, not executed.
+Licence: Apache 2.0 ([LICENSE](LICENSE)). Submission details: [SUBMISSION.md](SUBMISSION.md).
 
-## Run
+## 1. What we built
 
-Needs Python 3.9+. The default setup has no dependencies.
+A command-line agent, `python3 -m agent`, that reads a folder of cases (`index.md`, `history.md`, optional `attachments/` and audio) and writes, for every case, a decision with its reasoning:
+
+- the **next action**: wait, chase the landlord or provider, ask the tenant or provider, route a quote for approval, instruct the provider, send a reminder, close, or escalate to a person;
+- the **messages and phone calls** that action needs (staged and gated, see below);
+- a plain-language `ANSWER.md`, a `REASONING.md` with the checks applied, and a machine-readable `decision.json`.
+
+Around the core loop: a replay harness to test without an answer key, speech-to-text for audio files, phone calls through ElevenLabs and Twilio, an opt-in document consistency check, and an exporter that lays results out as `ANSWERS/<n>/`.
+
+## 2. The operational problem it solves
+
+Lettings teams spend their day on repairs, approvals and chasing. Each case arrives through different channels with details missing or conflicting, and most of the work is deciding what to do next and who to wait for. Two things go wrong: routine cases sit unanswered, and risky ones (a gas smell, an unapproved spend, a document for the wrong property) get handled without a person.
+
+The agent triages every case, takes safe next steps, and escalates the rest with what is known, what is missing, what was tried and two or three options. A case never ends without an output.
+
+## 3. Architecture
+
+The model proposes; plain code decides. Gates can only make an outcome stricter (wait or escalate), never looser. Full design: [docs/design.md](docs/design.md).
+
+```mermaid
+flowchart LR
+  subgraph W["Per-case process: own timeout, own errors, nothing shared with other cases"]
+    A["Case folder<br/>index.md, history.md, PDFs, audio"] -->|"audio -> text (opt-in)"| B["Timeline (code)<br/>events, who we wait on"]
+    B -.->|"opt-in"| K["Consistency check<br/>extraction + Jev"]
+    K -.->|flags| C
+    B --> C["Tool loop (model)<br/>read tools, stage actions, submit_decision"]
+    C --> D["Final gates (code)<br/>authority, spend, wait time, hazard, completion"]
+    D -->|"passes: commit matching actions"| E["Outbox + phone calls<br/>messages recorded, calls placed once"]
+  end
+  E --> F["decision.json, ANSWER.md, REASONING.md"]
+  W -. "crash, timeout, model failure, spend cap" .-> G["Fallback escalation (no model call)"]
+  G --> F
+  F -->|"calls collect"| H["Call result back into the case"]
+  F -->|"export"| I["ANSWERS/n/"]
+```
+
+- **Isolation.** Every case runs in its own process with a hard time limit. A crash, hang, model error or malformed answer becomes a fallback escalation, so outputs always equal inputs (`summary.json` checks it).
+- **Staged actions.** Tools only stage a message, approval request, follow-up, escalation, close or call. Staged actions commit only if they match the final action and the final gates pass; otherwise they are held for a person.
+- **No leaks.** The recorded summary and outcome in `index.md` are never loaded, so a case's ending cannot reach the decision. Replay cuts a case at a point and drops attachments.
+- **Atomic output.** Files are written to a temp file and renamed; `decision.json` is written last and marks a case as finished.
+
+| Module | Role |
+|---|---|
+| `agent/timeline.py` | parse a case into events, attachments (with audio transcripts) and a waiting state |
+| `agent/loop.py`, `agent/tools.py`, `agent/policy.py`, `agent/chat.py` | the bounded tool loop, its tools, the operating policy, the Claude/OpenAI clients |
+| `agent/gates.py`, `agent/evidence.py` | code checks on the final decision |
+| `agent/runner.py`, `agent/fallback.py` | isolation, time limits, concurrency, resume, escalation on failure |
+| `agent/report.py`, `agent/export.py`, `agent/files.py` | output files, the `ANSWERS/` exporter, atomic writes |
+| `agent/replay.py` | cut-and-compare check on finished cases |
+| `agent/stt.py`, `agent/voice*.py`, `agent/calls.py` | speech-to-text, phone calls, collecting call results |
+| `agent/consistency.py` | opt-in document consistency check |
+
+## 4. How to run it
+
+**Prerequisites.** Python 3.9 or newer. The default setup has no dependencies and needs no keys (the `fake` backend is free and offline).
+
+**Install.** `git clone https://github.com/kulakovvad/lettable && cd lettable`. Optional: `pip install pypdf` to read PDF attachments. The model clients use the standard library, so no SDK is needed.
+
+**Configure.** `cp .env.example .env`, fill in what you need, and export it (`set -a; . ./.env; set +a`). `.env` is gitignored; never commit keys. Paid features are off unless asked for by name.
+
+| Variable | Needed for | What it does |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | `--backend claude` | Claude (main model) |
+| `ANTHROPIC_MODEL` | optional | overrides the default model; must be a model id your key can use, otherwise leave empty |
+| `OPENAI_API_KEY` | `--backend openai` or `auto` | optional fallback model (`OPENAI_MODEL` overrides its name) |
+| `LETTABLE_BACKEND` | optional | default backend: `fake` (default), `claude`, `openai`, `auto` |
+| `ELEVENLABS_API_KEY` | `--stt elevenlabs`, live calls | speech-to-text and the phone agent platform |
+| `ELEVENLABS_AGENT_ID` | live calls | the phone agent (printed by `voice-setup --create-agent`) |
+| `ELEVENLABS_PHONE_NUMBER_ID` | live calls | the imported Twilio number (printed by `voice-setup --import-number`) |
+| `LETTABLE_STT` | optional | `off` (default), `fake`, `elevenlabs` |
+| `LETTABLE_CALLS` | optional | `dry_run` (default: records calls, dials nothing) or `elevenlabs` |
+| `DEMO_CALL_NUMBER` | optional | a reminder of the phone you use for a demo call; the code does not read it |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | `voice-setup --import-number` | read once when importing a Twilio number into ElevenLabs |
+| `TYPESAFE_API_KEY` | consistency check | Jev document-similarity service |
+| `TYPESAFE_MODEL`, `TYPESAFE_BASE_URL` | optional | override Jev model name and URL |
+
+**Run.**
 
 ```
-python3 -m agent run "<cases folder>" out/            # fake backend: free, offline
-python3 -m unittest discover -s tests -t .               # tests
+python3 -m agent run "<cases folder>" out/                      # fake backend: free, offline
+python3 -m agent run "<cases folder>" out/ --backend claude     # the tool loop with Claude
 ```
 
-Each case folder holds `index.md`, `history.md` and optional `attachments/`. For every case the run writes `out/<case>/ANSWER.md`, `REASONING.md` and `decision.json`, plus `out/trace.jsonl` and `out/summary.json`.
+Each case folder holds `index.md`, `history.md` and optional `attachments/`. Useful options: `--timeout` (seconds per case), `--deadline` (whole run), `--concurrency`, `--resume`, `--now <ISO time>` (judge waits as of that time), `--config file.json` (override any value in `agent/config.py`). Output format: [docs/output-format.md](docs/output-format.md).
 
-Useful options: `--timeout` (seconds per case), `--deadline` (whole run), `--concurrency`, `--resume` (skip cases the model already decided), `--now <ISO time>` (replay as of a past moment), `--config file.json` (override any value in `agent/config.py`).
+**Tests.** `python3 -m unittest discover -s tests -t .` (offline; failure injection for crashes, hangs and bad input included).
 
-### Real model (tool loop)
-
-Claude is the main driver; OpenAI is a fallback. The clients use the standard library, so no SDK is needed (`pip install pypdf` to read PDF attachments).
-
-```
-cp .env.example .env             # set ANTHROPIC_API_KEY (or OPENAI_API_KEY), then export it
-python3 -m agent run "<cases folder>" out/ --backend claude     # or: openai, auto
-```
-
-`claude`/`anthropic`, `openai` and `auto` run the bounded tool loop (`agent/loop.py`). `anthropic-single` is the original one-call backend. Model names come from `ANTHROPIC_MODEL` / `OPENAI_MODEL` or `agent/config.py`. The real model is only used when you ask for it by name; a key in the environment never turns on spending by itself.
-
-### Document consistency check (opt-in)
-
-```
-echo '{"consistency_check": true}' > jev.json      # set TYPESAFE_API_KEY too
-python3 -m agent run "<cases folder>" out/ --backend claude --config jev.json
-```
-
-Before the tool loop, one model call extracts names, contacts, the property address and references with their sources; code drops values not found in the cited source; Jev (typesafe.ai) scores the fields whose values still differ. A clear mismatch escalates, a near match is flagged to the model, and a failure of the check never stops the case. See [docs/design.md](docs/design.md#document-consistency-check-opt-in).
-
-### Replay (testing without an answer key)
+**Replay (testing without an answer key).**
 
 ```
 python3 -m agent replay "<cases folder>" out-replay/ --points 4
-python3 -m agent replay "<cases folder>" out-replay/ --points 2 --backend claude   # tool loop, capped at 30 points
+python3 -m agent replay "<cases folder>" out-replay/ --points 2 --backend claude   # paid, capped at 30 points
 ```
 
-Cuts each finished case at a few points, shows the agent only the events up to that point (clock set to when the next event happened), and compares its proposed action with what the agency actually did next. Writes `rows.jsonl`, `summary.json` and `report.md` (with the disagreements to read by hand). The "what happened next" label is a rough rule on the next event, so treat the numbers as agreement, not accuracy. Attachments are left out of a cut case, because they cannot be tied to a point in time. A paid backend is capped at 30 points unless you pass `--max-calls`.
+Cuts each finished case at a few points, shows the agent only the events up to that point and compares its proposed action with what the agency actually did next. The "what happened next" label is a rough rule, so read the numbers as agreement, not accuracy.
 
-### Voice
+**Voice.** Details and safety rules: [docs/voice.md](docs/voice.md).
 
-Audio files in a case can be transcribed (`--stt elevenlabs`), and the agent can phone a provider, landlord or tenant (`--calls elevenlabs`; `dry_run` by default). Both are off unless asked for. See [docs/voice.md](docs/voice.md).
+```
+python3 -m agent run cases/ out/ --stt elevenlabs --calls dry_run   # transcribe audio; record calls, dial nothing
+python3 -m agent voice-setup --create-agent --yes                    # one-off: create the phone agent
+python3 -m agent voice-setup --import-number +1... --yes             # one-off: import a Twilio number
+python3 -m agent run cases/ out/ --backend claude --calls elevenlabs # places a real call when the agent decides to
+python3 -m agent calls collect out/ --backend elevenlabs             # bring finished calls back; re-run to use them
+```
 
-## How it stays reliable
+**Document consistency check (opt-in).** `echo '{"consistency_check": true}' > jev.json` then add `--config jev.json` and set `TYPESAFE_API_KEY`. See [docs/design.md](docs/design.md#document-consistency-check-opt-in).
 
-- Every case runs in its own process with a hard time limit. A crash, hang, model error or malformed answer produces a fallback escalation, so outputs always equal inputs (`summary.json` checks this).
-- Gates can only make a decision stricter (wait or escalate), never looser.
-- The recorded summary and outcome in `index.md` are never loaded, so a case's ending cannot leak into the decision.
-- Results are written atomically; `decision.json` is written last and marks a case as finished.
+**Export the results for submission.**
 
-## Layout
+```
+python3 -m agent export out/ --to ANSWERS    # ANSWERS/<n>/ANSWER.md, REASONING.md, decision.json, ANSWERS/index.json, ANSWERS/_run/
+```
 
-- `agent/timeline.py`: parse a case into events and a waiting state
-- `agent/llm.py`: backends (`fake`, `claude`/`anthropic`, `openai`, `auto`, `anthropic-single`, or `module:Class`)
-- `agent/gates.py`: code checks on a proposal
-- `agent/fallback.py`: escalation when anything fails
-- `agent/runner.py`: isolation, time limits, concurrency, resume
-- `agent/report.py`: atomic output files
-- `agent/replay.py`: cut-and-compare check on finished cases
-- `agent/chat.py`: Claude/OpenAI tool-calling clients
-- `agent/loop.py`: bounded tool loop, final gates, commit or hold staged actions
-- `agent/tools.py`: read tools and gated action tools
-- `agent/policy.py`: trusted operating policy for the model
-- `agent/consistency.py`: opt-in document consistency check (extraction + Jev)
-- `tests/`: unit and failure-injection tests
+Files are copied byte for byte and never edited. Case folders named with digits keep their number (`003` becomes `3`). The command refuses, and writes nothing, if the run has no finished case, two cases would share a number, or `ANSWERS/` holds another run's results (override with `--force`).
 
-## Known limits
+## 5. Models, APIs and external services
 
-- Actions are staged and committed to a local outbox only; no external messaging, CRM or ticketing system is connected.
-- PDFs are read only when `pypdf` is installed; scanned or image-only files are listed as "content not available".
-- Thresholds in `agent/config.py` are starting values, not tuned.
-- The real model path has been run end to end on 15 public cases (replay, 30 decision points); results and open findings are in [docs/design.md](docs/design.md#replay-findings-dev-split-1200-run). Thresholds and prompts are not tuned beyond that.
-- The consistency check uses an external service, Jev (`api.typesafe.ai`, `jev-1.13.0`), and adds one extraction model call per case. It is off by default.
+| Service | Used for | Default |
+|---|---|---|
+| Anthropic Claude (Messages API), model from `agent/config.py` (`claude-sonnet-5-5`) or `ANTHROPIC_MODEL` | the tool loop; main driver | off (`fake` backend until `--backend claude`) |
+| OpenAI (model `gpt-5.4-mini` unless `OPENAI_MODEL`) | optional fallback driver | off |
+| ElevenLabs Scribe (`scribe_v2`) | speech-to-text for audio files | off (`--stt`) |
+| ElevenLabs Agents platform | the voice agent on a phone call | off (calls are `dry_run`) |
+| Twilio | the telephone line the calls go through | off |
+| Jev, `api.typesafe.ai` (`jev-1.13.0`) | scoring whether names or addresses refer to the same entity | off (`consistency_check`) |
+
+Everything else is the Python standard library. Optional: `pypdf` for PDF text. The case text is sent to the services you switch on; the public cases are synthetic. Third-party services remain subject to their own terms.
+
+## 6. Important assumptions
+
+- The public cases are the model for the hidden ones: markdown timelines, a landlord, a provider and a tenant, UK lettings.
+- Case dates are synthetic, so by default waits are judged as of the latest event (`as_of = last_event`), not the wall clock. `--now` or `--as-of` change that.
+- Thresholds are starting values, not tuned: chase after 3 days, a GBP 300 approval limit (a placeholder), minimum model confidence 0.5. The agency has no authority of its own to approve spend.
+- Actions are recorded in a local outbox; no email, CRM or ticketing system is connected. Phone calls are the one action that leaves the machine, and only when `--calls elevenlabs` is set.
+- Live calls are only placed between 08:00 and 21:00 UK time, at most one per case and 10 per run, to a number found in the case.
+- Hazard detection is a keyword check on recent events and attachments plus the model's judgement; when unsure the agent escalates.
+
+## 7. Known limitations
+
+- **Core logic only lightly tuned.** The Claude loop has been run on a small replay of the public cases, one real phone call to a team phone and one real transcription. Prompts and thresholds are not tuned beyond that, and there is no run on a large held-out set.
+- **Completed jobs often escalate.** Only about 15 of the 50 public cases show a completion the code recognises ([#11](https://github.com/kulakovvad/lettable/issues/11)): providers that sign as a firm are not recognised as providers, and wording such as "this one is done" is missed. Closing also needs invoice and key evidence ([#6](https://github.com/kulakovvad/lettable/issues/6): "no keys held" wrongly blocks a close).
+- **Chase timing is a fixed 3 days** instead of the hold's own "(N days)" ([#7](https://github.com/kulakovvad/lettable/issues/7)).
+- **The tenant update with `INSTRUCT_PROVIDER` is held**, although the prompt suggests sending it ([#8](https://github.com/kulakovvad/lettable/issues/8)).
+- **The first landlord approval request cannot be sent** under `WAIT` (see [docs/design.md](docs/design.md#replay-findings-dev-split-1200-run)).
+- **Voice:** inbound calls, text-to-speech replies and voicemail drops are not handled; calling hours and the run cap are checked in the runner and again in the dialer; dry runs skip the hours check; `calls collect` rewrites `decision.json` without a lock.
+- PDFs are read only when `pypdf` is installed; scanned files show as "content not available". Replay drops attachments.
+- The consistency check adds a model call and an external service per case, and on a small sample did not improve agreement, so it stays off.
+
+## 8. What we would build next
+
+1. Fix completion detection (#11, #6, #7, #8) and measure it with replay on a held-out split.
+2. A real action layer: send email and SMS, create tickets, and read the state back before retrying.
+3. Send the first landlord approval request instead of holding it.
+4. Tune thresholds and the policy on more cases, including a large held-out split.
+5. Inbound calls and voicemail for tenants, with a human handover that keeps the call transcript.
+6. A dashboard over `decision.json` for the operations team.
