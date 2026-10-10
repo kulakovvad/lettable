@@ -71,6 +71,41 @@ class DetectorTests(unittest.TestCase):
         ):
             self.assertNotIn("payment", self.cats(text), text)
 
+    def test_direct_debit_confirmation_with_the_assigned_provider_is_not_a_payment_flag(self):
+        # Public case 039, event-029: a receipt confirmation, not new bank details
+        # and not a Direct Debit request from a firm other than the assigned provider.
+        self.n += 1
+        events = [
+            ("2025-09-10 08:41:12", "Email", "Northbridge Lettings", "Tenant",
+             "Our maintenance provider **Keystone Works** will be attending your property."),
+            ("2026-01-19 05:43:23", "Email", "Tenant", "Agency / system",
+             "Harriet Dawson confirms receipt of an email about the setup of a Direct Debit with Meadow Maintenance."),
+        ]
+        case = load_case(make_case(self.root, "c039", events))
+        self.assertNotIn("payment", [f["category"] for f in redflags.scan(case)])
+        d = gates.apply(case, prop("WAIT"), CFG, NOW)
+        self.assertEqual(d.action, "WAIT")
+
+    def test_direct_debit_request_names_the_assigned_provider_or_another_firm(self):
+        self.n += 1
+        assigned = ("2025-09-10 08:41:12", "Email", "Northbridge Lettings", "Tenant",
+                    "Our maintenance provider **Keystone Works** will be attending your property.")
+        with_them = load_case(make_case(self.root, "dd-assigned", [
+            assigned,
+            ("2026-01-19 09:00:00", "Email", "Tenant", "Agency",
+             "Please set up a Direct Debit with Keystone Works for the washing machine cover."),
+        ]))
+        self.assertNotIn("payment", [f["category"] for f in redflags.scan(with_them)])
+        other = load_case(make_case(self.root, "dd-other", [
+            assigned,
+            ("2026-01-19 09:00:00", "Email", "BrightServe Appliance Cover", "Agency",
+             "Please complete the attached Direct Debit mandate so we can collect the fee."),
+        ]))
+        flags = redflags.scan(other)
+        self.assertEqual(flags[0]["category"], "payment")
+        self.assertTrue(flags[0]["force"])
+        self.assertEqual(flags[0]["route"], "accounts")
+
     def test_legal_deposit_and_section_21(self):
         flags = redflags.scan(self.case(
             "I've taken advice from a solicitor and I'll be claiming compensation at the tribunal."))

@@ -17,16 +17,25 @@ from agent.timeline import Case
 
 _NEG = re.compile(r"\b(?:no|not|never|without|n't)\b", re.I)
 
-# Payment redirection: new bank details or a Direct Debit mandate. Policy: P1, accounts.
-_PAYMENT: Tuple[Pattern[str], ...] = (
+# New bank details. Policy: P1, accounts. A routine Direct Debit with the assigned provider is not this.
+_BANK: Tuple[Pattern[str], ...] = (
     re.compile(r"\b(?:changed|new|different|updated)\s+banks?\b", re.I),
     re.compile(r"\b(?:new|changed|different|updated)\s+(?:bank details|account details|sort code|payment details)\b", re.I),
     re.compile(r"\b(?:bank details|account details|sort code)\b.{0,80}\b(?:have changed|has changed|changed|new account|update your records|with immediate effect)\b", re.I),
     re.compile(r"\bpay\b.{0,60}\bnew account\b", re.I),
-    re.compile(r"\bdirect debit\b.{0,30}\bmandate\b", re.I),
-    re.compile(r"\bmandate\b.{0,30}\bdirect debit\b", re.I),
-    re.compile(r"\b(?:set up|setup|complete)\b.{0,40}\bdirect debit\b", re.I),
 )
+# A Direct Debit request. A confirmation ("confirms receipt", "the setup of") is not a request.
+_DD: Tuple[Pattern[str], ...] = (
+    re.compile(r"\bdirect debit\b.{0,40}\bmandate\b", re.I),
+    re.compile(r"\bmandate\b.{0,40}\bdirect debit\b", re.I),
+    re.compile(r"\b(?:set up|complete|sign)\b.{0,50}\bdirect debit\b", re.I),
+)
+_DD_CONFIRM = re.compile(
+    r"\b(?:confirms? receipt|about the setup|has been set up|direct debit (?:is|was) (?:now )?set up)\b",
+    re.I,
+)
+_ASSIGNED_BOLD = re.compile(r"maintenance provider\s+\*\*([^*]{2,80})\*\*", re.I)
+_ASSIGNED_LINE = re.compile(r"Maintenance Provider Name:\s*([^\n,]{2,80})", re.I)
 
 # Deposits, notices and legal threats. Policy: never-touch, property manager.
 _LEGAL: Tuple[Pattern[str], ...] = (
@@ -172,11 +181,48 @@ def _failed(sources: Sequence[Tuple[str, str]]) -> Optional[Dict[str, Any]]:
     return _flag("failed_action", hits[0][0], excerpt[:180], False)
 
 
+def _assigned_firms(case: Case) -> List[str]:
+    """Firm names the agency assigned to the job ("Our maintenance provider **Keystone Works**")."""
+    names: List[str] = []
+    for e in case.events:
+        for rx in (_ASSIGNED_BOLD, _ASSIGNED_LINE):
+            m = rx.search(e.body or "")
+            if not m:
+                continue
+            name = re.sub(r"\s+", " ", m.group(1)).strip(" .")
+            if name and name not in names:
+                names.append(name)
+    return names
+
+
+def _payment(case: Case) -> Optional[Tuple[str, str]]:
+    """New bank details, or a Direct Debit request that is not with the assigned provider.
+
+    A confirmation of a Direct Debit (public case 039, event-029) is not a request.
+    A request whose own text names the assigned provider is with that provider.
+    """
+    sources = _sources(case)
+    bank = _first(sources, _BANK)
+    if bank:
+        return bank
+    firms = [n.lower() for n in _assigned_firms(case)]
+    for ref, text in sources:
+        if _DD_CONFIRM.search(text or ""):
+            continue
+        low = (text or "").lower()
+        if any(firm in low for firm in firms):
+            continue
+        hit = _first([(ref, text)], _DD)
+        if hit:
+            return hit
+    return None
+
+
 def scan(case: Case) -> List[Dict[str, Any]]:
     """Flags in the order payment, legal, vulnerability, abuse, failed action. At most one of each."""
     sources = _sources(case)
     found: List[Dict[str, Any]] = []
-    payment = _first(sources, _PAYMENT)
+    payment = _payment(case)
     if payment:
         found.append(_flag("payment", *payment, True, "accounts", "P1"))
     legal = _first(sources, _LEGAL)
@@ -206,5 +252,4 @@ def describe(flags: Sequence[Dict[str, Any]]) -> str:
         lines.append("- %s%s%s (%s) at %s: %s" % (f["category"], pri, route, mode, f.get("ref"), f.get("excerpt")))
         lines.append("  %s" % f.get("guidance", ""))
     return "\n".join(lines)
-
 
