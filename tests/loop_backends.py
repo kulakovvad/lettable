@@ -39,3 +39,12 @@ class LeakProbeChat(ScriptedChat):
             Turn(calls=[call("schedule_followup", 2, after_hours=24, waiting_on="landlord", reason="probe")]),
             Turn(calls=[submit("WAIT")]),
         ])
+
+
+class TokenWaitChat(ScriptedChat):
+    """Waits, reporting token use so the run-wide cap can trip."""
+    def __init__(self):
+        super().__init__([
+            Turn(calls=[call("schedule_followup", 1, after_hours=48, waiting_on="landlord", reason="Asked today.")], tokens=500),
+            Turn(calls=[submit("WAIT")], tokens=500),
+        ])

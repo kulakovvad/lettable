@@ -15,54 +15,30 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from agent import gates
+from agent import evidence, gates
 from agent.config import Config
 from agent.policy import policy_topics
 from agent.schema import ACTIONS
 from agent.timeline import Case, Event
 
 PRIORITIES = ("P0", "P1", "P2", "P3")
-PARTIES = ("tenant", "landlord", "provider")
+PARTIES = evidence.PARTIES
 PURPOSES = ("chase", "request_info", "reminder", "update", "safety_advice", "instruct_provider")
 INVOICE_STATES = ("sent_to_landlord", "landlord_pays_directly", "no_charge", "unknown")
 # Numbers a safety message may always contain: gas emergency, emergency services, NHS 111, power cut 105.
-SAFE_NUMBERS = {"08001119999", "999", "111", "105"}
+SAFE_NUMBERS = {"0800111999", "999", "111", "105"}
 
 _PHONE_RE = re.compile(r"(?:\+44\s?\(?0?\)?|\b0)\d(?:[\s-]?\d){8,10}\b")
-_MONEY_RE = re.compile(r"£\s?(\d[\d,]*(?:\.\d{1,2})?)|\b(\d[\d,]*(?:\.\d{1,2})?)\s?(?:GBP|pounds)\b", re.I)
-_APPROVAL_RE = re.compile(r"\b(go ahead|approved?|proceed|yes,? please|happy (?:for|to)|ok to|okay to|fine to|authori[sz]e)\b", re.I)
-_AGENCY_APPROVAL_RE = re.compile(r"\b(landlord approval confirmed|estimate approved|quote approved|landlord (?:has )?approved)\b", re.I)
 _APPOINTMENT_RE = re.compile(r"\b(appointment|booked|attend(?:ing|ance)?|visit|scheduled|between \d{1,2}(?::\d\d)? ?(?:am|pm)?(?: and| -| to) \d)", re.I)
-_REOPEN_RE = re.compile(r"\b(still|again|not working|isn't working|is not working|came back|is back|broken|leak(?:ing)?|worse|not fixed|hasn't been)\b", re.I)
 _SECTION_RE = re.compile(r"^## (Overview|Outcome|Summary|Resolution)\b.*?(?=^## |\Z)", re.M | re.S | re.I)
+_KEY_HELD_RE = re.compile(r"\b(collect(?:ed)? (?:the )?keys?|keys? (?:collected|held|from the office)|key collection|return (?:the )?keys?)\b", re.I)
 
-
-def role_of(name: str) -> str:
-    n = (name or "").lower()
-    if "landlord" in n or "owner" in n:
-        return "landlord"
-    if "tenant" in n or "resident" in n:
-        return "tenant"
-    if any(w in n for w in ("contractor", "provider", "supplier", "engineer", "plumber", "electrician")):
-        return "provider"
-    if any(w in n for w in ("agency", "lettings", "system", "manager")):
-        return "agency"
-    return "other"
+role_of = evidence.role_of
+_amounts = evidence.amounts
 
 
 def _digits(s: str) -> str:
     return re.sub(r"\D", "", s)
-
-
-def _amounts(text: str) -> List[float]:
-    out = []
-    for m in _MONEY_RE.finditer(text):
-        raw = (m.group(1) or m.group(2) or "").replace(",", "")
-        try:
-            out.append(round(float(raw), 2))
-        except ValueError:
-            pass
-    return out
 
 
 def ref(e: Event) -> str:
@@ -100,7 +76,7 @@ TOOL_SPECS: List[Dict[str, Any]] = [
      "parameters": _schema({}, [])},
     {"name": "read_events", "description": "Read full events by number range (inclusive), max 30 per call. Use when the overview omitted events or cut long bodies.",
      "parameters": _schema({"first": {"type": "integer"}, "last": {"type": "integer"}}, ["first", "last"])},
-    {"name": "search_case", "description": "Case-insensitive search across events, the request and attachment text. Returns refs and snippets.",
+    {"name": "search_case", "description": "Case-insensitive plain-text search across events, the request and attachment text. Returns refs and snippets.",
      "parameters": _schema({"query": _STR}, ["query"])},
     {"name": "read_attachment", "description": "Extracted text of one attachment by file name, or a note that its contents are unavailable.",
      "parameters": _schema({"name": _STR}, ["name"])},
@@ -108,7 +84,7 @@ TOOL_SPECS: List[Dict[str, Any]] = [
      "parameters": _schema({}, [])},
     {"name": "read_case_file", "description": "Read a text file in the case folder by relative path (capped). Summary/outcome sections are removed.",
      "parameters": _schema({"path": _STR}, ["path"])},
-    {"name": "check_policy", "description": "Read the agency operating policy. Topics: authority, chasing, safety, closing, communication, escalation, scope, data, or 'all'.",
+    {"name": "check_policy", "description": "Read the agency operating policy. Topics: authority, chasing, safety, damp_mould, compliance, never_touch, closing, communication, escalation, scope, data, or 'all'.",
      "parameters": _schema({"topic": _STR}, ["topic"])},
     {"name": "send_message", "description": "Stage a message to a party. Gates check the party exists in the case, chase timing, landlord approval before instructing a provider, appointment evidence for reminders, and that every phone number and amount in the body appears in the case. Returns staged or blocked with a reason.",
      "parameters": _schema({
@@ -130,10 +106,12 @@ TOOL_SPECS: List[Dict[str, Any]] = [
          "route": {"type": "string", "enum": ["on_call_emergency", "property_manager", "accounts", "complaints"]},
          "summary": _STR, "known": _STRS, "unknowns": _STRS, "tried": _STRS, "options": _STRS, "evidence_refs": _STRS,
      }, ["priority", "route", "summary", "known", "unknowns", "tried", "options", "evidence_refs"])},
-    {"name": "close_case", "description": "Stage closing the case. Requires completion confirmed by provider, tenant or landlord (event refs), no later report reopening it, and a known invoice position.",
+    {"name": "close_case", "description": "Stage closing the case. Cite the event where the provider, tenant or landlord says the job is done, the event that shows the invoice position, and (if keys were held) the event confirming key return. Blocked if a later tenant message may reopen it.",
      "parameters": _schema({"completion_refs": _STRS, "invoice_status": {"type": "string", "enum": list(INVOICE_STATES)},
-                            "keys_status": {"type": "string", "enum": ["returned", "not_applicable", "unknown"]}, "reason": _STR},
-                           ["completion_refs", "invoice_status", "keys_status", "reason"])},
+                            "invoice_refs": _STRS,
+                            "keys_status": {"type": "string", "enum": ["returned", "not_applicable", "unknown"]},
+                            "key_refs": _STRS, "reason": _STR},
+                           ["completion_refs", "invoice_status", "invoice_refs", "keys_status", "key_refs", "reason"])},
     {"name": "submit_decision", "description": "Finish the case with ONE primary action. Stage the matching action first (message, approval, close, follow-up or escalation). Ends the loop.",
      "parameters": _schema({
          "action": {"type": "string", "enum": list(ACTIONS)},
@@ -167,6 +145,9 @@ class Toolbox:
         self.blocked: List[Dict[str, Any]] = []
         self.decision: Optional[Dict[str, Any]] = None
         self._by_index = {e.index: e for e in case.events}
+        # Urgency comes from code, never from the model's own priority argument.
+        self.hazards = gates.hazard_hits(case, cfg)
+        self.urgent = bool(self.hazards)
         self._corpus = "\n".join([case.request] + [e.body for e in case.events] + [a.text or "" for a in case.attachments])
         self._handlers: Dict[str, Callable[[Dict[str, Any]], Dict[str, Any]]] = {
             s["name"]: getattr(self, "_t_" + s["name"]) for s in TOOL_SPECS
@@ -237,24 +218,6 @@ class Toolbox:
                 return True
         return False
 
-    def latest_quote(self) -> Optional[Event]:
-        for e in reversed(self.case.events):
-            if role_of(e.sender) == "provider" and _amounts(e.body):
-                return e
-        return None
-
-    def landlord_approval(self) -> Optional[Event]:
-        """Latest landlord approval that postdates the latest provider quote (approving a visit is not approving a quote)."""
-        quote = self.latest_quote()
-        for e in reversed(self.case.events):
-            if quote is not None and e.index <= quote.index:
-                return None
-            if role_of(e.sender) == "landlord" and _APPROVAL_RE.search(e.body):
-                return e
-            if role_of(e.sender) in ("agency", "other") and _AGENCY_APPROVAL_RE.search(e.body):
-                return e
-        return None
-
     def facts(self) -> Dict[str, Any]:
         wait = self.case.waiting()
         parties = {}
@@ -276,27 +239,19 @@ class Toolbox:
         for a in self.case.attachments:
             for amt in _amounts(a.text or ""):
                 money.append({"ref": a.name, "amount_gbp": amt})
-        hazards = []
-        for p in self.cfg.hazard_patterns:
-            for e in self.case.events:
-                m = re.search(p, e.body, re.I)
-                if m:
-                    hazards.append({"ref": ref(e), "match": m.group(0)})
-            for a in self.case.attachments:
-                m = re.search(p, a.text or "", re.I)
-                if m:
-                    hazards.append({"ref": a.name, "match": m.group(0)})
         done = gates.confirmed_completion(self.case)
-        approval = self.landlord_approval()
+        approval, approved_cap = evidence.covering_approval(self.case)
+        quote = evidence.latest_quote(self.case)
         return {
             "as_of": self.now.isoformat(),
             "waiting_on": {"party": wait.party, "since": wait.since.isoformat(), "since_event": "event-%03d" % wait.event_index,
                            "days": round((self.now - wait.since).total_seconds() / 86400, 1)} if wait else None,
             "parties": parties,
             "money_mentions": money[:30],
-            "latest_provider_quote": ref(self.latest_quote()) if self.latest_quote() else None,
-            "landlord_approval_after_latest_quote": ref(approval) if approval else None,
-            "hazard_keyword_hits": hazards[:15],
+            "latest_provider_quote": ref(quote) if quote else None,
+            "landlord_approval_in_force": ({"ref": ref(approval), "covers_gbp": approved_cap} if approval else None),
+            "open_hazard_hits": [{"ref": r, "match": m} for r, m in self.hazards[:15]],
+            "urgent_by_code": self.urgent,
             "completion_signal": ref(self.case.events[done]) if done is not None else None,
             "attachments": [{"name": a.name, "available": bool(a.text)} for a in self.case.attachments],
             "input_warnings": list(self.case.warnings),
@@ -321,10 +276,7 @@ class Toolbox:
         q = _s(args.get("query"), 200)
         if not q:
             return {"status": "error", "error": "empty query"}
-        try:
-            pat = re.compile(q, re.I)
-        except re.error:
-            pat = re.compile(re.escape(q), re.I)
+        pat = re.compile(re.escape(q), re.I)
         hits = []
         sources = [("request", self.case.request)] + [(ref(e), e.body) for e in self.case.events] + \
                   [(a.name, a.text or "") for a in self.case.attachments]
@@ -399,7 +351,7 @@ class Toolbox:
         fab = self._fabrication(body)
         if fab:
             return self._blocked("unverified_detail", fab, "Only use numbers and amounts from the case, or leave them out.")
-        urgent = priority in ("P0", "P1")
+        urgent = self.urgent
         if purpose == "chase":
             if to == "tenant":
                 return self._blocked("wrong_purpose", "chasing applies to landlords and providers",
@@ -415,17 +367,18 @@ class Toolbox:
             if days is not None and days < self.cfg.chase_after_days and not urgent:
                 return self._blocked("too_early", "only %.1f days since we wrote to the %s (%s); policy is %.0f days" %
                                      (days, to, ref(out), self.cfg.chase_after_days),
-                                     "Schedule a follow-up and WAIT, unless the risk is P0/P1.")
+                                     "Schedule a follow-up and WAIT. Only an open hazard found by code allows an early chase.")
         if purpose == "instruct_provider":
             if to != "provider":
                 return {"status": "error", "error": "instruct_provider messages go to the provider"}
-            approval = self.landlord_approval()
-            if approval is None and not urgent:
-                return self._blocked("no_landlord_approval", "no landlord approval is recorded for this work",
-                                     "Route the quote to the landlord first, or escalate.")
+            approval, _ = evidence.covering_approval(self.case)
+            if approval is None:
+                return self._blocked("no_landlord_approval",
+                                     "no landlord approval in force (none recorded, negated, or older than the latest quote)",
+                                     "Route the quote to the landlord first, or escalate. Urgency never skips approval.")
         if purpose == "reminder":
-            evidence = [self._by_index[int(re.search(r"\d+", r).group())] for r in refs if r.startswith("event-")]
-            if not any(_APPOINTMENT_RE.search(e.body) for e in evidence):
+            booked = self._event_refs(refs)
+            if not any(_APPOINTMENT_RE.search(e.body) for e in booked):
                 return self._blocked("no_appointment", "evidence_refs do not include an event that records the appointment",
                                      "Cite the event that books the appointment, or do not send a reminder.")
         result = self._stage("message", {"to": to, "purpose": purpose, "priority": priority, "body": body, "evidence_refs": refs})
@@ -449,12 +402,10 @@ class Toolbox:
         fab = self._fabrication(body)
         if fab:
             return self._blocked("unverified_detail", fab, "Only use numbers and amounts from the case.")
-        first = next((e for e in self.case.events if amount in _amounts(e.body)), None)
-        if first is not None:
-            for e in self.case.events:
-                if e.index > first.index and role_of(e.sender) == "landlord" and _APPROVAL_RE.search(e.body):
-                    return self._blocked("already_approved", "the landlord approved at %s after the amount appeared at %s" % (ref(e), ref(first)),
-                                         "Instruct the provider or wait for the work instead of asking again.")
+        if evidence.approval_covers(self.case, amount):
+            approval, cap = evidence.covering_approval(self.case)
+            return self._blocked("already_approved", "the landlord approval at %s already covers GBP %.2f" % (ref(approval), cap),
+                                 "Instruct the provider or wait for the work instead of asking again.")
         result = self._stage("approval_request", {"to": "landlord", "amount_gbp": amount, "scope": _s(args.get("scope"), 500),
                                                   "body": body, "evidence_refs": refs,
                                                   "above_limit": amount > self.cfg.approval_limit_gbp})
@@ -486,26 +437,44 @@ class Toolbox:
             result["ignored_refs"] = bad
         return result
 
+    def _event_refs(self, refs: List[str]) -> List[Event]:
+        return [self._by_index[int(re.search(r"\d+", r).group())] for r in refs if r.startswith("event-")]
+
     def _t_close_case(self, args):
+        """Completion uses the same definition as the final gate (gates.confirmed_completion)."""
         refs, bad = self._resolve_refs(args.get("completion_refs"))
-        events = [self._by_index[int(re.search(r"\d+", r).group())] for r in refs if r.startswith("event-")]
-        confirmers = [e for e in events if role_of(e.sender) in PARTIES]
+        confirmers = [e for e in self._event_refs(refs) if evidence.reports_completion(e)]
         if not confirmers:
-            return self._blocked("no_confirmation", "none of the cited events is a completion confirmation from the provider, tenant or landlord",
-                                 "Ask the provider or tenant to confirm completion.")
-        latest = max(e.index for e in confirmers)
-        later = [e for e in self.case.events if e.index > latest and role_of(e.sender) == "tenant" and _REOPEN_RE.search(e.body)]
-        if later:
-            return self._blocked("possibly_reopened", "the tenant wrote %s after the confirmation and it may report the problem continues" % ref(later[0]),
+            return self._blocked("no_confirmation",
+                                 "none of the cited events is a provider, tenant or landlord saying the job is done "
+                                 "(agency notes, quotes, questions and negated mentions do not count)",
+                                 "Cite the confirming event, or ask the provider or tenant to confirm completion.")
+        done = gates.confirmed_completion(self.case)
+        if done is None or self.case.events[done].index < max(e.index for e in confirmers):
+            return self._blocked("possibly_reopened", "a later tenant message is not a clear all-clear, so the job may be reopened",
                                  "Check with the tenant before closing.")
         invoice = _s(args.get("invoice_status"), 30)
+        invoice_refs, _ = self._resolve_refs(args.get("invoice_refs"))
         if invoice not in INVOICE_STATES or invoice == "unknown":
             return self._blocked("invoice_unknown", "the invoice position is not known",
                                  "Ask the provider for the invoice or confirm with the landlord how it is paid.")
-        if _s(args.get("keys_status"), 20) == "unknown":
-            return self._blocked("keys_unknown", "key return is not confirmed", "Confirm keys were returned, or mark not_applicable if no keys were held.")
-        return self._stage("closure", {"completion_refs": [ref(e) for e in confirmers], "invoice_status": invoice,
-                                       "keys_status": _s(args.get("keys_status"), 20), "reason": _s(args.get("reason"), 800)})
+        if not any(evidence.INVOICE_RE.search(e.body) for e in self._event_refs(invoice_refs)):
+            return self._blocked("invoice_unverified", "no cited event shows the invoice position (%s)" % invoice,
+                                 "Cite the event that shows the invoice was sent, paid directly or not charged.")
+        keys = _s(args.get("keys_status"), 20)
+        key_refs, _ = self._resolve_refs(args.get("key_refs"))
+        held = [e for e in self.case.events if _KEY_HELD_RE.search(e.body)]
+        if keys == "unknown" or (keys == "not_applicable" and held):
+            return self._blocked("keys_unknown", "key return is not confirmed%s" % (" (keys are mentioned at %s)" % ref(held[0]) if held else ""),
+                                 "Confirm the keys were returned before closing.")
+        if keys == "returned" and not any(evidence.KEYS_RE.search(e.body) for e in self._event_refs(key_refs)):
+            return self._blocked("keys_unverified", "no cited event shows the keys were returned", "Cite the event that confirms key return.")
+        result = self._stage("closure", {"completion_refs": [ref(e) for e in confirmers], "invoice_status": invoice,
+                                         "invoice_refs": invoice_refs, "keys_status": keys, "key_refs": key_refs,
+                                         "reason": _s(args.get("reason"), 800)})
+        if bad:
+            result["ignored_refs"] = bad
+        return result
 
     # ---------- finish ----------
 

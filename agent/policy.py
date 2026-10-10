@@ -36,6 +36,27 @@ def policy_topics(cfg: Config) -> Dict[str, str]:
             "with health impact. Routine compliance lines in inspection reports (e.g. 'smoke and CO alarms "
             "checked') are NOT hazards. Separate what was reported from what was verified."
         ),
+        "damp_mould": (
+            "Damp and mould are a health hazard, not a routine repair. Treat reports with health impact, "
+            "children, elderly or vulnerable occupants, or spreading mould as P1 and escalate to the property "
+            "manager; statutory timescales may apply (Awaab's Law requires emergency hazards to be dealt with "
+            "within 24 hours and sets fixed investigation deadlines). Never tell the tenant it is caused by their "
+            "lifestyle or that it is their responsibility to fix; do not close a damp/mould case on cosmetic "
+            "treatment alone."
+        ),
+        "compliance": (
+            "Gas Safety Certificate (annual CP12), Electrical Installation Condition Report (EICR, at least every "
+            "5 years) and working smoke/CO alarms are legal requirements. A certificate that is expired, missing "
+            "or showing unsafe (C1/C2 or 'immediately dangerous') results must be escalated to a person (P1 if "
+            "unsafe, P2 if only expired). Never tell a tenant an appliance is safe without a certificate in the case."
+        ),
+        "never_touch": (
+            "The agent never acts on, promises or gives an opinion about: deposits and deposit deductions, rent "
+            "or arrears, rent changes, tenancy terms or renewals, notices (Section 21, Section 8 or any notice "
+            "to quit), eviction, disrepair claims or legal action, compensation, or a tenant's personal "
+            "circumstances. If the thread raises any of these, escalate to a person and keep any message to "
+            "an acknowledgement."
+        ),
         "closing": (
             "Close only when the provider, tenant or landlord confirms the work is complete, nothing later "
             "reopens it, and the invoice position is known (sent to landlord, paid directly by landlord, or no "
@@ -43,7 +64,7 @@ def policy_topics(cfg: Config) -> Dict[str, str]:
             "proof. If any of these is missing, ask for it rather than closing."
         ),
         "communication": (
-            "Write short, polite UK-English messages signed 'Northbridge Lettings'. Use only names, dates, "
+            "Write short, polite UK-English messages signed with the agency's name as it appears in the case. Use only names, dates, "
             "amounts and phone numbers that appear in the case. Never claim something was done, sent, paid or "
             "approved unless the case shows it. Never share one party's personal contact details with another "
             "unless the case shows the agency already does that for this job (e.g. tenant number to the assigned "
