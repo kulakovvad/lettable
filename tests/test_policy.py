@@ -29,6 +29,11 @@ class PolicyTests(unittest.TestCase):
         for topic, text in policy_topics(Config()).items():
             self.assertGreater(len(text), 100, topic)
 
+    def test_calls_policy_does_not_say_to_phone_because_a_voicemail_was_left(self):
+        text = policy_topics(Config())["calls"]
+        self.assertNotIn("voicemail", text)
+        self.assertIn("email chase went unanswered or the matter is urgent", text)
+
 
 class CheckPolicyToolTests(unittest.TestCase):
     def setUp(self):

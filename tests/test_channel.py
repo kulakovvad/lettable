@@ -97,20 +97,37 @@ class Matrix(unittest.TestCase):
         self.assertIn("urgent", why)
 
     def test_a_bounce_of_the_latest_message_allows_a_call(self):
-        bounce = ("2026-01-03 09:00:00", "Update", "Agency / system", "Not specified", "Delivery failed: mailbox full")
+        bounce = ("2026-01-03 09:00:00", "Update", "Agency / system", "Contractor", "Delivery failed: mailbox full")
         ok, why, _ = self.check([sent(2), bounce])
         self.assertTrue(ok)
         self.assertIn("did not arrive", why)
 
     def test_a_bounce_of_an_older_message_does_not(self):
-        bounce = ("2026-01-02 12:00:00", "Update", "Agency / system", "Not specified", "Message bounced")
+        bounce = ("2026-01-02 12:00:00", "Update", "Agency / system", "Contractor", "Message bounced")
         three = dataclasses.replace(CFG, call_after_unanswered=3)  # isolate the bounce rule from the unanswered rule
         self.assertFalse(self.check([sent(2), bounce, sent(5)], cfg=three)[0])  # a later message went out after the bounce
-        self.assertTrue(self.check([sent(2), sent(5), ("2026-01-05 12:00:00", "Update", "Agency / system", "Not specified", "Message bounced")],
+        self.assertTrue(self.check([sent(2), sent(5), ("2026-01-05 12:00:00", "Update", "Agency / system", "Contractor", "Message bounced")],
                                    cfg=three)[0])  # a bounce of the latest one counts
 
     def test_bounce_wording_from_the_party_itself_is_not_a_bounce(self):
         self.assertFalse(self.check([sent(2), got(3, body="your last email bounced for me, please resend")])[0])
+
+    def test_a_later_note_that_something_was_not_delivered_is_not_a_bounce(self):
+        # a tenant talking about a part, or a system note using the same words, is not a mailer bounce
+        tenant = ("2026-01-03 09:00:00", "Email", "Tenant", AG, "The new part was not delivered.")
+        self.assertFalse(self.check([sent(2), tenant])[0])
+        system = ("2026-01-03 09:00:00", "Update", "Agency / system", "Contractor", "The new part was not delivered.")
+        self.assertFalse(self.check([sent(2), system])[0])
+
+    def test_a_bounce_that_does_not_name_this_recipient_does_not_allow_a_call(self):
+        unnamed = ("2026-01-03 09:00:00", "Update", "Agency / system", "Not specified", "Message bounced")
+        self.assertFalse(self.check([sent(2), unnamed])[0])
+        other = ("2026-01-03 09:00:00", "Update", "Agency / system", "Landlord", "Message bounced")
+        self.assertFalse(self.check([sent(2), other])[0])
+        named = ("2026-01-03 09:00:00", "Email", "Mailer-Daemon", AG, "Undeliverable: returned to sender for the contractor.")
+        ok, why, _ = self.check([sent(2), named])
+        self.assertTrue(ok)
+        self.assertIn("did not arrive", why)
 
     # ---- tenant
     def test_tenant_who_phoned_in_can_be_phoned_back_for_a_question_only(self):

@@ -19,9 +19,16 @@ from agent.evidence import role_of
 from agent.timeline import Case, Event
 
 WRITTEN = ("Email", "SMS")
+# "not delivered" on its own is ordinary language ("the part was not delivered"), not a mailer bounce.
 _BOUNCE = re.compile(
-    r"\b(bounced|undeliverable|undelivered|not delivered|could not be delivered|delivery (?:failed|failure|status: failed)|"
+    r"\b(bounced|undeliverable|undelivered|could not be delivered|delivery (?:failed|failure|status: failed)|"
     r"failed to (?:send|deliver)|message failed|mailbox (?:full|unavailable)|returned to sender|no such (?:user|address))\b", re.I)
+_SYSTEM_OR_MAILER = re.compile(r"\b(system|mailer(?:-daemon)?|mailer daemon|postmaster|mail delivery)\b", re.I)
+_PARTY_NAME = {
+    "provider": re.compile(r"\b(providers?|contractors?|suppliers?|engineers?)\b", re.I),
+    "landlord": re.compile(r"\b(landlords?|owners?)\b", re.I),
+    "tenant": re.compile(r"\b(tenants?|residents?)\b", re.I),
+}
 
 
 def _written_to(case: Case, party: str) -> List[Event]:
@@ -36,14 +43,26 @@ def unanswered(case: Case, party: str) -> List[Event]:
     return [e for e in _written_to(case, party) if e.index > last_reply]
 
 
+def _names_recipient(event: Event, party: str, message: Event) -> bool:
+    """The bounce is about this party or this message, not a later note that happens to use bounce wording."""
+    if role_of(event.recipient) == party:
+        return True
+    if re.search(r"\bevent[- ]0*%d\b" % message.index, event.body or "", re.I):
+        return True
+    named = _PARTY_NAME.get(party)
+    return named is not None and named.search(event.body or "") is not None
+
+
 def _bounced(case: Case, party: str) -> Optional[Event]:
-    """The latest written message to the party, if a later event from the system says it did not arrive."""
+    """The latest written message to the party, if a later system or mailer bounce says that message did not arrive."""
     sent = _written_to(case, party)
     if not sent:
         return None
     last = sent[-1]
     for e in case.events:
-        if e.index > last.index and role_of(e.sender) != party and _BOUNCE.search(e.body):
+        if e.index <= last.index or not _SYSTEM_OR_MAILER.search(e.sender or ""):
+            continue
+        if _BOUNCE.search(e.body or "") and _names_recipient(e, party, last):
             return last
     return None
 
