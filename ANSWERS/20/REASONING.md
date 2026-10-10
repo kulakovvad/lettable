@@ -2,8 +2,8 @@
 
 - Decided by: the model, checked by code
 - Events seen: 25
-- Model: claude-sonnet-5-5, 3 turn(s), 45433 tokens
-- Evidence cited: event-001, event-004, event-011, event-017, event-023, event-024, event-025
+- Model: claude-sonnet-5-5, 3 turn(s), 45741 tokens
+- Evidence cited: event-001, event-004, event-011, event-015, event-016, event-017, event-023, event-024, event-025
 - Model confidence: 0.93
 
 ## 1. Decision and next action
@@ -15,30 +15,29 @@
 
 ## 2. Why
 
-The tenant reports a hot, burning smell and a warm socket (event-001). At 16:42 she says the smell persists and nobody has inspected (event-025). Warmth near the socket was still noticed at event-017. A 10-year-old child is in the home (event-004). I treat this as a reported electrical fire risk, so it is P0 until verified. The landlord only offered a handyman who cannot do fixed wiring, has no test equipment and did not enter (events 6, 11, 15, 23). The landlord has given no electrician approval and has not answered the access question or the latest request (events 16, 20, 24). So waiting or chasing alone would leave the risk uncontrolled. The agency cannot approve spend, so a person on call must decide on an emergency electrician. No emergency guidance had been given (event-009, event-025). I staged immediate safety advice to the tenant: keep appliances off, leave and call 999 if there is smoke, sparks or a stronger smell, and isolate the circuit only if she can identify it with certainty. No documents conflict. Unknowns are the real condition of the socket and the landlord's decision.
+Tenant reports a persistent burning smell and warmth at a kitchen socket (event-001, event-017, event-025), with a 10-year-old child at home (event-004). The case treats this as a reported electrical fire risk, so it is P0 until verified. Nothing has been inspected or isolated. The landlord's handyman has no electrical competence or test equipment (event-011, event-015) and did not enter (event-023). The landlord has authorised only a look-and-report visit and has not answered the authority and electrician request since 15:02 (event-016, event-020, event-024). The agency cannot approve spend, and waiting or chasing again would leave the hazard open, so a person on call must decide on an emergency electrician. The file note records that no emergency guidance had reached the tenant (event-009, event-025). I have staged safety advice to the tenant now, since urgent_by_code is true. This covers not using the socket, leaving and calling 999 if smoke, sparks or a stronger smell appear, and not opening the socket. The decision would change if the landlord approves an electrician or the tenant reports the hazard has resolved.
 
 Facts the decision rests on:
 
-- Reported 08:14: burning smell, socket face warm after kettle use (event-001); kettle unplugged, no smoke/sparks (event-004)
-- Smell still faint at 16:42; area still feels warm to hand near it (event-017, event-025)
-- Tenant is home with 10-year-old son (event-004); fridge running, breaker not identified or switched off (event-025)
-- Landlord only offered handyman Rowan Pike (event-006, event-016); no electrician approval given
-- Rowan does not do fixed wiring, has only a voltage pen, did not enter, no inspection or isolation done (event-011, event-015, event-023)
-- Landlord not reached by phone (event-020), no reply to event-024; no access authority given for keys (event-021)
-- No emergency guidance had been given to tenant before now (event-009, event-025); basic safety advice sent at decision time
-- No photo, temperature reading or electrical test available (event-018)
+- Event-001: burning smell, socket face warm after kettle; kettle unplugged
+- Event-017/025: smell still noticeable, area still warm near socket as of 16:42; no breaker switched off; fridge running
+- Event-004: tenant at home with 10-year-old son; tenant is back at property as of event-025
+- Event-011/015: landlord's handyman Rowan Pike does not do fixed wiring, has no test equipment, only a voltage pen; did not enter (event-023)
+- Event-006/016: landlord has only authorised handyman to look and report; no approval for electrician call-out or repairs
+- Event-020/024: calls/emails to landlord on authority and electrician unanswered since 13:14
+- Event-009/025: no emergency guidance had been given to tenant before now; safety advice sent at 16:42 decision time
 - Property: 8 Brindlewick Row, Oakhollow, ZZ1 1ZZ (index)
 - Request: There is a hot smell near the kitchen socket by the counter, and the socket face feels warm. Please arrange an inspection. I am not sure whether the socket is safe to use. (request)
 
-Evidence cited by the model: event-001, event-004, event-011, event-017, event-023, event-024, event-025
+Evidence cited by the model: event-001, event-004, event-011, event-015, event-016, event-017, event-023, event-024, event-025
 
 ## 3. Missing information and conflicting facts
 
 Not known:
 
-- Socket and wiring condition
-- Which breaker serves the socket
-- Landlord's decision on an electrician and access
+- Actual condition of socket/circuit
+- Landlord's decision on electrician and access
+- Which breaker serves the kitchen socket
 
 ### Inconsistencies and mismatches
 
@@ -63,9 +62,10 @@ EXECUTED means the action was committed. PROPOSED, NOT SENT means it was staged 
 
 What was tried before this decision:
 
-- Portal triage with tenant (events 3,7)
-- Email and voicemail to landlord (events 5,20,24)
-- Handyman booked 13:00-15:00 but could not attend usefully (events 14,23)
+- Asked tenant for symptoms and circuit (events 3, 7)
+- Emailed landlord 09:03 and 15:02; called 13:14, voicemail
+- Arranged landlord's handyman visit; failed, no access and not competent for fixed wiring (event-23)
+- Sent tenant safety advice at decision time
 - Agent proposed ESCALATE
 
 Checks applied by code:
@@ -79,15 +79,15 @@ Failures and refused actions:
 ## 5. Handover to a person
 
 - **Route:** on_call_emergency, priority P0, respond by 2025-04-12T17:42:00+00:00
-- **Summary:** Tenant reports hot/burning smell and warm kitchen socket at 8 Brindlewick Row since 08:14; tenant and 10-year-old son at home. Nine hours on, nobody has inspected; landlord has not authorised an electrician; the only attendee (handyman) is not qualified and could not get in. Needs an emergency electrician decision now.
+- **Summary:** Reported hot/burning smell and warm socket at kitchen counter, 8 Brindlewick Row. Tenant and 10-year-old son at home. Unresolved for ~8.5 hours; no inspection, no isolation, no qualified electrician; landlord unresponsive on authority since 15:02. Needs urgent decision to commission an emergency electrician.
 
 Options for the person:
 
-- Recommended: Arrange an emergency qualified electrician now and seek landlord approval urgently, treating it as a safety matter
-- Advise tenant to isolate the circuit at the consumer unit if safe, and call 999 or the fire service if the smell or heat worsens
-- Keep trying the landlord by every channel and record the lack of response, while on-call decides whether to proceed on safety grounds
+- Recommended: Commission an emergency electrician immediately under agency emergency authority/protocol and inform landlord
+- Keep trying the landlord by phone for urgent electrician approval while advising tenant to isolate the circuit/leave if worse
+- If tenant reports worsening signs (smoke, sparks, stronger smell), tenant calls 999 / fire service attends
 
-Recommended: Arrange an emergency qualified electrician now and seek landlord approval urgently, treating it as a safety matter
+Recommended: Commission an emergency electrician immediately under agency emergency authority/protocol and inform landlord
 
 ## Uncertainty
 
@@ -107,7 +107,7 @@ Recommended: Arrange an emergency qualified electrician now and seek landlord ap
 Every tool call the agent made, in order, with the code's response.
 
 0. `consistency_check(null)` -> `{"status": "ok", "checks": [], "dropped": 0, "error": null}`
-1. `check_policy({"topic": "safety,escalation,communication"})` -> `{"status": "ok"}`
-2. `send_message({"to": "tenant", "purpose": "safety_advice", "body": "Hi Nora, thank you for the update. Please keep the kettle and all other appliances away from that socket and do not touch its face. If you see smoke, sparks or scorch marks, hear crackling or buzzing, or the smell gets stronger, leave the flat with your son straight away and call 999. Please do not open or work on the socket yourself. If you can identify the kitchen breaker with certainty you may switch it off, but do not guess or take any risk. We have passed this to our on-call team as urgent and will update you as soon as a person has reviewed it. Northbridge Lettings (Maya Chen)", "evidence_refs": ["event-001", "event-017", "event-025"], "priority": "P0"})` -> `{"status": "staged", "id": "message-1", "note": "Staged. Committed only if the final decision passes code checks."}`
-2. `escalate_to_human({"priority": "P0", "route": "on_call_emergency", "summary": "Tenant reports hot/burning smell and warm kitchen socket at 8 Brindlewick Row since 08:14; tenant and 10-year-old son at home. Nine hours on, nobody has inspected; landlord has not authorised an electrician; the only attendee (handyman) is not qualified and could not get in. Needs an emergency electrician decision now.", "known": ["Reported 08:14: burning smell, socket face warm after kettle use (event-001); kettle unplugged, no smoke/sparks (event-004)", "Smell still faint at 16:42; area still feels warm to hand near it (event-017, event-025)", "Tenant is home with 10-year-old son (event-004); fridge running, breaker not identified or switched off (event-025)", "Landlord only offered handyman Rowan Pike (event-006, event-016); n)` -> `{"status": "staged", "id": "escalation-2", "note": "Staged. Committed only if the final decision passes code checks."}`
-3. `submit_decision({"action": "ESCALATE", "priority": "P0", "reason": "The tenant reports a hot, burning smell and a warm socket (event-001). At 16:42 she says the smell persists and nobody has inspected (event-025). Warmth near the socket was still noticed at event-017. A 10-year-old child is in the home (event-004). I treat this as a reported electrical fire risk, so it is P0 until verified. The landlord only offered a handyman who cannot do fixed wiring, has no test equipment and did not enter (events 6, 11, 15, 23). The landlord has given no electrician approval and has not answered the access question or the latest request (events 16, 20, 24). So waiting or chasing alone would leave the risk uncontrolled. The agency cannot approve spend, so a person on call must decide on an emergency electrician. No em)` -> `{"status": "accepted"}`
+1. `check_policy({"topic": "safety,escalation,calls"})` -> `{"status": "ok"}`
+2. `send_message({"to": "tenant", "purpose": "safety_advice", "body": "Hi Nora, thank you for the update. A warm socket with a burning smell can be an electrical fire risk, so please: keep everything unplugged from that socket and do not use it. Do not touch the socket face or try to open it. If you see smoke or sparks, hear buzzing or crackling, or the smell gets stronger, leave the property with your son straight away and call 999. If you can see a consumer unit switch clearly labelled for the kitchen or sockets and can reach it safely with dry hands, you may switch that one off, but do not open anything or guess at breakers. If the fridge is affected, move any essentials to a cooler place. We have passed this to our on-call team as urgent and will update you as soon as we have an electrician or inspecti)` -> `{"status": "staged", "id": "message-1", "note": "Staged. Committed only if the final decision passes code checks."}`
+2. `escalate_to_human({"priority": "P0", "route": "on_call_emergency", "summary": "Reported hot/burning smell and warm socket at kitchen counter, 8 Brindlewick Row. Tenant and 10-year-old son at home. Unresolved for ~8.5 hours; no inspection, no isolation, no qualified electrician; landlord unresponsive on authority since 15:02. Needs urgent decision to commission an emergency electrician.", "known": ["Event-001: burning smell, socket face warm after kettle; kettle unplugged", "Event-017/025: smell still noticeable, area still warm near socket as of 16:42; no breaker switched off; fridge running", "Event-004: tenant at home with 10-year-old son; tenant is back at property as of event-025", "Event-011/015: landlord's handyman Rowan Pike does not do fixed wiring, has no test equipment, only a voltage pen; did not)` -> `{"status": "staged", "id": "escalation-2", "note": "Staged. Committed only if the final decision passes code checks."}`
+3. `submit_decision({"action": "ESCALATE", "priority": "P0", "reason": "Tenant reports a persistent burning smell and warmth at a kitchen socket (event-001, event-017, event-025), with a 10-year-old child at home (event-004). The case treats this as a reported electrical fire risk, so it is P0 until verified. Nothing has been inspected or isolated. The landlord's handyman has no electrical competence or test equipment (event-011, event-015) and did not enter (event-023). The landlord has authorised only a look-and-report visit and has not answered the authority and electrician request since 15:02 (event-016, event-020, event-024). The agency cannot approve spend, and waiting or chasing again would leave the hazard open, so a person on call must decide on an emergency electrician. The file note records that no)` -> `{"status": "accepted"}`

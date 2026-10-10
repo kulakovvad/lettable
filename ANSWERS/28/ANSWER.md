@@ -1,6 +1,6 @@
 # Case 28
 
-**Decision:** Escalate to a person
+**Decision:** Wait, nothing to do yet
 **Priority:** P3
 
 ## Details
@@ -37,12 +37,12 @@
 
 ### Decision
 
-- **Action:** Escalate to a person
+- **Action:** Wait, nothing to do yet
 - **Priority:** P3
-- **Confidence:** 0.70
+- **Confidence:** 0.80
 - **Decided by:** model
 - **As of:** 2025-09-18T14:50:04+00:00
-- **Evidence cited:** event-012, event-017, event-020, event-021, event-022, event-023, event-024
+- **Evidence cited:** event-012, event-017, event-020, event-021, event-022, event-023, event-024, event-025
 
 ### Case card (machine-readable)
 
@@ -151,9 +151,9 @@
     }
   ],
   "decision": {
-    "action": "ESCALATE",
+    "action": "WAIT",
     "priority": "P3",
-    "confidence": 0.7,
+    "confidence": 0.8,
     "decided_by": "model",
     "cause": null,
     "as_of": "2025-09-18T14:50:04+00:00",
@@ -164,7 +164,8 @@
       "event-021",
       "event-022",
       "event-023",
-      "event-024"
+      "event-024",
+      "event-025"
     ]
   },
   "calls": [],
@@ -179,62 +180,14 @@ Initial request: Following the move-out inspection, arrange attention to the ele
 
 ## Decision
 
-The landlord declined the £564.48 Pineglass quote (event-017) and arranged her own contractor, and the provider was stood down (event-020). Her only completion claim (event-021) has no date, photos, invoice or contractor name. Event-022 marked the request complete on that email alone, and event-024 dismissed the workflow task. Agency notes are not proof, so I am not closing yet. Our own event-023 asked which repairs are the former tenant's responsibility so the tenancy account could be reviewed. That touches deposit deductions, which policy says never to act on, so a person must take it over. I rejected WAIT or a chase because event-023 is only about 6 hours old and is not due for a chase. I rejected CLOSE because the invoice position and the actual work are unverified and the cost and responsibility question is still open. The code's "approval in force" flag for £564.48 is wrong: event-012 only asked for approval, and the landlord declined. The reference-number flag is only the normal NBL-028 prefix variants on the documents, and the address matches on both. There is no hazard and no tenant, so priority is P3. If the landlord supplies evidence and a person confirms there is no deduction issue, the case can close.
+The landlord declined the Pineglass quote of £564.48 (event-017) and chose her own contractor. We stood Pineglass down (event-018, event-020). The £564.48 was never approved: event-012 only asked for approval, and the "approval in force" flag in the code facts is wrong. On 18 Sept the landlord wrote that the work is complete (event-021). That is a claim only, with no date, photos, contractor name or invoice. Oren's "completed" marking (event-022) is a system note and is not proof (closing policy). We asked the landlord for an itemised cost breakdown and any responsibility allocation (event-023) about 6 hours before the decision time, so no reply is due yet. The chase threshold is 3 days. Closing is blocked because our own question is unanswered and the invoice position is unknown. Escalating is not needed: there is no hazard, no dispute, and no sign of fraud, and the property is vacant. The reference-number flag is only the usual suffixes on NBL-028, and both PDFs show the correct address. If the landlord's reply raises tenant charges, deposit deductions or the tenancy account, it must go to a person, because that is never_touch. Event-023 mentioned reviewing the tenancy account, so a person should be aware of that. If there is no reply by about 21 Sept, chase the landlord. Once the invoice position and completion are confirmed, close. The workflow task was dismissed (event-024), so I have set a follow-up to keep the case from being forgotten.
 
 ## Actions taken
 
-- **COMMITTED**: Escalation ticket P3 to property_manager `escalation-1`. Recorded in the local outbox (no external delivery connected).
-
-## Handover for the person taking over
-
-Move-out works at 42 Mallowfen Crescent: landlord declined our provider's £564.48 quote and used her own contractor. She says the work is done, with no evidence. Our own message (event-023) also raised former-tenant responsibility and the tenancy account, which is deposit-deduction territory and needs a person.
-
-Respond by 2025-09-21T14:50:04+00:00 (P3, route property_manager).
-
-Conflicts:
-- reference_number: NBL-028 (event-001) vs NBL-028-CHECKOUT (checkout-report.pdf) vs NBL-028-Q1 (provider-quotation.pdf)
-
-Known:
-- Pineglass quote NBL-028-Q1 for £564.48 (bundled, not itemised) was sent to landlord for approval in event-012. The landlord declined it in event-017 and said she would use her own company.
-- Pineglass was told to stand down in event-020. There is no reply from Pineglass and none is needed.
-- Landlord email event-021 (2025-09-18) says 'The work has been completed'. It gave no date, photos, invoice or contractor name.
-- Event-022 marked the request completed on that email alone. Event-024 dismissed the workflow task.
-- Event-023 (2025-09-18 08:46) asked the landlord for an itemised cost breakdown and which repairs she considers the former tenant's responsibility. No reply yet, and it is only about 6 hours old.
-- The property is vacant. No tenant is in the case and no keys are recorded as held by a provider.
-- The £564.48 quote exceeds the £300 approval limit. The landlord never approved it, so the 'approval in force' flag in the code facts does not apply.
-- Property: 42 Mallowfen Crescent, Ternwick, ZZ1 1ZZ (index)
-- Request: Following the move-out inspection, arrange attention to the electric meter cabinet door hinges, four nails and paint in Bedroom 1, and sticker residue on the front door. The property is vacant. (request)
-
-Not known:
-- Which contractor did the work, and when
-- Whether all three items were done: meter cabinet hinges, four nails and paint in Bedroom 1, and front door sticker residue
-- What the work cost, and who pays
-- Whether any deduction from the former tenant is intended; this is for a person to handle, not the agent
-- Contractor identity and completion date
-- Whether all three items were completed
-- Cost and who pays
-- Whether any deduction from the former tenant is intended
-
-Tried:
-- Quote requested and chased from Pineglass; the quote arrived 2025-09-10.
-- Landlord approval requested (event-012, event-015).
-- Provider stood down (event-020).
-- Cost breakdown and responsibility question sent to landlord (event-023).
-- Agent proposed ESCALATE
-
-Options:
-- Recommended: Take over the deposit/tenancy-account question, and decide whether the cost breakdown request in event-023 should stand. Any reply from the landlord should be handled by a person.
-- Ask the landlord for completion evidence (photos, contractor invoice or name) and confirm the invoice position as landlord pays directly. Then close the case once those are in.
-- Reopen the request status until evidence arrives, because event-022 marked it complete on an unsupported claim.
-
-Recommended: Recommended: Take over the deposit/tenancy-account question, and decide whether the cost breakdown request in event-023 should stand. Any reply from the landlord should be handled by a person.
+- **COMMITTED**: Follow-up at 2025-09-21T14:50:04+00:00, waiting on landlord: Awaiting landlord reply to event-023 (itemised costs of own-contractor works, invoice position). Chase is due after 3 days. Any reply that raises tenant responsibility or deposit deductions goes to a person. Case should not be closed until the invoice position and works are confirmed. `followup-1`. Recorded in the local outbox (no external delivery connected).
 
 ## Inconsistencies and mismatches
 
-- **document consistency** (flag): reference number differs between documents: 'NBL-028' vs 'NBL-028-CHECKOUT' vs 'NBL-028-Q1' (similarity 0.58). [checkout-report.pdf, event-001, provider-quotation.pdf]
+- **document consistency** (flag): reference number differs between documents: 'NBL-028' vs 'NBL-028-CHECKOUT' vs 'NBL-028-Q1' (similarity 0.56). [checkout-report.pdf, event-001, provider-quotation.pdf]
 
 Checked: addresses, invoice amounts against quotes and approval, completion against later reports, contact details; document consistency check on.
-
-## Separate issues to raise as new requests
-
-- Former-tenant responsibility and tenancy account review (deposit-related, never_touch)

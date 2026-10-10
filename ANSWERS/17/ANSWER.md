@@ -1,7 +1,7 @@
 # Case 17
 
 **Decision:** Wait, nothing to do yet
-**Priority:** P2
+**Priority:** P3
 
 ## Details
 
@@ -41,11 +41,11 @@
 ### Decision
 
 - **Action:** Wait, nothing to do yet
-- **Priority:** P2
-- **Confidence:** 0.70
+- **Priority:** P3
+- **Confidence:** 0.72
 - **Decided by:** model
 - **As of:** 2025-02-12T16:10:00+00:00
-- **Evidence cited:** event-017, event-018, event-013, event-005, event-011, event-014, fire-door-quotation.pdf
+- **Evidence cited:** event-007, event-017, event-018, event-019, event-005, event-013, fire-door-quotation.pdf
 
 ### Case card (machine-readable)
 
@@ -149,18 +149,18 @@
   ],
   "decision": {
     "action": "WAIT",
-    "priority": "P2",
-    "confidence": 0.7,
+    "priority": "P3",
+    "confidence": 0.72,
     "decided_by": "model",
     "cause": null,
     "as_of": "2025-02-12T16:10:00+00:00",
     "evidence_refs": [
+      "event-007",
       "event-017",
       "event-018",
-      "event-013",
+      "event-019",
       "event-005",
-      "event-011",
-      "event-014",
+      "event-013",
       "fire-door-quotation.pdf"
     ]
   },
@@ -176,19 +176,14 @@ Initial request: The paint on the inside of my flat entrance door is flaking, an
 
 ## Decision
 
-The job is a flaking-paint and catching-door report at 14 Lantern Mews. Pale Finch Decorating inspected on 7 Feb (event-10) and quoted £186 (fire-door-quotation.pdf, event-11). The quote is below the £300 threshold, but the agency cannot approve spend. The landlord's event-17 asks whether it can be approved "from the repair budget" and wants the scope and the building response confirmed before booking. That is not a clear written approval, so I am not instructing the provider. I am also not routing for approval yet. The building manager's reply to our scope query of 12 Feb 09:30 (event-18) is pending and is not overdue. The building manager has repeatedly asked to be consulted about the door (events 5, 13). The building file lists the flat entrance doors as fire-resisting (event-5). Slow closing was noted before (event-13). The quote excludes any door-set or fire-door inspection, adjustment or hardware work, and makes no statement on the door's fire performance. The landlord's question in event-14 about further inspection costs is unanswered. No danger is reported: the door latches with a firm pull and the tenant reports no access issue (events 1, 15). So this is P2, not P0 or P1, and not an escalation. The quote address matches the job (the document check flag is only a postcode-format difference). The tenant was sent an update (message-1) with no cost promises. A follow-up is set. This decision would change if the building manager replies (then route the quote for approval), if the door stops latching (then escalate as a safety risk), or if the building manager does not reply (then chase).
+Pale Finch's quote (NBL-017-Q1, £186, valid to 28 Feb) is on file and was received from the assigned contractor. The property matches (the only address difference is the fuller postcode form). The landlord's event-017 asks whether it can be approved from the repair budget, but it also asks for the scope and the building's response to be confirmed before booking. That is not a clear written approval of the quote, and event-007 only authorised an inspection. The building manager was asked on 12 Feb at 09:30 (event-018), under four hours before the decision time, so a reply is not overdue. Building management has asked twice to be consulted (events 5 and 13), and no work is booked (event-019). Nothing in the case reports danger: the door latches and the tenant reports no access issue (events 1, 15). The building file lists the door as fire-resisting (event-5), and the quote expressly excludes any door or fire-performance inspection. That gap does not need an escalation now, but it should go to the landlord with the approval request. I considered ROUTE_FOR_APPROVAL now. It is premature because the landlord asked for the building response first, and the 12 Feb note (event-19) already told him it is pending. Chasing Ravi is too early. Escalation is not needed because there is no conflict, danger or spend above the £300 limit. This decision would change if Ravi replies, if the landlord gives explicit written approval, or if the tenant reports the door no longer latching. In those cases I would route the quote for approval or escalate.
 
 ## Actions taken
 
-- **HELD_FOR_REVIEW**: Message to tenant (update, P2) `message-1`. Held: not part of the final action WAIT; a person can release it.
-- **COMMITTED**: Follow-up at 2025-02-14T16:10:00+00:00, waiting on internal: Building manager's reply to the 12 Feb scope query (event-018) is pending. Once it arrives, route the £186 quote for the landlord's written approval with the building response and the exclusions stated. Chase the building manager if there is no reply, and ask the landlord whether to commission a competent door inspection (event-014 question still open). `followup-2`. Recorded in the local outbox (no external delivery connected).
-
-### Message to tenant `message-1`
-
-Hi Iona, thank you for your update on 10 February. A contractor's quotation for repainting the flat-side face of the door is on file. It covers decorating only. It does not include adjusting the door or checking how it closes. We are waiting for the building manager to confirm whether any approval or specific process applies, and the landlord has asked for that before any work is booked. Nothing is booked yet. We will give you advance notice before any access, and we will keep to your preference for visits after 10:00. We will come back to you on your question about whether painting would affect the door once we have the building manager's response. In the meantime, please tell us if the door stops latching or becomes harder to close. Northbridge Lettings (Maya Chen)
+- **COMMITTED**: Follow-up at 2025-02-13T16:10:00+00:00, waiting on internal: Building manager (Ravi Dast) reply to the 12 Feb 09:30 scope query is pending. When it arrives, route the £186 quote (NBL-017-Q1) to the landlord for written approval together with the building response. Tell the tenant no work is booked and give advance notice. Raise the unresolved door catching/slow closing and the lack of any door-set inspection with the landlord as a separate question. `followup-1`. Recorded in the local outbox (no external delivery connected).
 
 ## Inconsistencies and mismatches
 
-- **document consistency** (flag): property address differs between documents: '14 Lantern Mews, Brindlewick, ZZ1 1ZZ' vs '14 Lantern Mews' (similarity 0.69). [event-001, event-002, event-003, event-006, event-007, event-008, event-009, event-014, event-015, event-017, event-019, fire-door-quotation.pdf, index]
+- **document consistency** (flag): property address differs between documents: '14 Lantern Mews, Brindlewick, ZZ1 1ZZ' vs '14 Lantern Mews' (similarity 0.683). [event-001, event-002, event-003, event-006, event-007, event-008, event-009, event-014, event-015, event-017, event-019, fire-door-quotation.pdf, index]
 
 Checked: addresses, invoice amounts against quotes and approval, completion against later reports, contact details; document consistency check on.

@@ -28,10 +28,10 @@
 
 - **Action:** Escalate to a person
 - **Priority:** P1
-- **Confidence:** 0.80
+- **Confidence:** 0.70
 - **Decided by:** model
 - **As of:** 2025-06-13T15:26:00+00:00
-- **Evidence cited:** event-009, event-017, event-018, event-020, event-022, event-023, event-024
+- **Evidence cited:** event-007, event-009, event-013, event-017, event-018, event-020, event-022, event-023, event-024
 
 ### Case card (machine-readable)
 
@@ -111,12 +111,14 @@
   "decision": {
     "action": "ESCALATE",
     "priority": "P1",
-    "confidence": 0.8,
+    "confidence": 0.7,
     "decided_by": "model",
     "cause": null,
     "as_of": "2025-06-13T15:26:00+00:00",
     "evidence_refs": [
+      "event-007",
       "event-009",
+      "event-013",
       "event-017",
       "event-018",
       "event-020",
@@ -137,7 +139,7 @@ Initial request: Please arrange an inspection of a damp patch and occasional dri
 
 ## Decision
 
-The repair is blocked and a person needs to decide the next step. The leaking compression joint was confirmed by the contractor and the tenant (event-009, event-010), and the leak recurred on 13 June when the tap was used (event-020). The joint cannot be reached through the hatch. The contractor found an unidentified fibrous lining behind the ceiling board, paused, and left without opening it (event-017, event-023). We told him not to disturb the lining (event-018). No survey or alteration records exist (event-006, event-013, event-022). A young child lives in the flat (event-007). The landlord's authority covers the quoted plumbing scope only. She has refused to extend it to a material assessment without cost and timing (event-013, event-022). The contractor cannot price that assessment (event-023). We have no authority to approve spend, and there is no quote to route for approval, so ROUTE_FOR_APPROVAL does not fit. WAIT is wrong because the leak is active and the landlord decision was already requested (event-024). I set P1 because the leak is ongoing, a child is present and the material is unidentified. I did not set P0 because the tenant reports no electrical impact, no sagging and a small drip only, and the tap is out of use (event-003, event-020). This would become P0 if the drip worsens, the ceiling sags, or water reaches electrics. No attachments exist and no instruction in the case tried to change our process.
+The kitchen ceiling leak is confirmed at a compression joint above the hatch (event-009, event-011). It recurred on 13 June when the tap was used (event-020). The authorised repair cannot go ahead. On the return visit the contractor found an unidentified pale fibrous lining and paused (event-017). We told him not to disturb it (event-018), and he left without opening the ceiling (event-023). No survey exists (event-006, event-013, event-022). A young child lives in the flat (event-007). The leak is ongoing and a possible hazardous material blocks the fix, so a person should decide how to proceed. I rate it P1, not P0: the tenant reports no electrics affected, no sagging, and only a small drip with the tap now out of use (event-003, event-020). The landlord's approval covers only the quoted plumbing scope (event-013). She has declined to extend it without cost and timing (event-022), and the contractor cannot price an assessment (event-023). I cannot approve spend or instruct more work, and routing for approval has no amount to cite. Waiting would leave a recurring leak with no route to repair. I already asked the landlord for a decision (event-024), and her reply is not overdue. If she authorises assessment, or the leak worsens, the plan changes. Escalating to the property manager gives a person the task of arranging the assessment and tenant advice.
 
 ## Actions taken
 
@@ -145,44 +147,45 @@ The repair is blocked and a person needs to decide the next step. The leaking co
 
 ## Handover for the person taking over
 
-16 Brindlewick Mews: the kitchen ceiling leak from a compression joint is recurring and the repair is blocked. An unidentified fibrous lining sits behind the ceiling board, and nobody can say whether it is hazardous. A young child lives in the flat. The landlord authorised the plumbing scope only and wants cost and timing for any assessment, which we cannot supply yet.
+Kitchen ceiling leak at 16 Brindlewick Mews is confirmed (leaking compression joint above the hatch) and recurs when the kitchen tap is used. The authorised repair is blocked. The contractor found an unidentified pale fibrous lining behind the ceiling board and stopped. A young child lives in the flat. A person needs to decide how to handle the suspect material and the ongoing leak. The landlord has only approved the quoted plumbing scope.
 
 Respond by 2025-06-13T19:26:00+00:00 (P1, route property_manager).
 
 Known:
-- Tenant reported damp patch and drips on 10 June (event-001); no electrics affected, no sagging (event-003).
-- Mossbarrow Pipe Services saw moisture at a compression joint above the hatch with the tap running; the joint is unreachable through the hatch (event-009, event-011).
-- Landlord authorised the quoted plumbing scope only, up to the estimate, and asked to be told before any scope or cost increase (event-013). On 13 June she confirmed that this does not cover a specialist material assessment and asked for likely cost and timing (event-022).
-- On 13 June Kellan saw a pale fibrous-looking lining behind the board, could not identify it, and paused (event-017). We told him not to disturb it or drill, cut, sample or remove (event-018). He left without opening the ceiling (event-023).
-- Tenant reported a small drip when the tap was used on the morning of 13 June, has stopped using that tap, and the ceiling is not sagging (event-020). A young child will be present (event-007).
-- No survey or ceiling alteration records exist from the landlord or the building manager (event-006, event-013, event-022).
-- Event-024 asked the landlord for a decision on further assessment or repair scope; no extra cost or appointment is agreed.
+- Tenant reported damp patch and drips on 2025-06-10 (event-001). No electrics affected, no sagging (event-003, event-020).
+- Mossbarrow Pipe Services saw moisture at a compression joint above the hatch with the tap running. The hatch is too small to reach the joint (event-009, event-011).
+- Landlord authorised the quoted plumbing scope only, up to the estimate, and wants to be contacted before any scope or cost increase (event-013). The estimate amount is not stated in the case.
+- On the 13 June return visit Kellan saw a pale fibrous-looking lining. He has not touched it, cannot identify it, and paused (event-017). Mara told him not to drill, cut, sample or remove (event-018) and he left without opening the ceiling (event-023).
+- No survey or ceiling alteration records exist. The landlord and building manager have none (event-006, event-013, event-022).
+- Tenant reported a small drip when the tap was used on the morning of 13 June and has stopped using that tap. A young child is present (event-007, event-020).
+- Landlord said her authorisation does not cover specialist material assessment and asked for likely cost and timing first (event-022). Mara has asked for a decision on further scope; nothing extra is agreed (event-024).
+- The communal roof inspection is planned for the week after 10 June (event-006).
 - Property: 16 Brindlewick Mews, Fenbarrow, ZZ1 1ZZ (index)
 - Request: Please arrange an inspection of a damp patch and occasional dripping from the kitchen ceiling. The patch has returned after rain. (request)
 
 Not known:
-- What the lining is, and whether it contains asbestos.
-- Cost and timing of a specialist assessment, and who should provide it.
-- Whether the landlord will authorise an assessment and the later repair.
-- Whether the leak is getting worse, and how long the isolated tap can stay out of use.
-- Composition of the lining
+- What the lining is, and whether it contains asbestos
+- Cost and timing of a specialist assessment. The contractor cannot price it (event-023).
+- Whether the leak can be isolated, for example at a stopcock or isolation valve, to stop further drips
+- Whether the leak is wholly from the joint or whether the roof or communal stack contributes
+- The amount of the approved estimate (not in the case data)
+- Whether the landlord will authorise assessment or repair
+- Identity of the lining and whether it contains asbestos
 - Cost and timing of an assessment
-- Landlord decision on further scope
 
 Tried:
-- Asked the building manager for records (event-005, event-006).
-- Asked the landlord for survey records and authorisation (event-012, event-013).
-- Paused the contractor and kept the ceiling undisturbed (event-018).
-- Told the tenant not to touch the hatch and to report any new dripping (event-019).
-- Asked the landlord for a decision on further scope (event-024).
+- Asked the building manager about leaks and records (event-005, event-006)
+- Inspection, then quote, then landlord approval, then return visit (event-008 to event-016)
+- Stopped work and told the tenant not to touch the hatch or ceiling (event-018, event-019)
+- Sent the landlord an update requesting a decision on further scope (event-024). Her reply is not yet due.
 - Agent proposed ESCALATE
 
 Options:
-- Recommended: Ask the landlord to approve a specialist surveyor attending or quoting for identification of the lining, then route the quote for approval; give the landlord an interim cost and timing indication once known.
-- Ask the landlord for approval to use a licensed contractor who can isolate the supply or make a temporary non-invasive control of the leak, without disturbing the lining, while the assessment is arranged.
-- Keep the tenant updated, tell them to keep the tap out of use, and report any worsening drip, sagging or electrical effect at once for re-triage to P0.
+- Recommended: Ask the landlord to authorise a specialist asbestos/material assessment (get a quote first, as she asked) before any opening. Meanwhile ask the contractor whether the supply can be isolated or the tap/joint made safe without disturbing the lining.
+- Have the tenant keep the kitchen tap out of use and report any new drips or sagging. Send safety advice to the tenant (keep the child away from the area, do not disturb the ceiling) and set a short follow-up for the landlord's decision.
+- If the leak worsens, spreads, reaches electrics or the ceiling sags, treat it as P0 and send on-call. Consider a different contractor or a specialist if the landlord approves.
 
-Recommended: Recommended: Ask the landlord to approve a specialist surveyor attending or quoting for identification of the lining, then route the quote for approval; give the landlord an interim cost and timing indication once known.
+Recommended: Recommended: Ask the landlord to authorise a specialist asbestos/material assessment (get a quote first, as she asked) before any opening. Meanwhile ask the contractor whether the supply can be isolated or the tap/joint made safe without disturbing the lining.
 
 ## Inconsistencies and mismatches
 

@@ -46,7 +46,7 @@
 - **Confidence:** 0.80
 - **Decided by:** model
 - **As of:** 2025-09-23T16:12:00+00:00
-- **Evidence cited:** event-005, event-016, event-021, event-023, bathroom-works-quotation.pdf
+- **Evidence cited:** event-005, event-016, event-021, event-022, event-023, bathroom-works-quotation.pdf
 
 ### Case card (machine-readable)
 
@@ -214,6 +214,7 @@
       "event-005",
       "event-016",
       "event-021",
+      "event-022",
       "event-023",
       "bathroom-works-quotation.pdf"
     ]
@@ -230,36 +231,26 @@ Initial request: The tenant reports a continuing leak behind the shower and mois
 
 ## Decision
 
-The landlord's latest message (event-23) asks which quote we mean. Event-5 approved only an inspection and a quote, and nothing has been approved since. The code's "approval in force" of £1,270 (event-23) is wrong: event-23 is a question, not an approval. The quote PDF (bathroom-works-quotation.pdf, event-16) names 8 Wrenfold Mews, Brindlewick, not our job address at 4 Thistlewick Rise, Larkcombe. That is a property mismatch under verify_claims, so we cannot route it for approval or instruct on it. The price is also unclear. The PDF total is £2,844.00 (£2,370 plus £474 VAT), while Ewan's email (event-21) gives materials £1,270 and labour £1,170, mentions commission and a 50% deposit, and states no revised total. The quote is above the £300 limit and the agency cannot approve spend. I asked Ewan to confirm the address and send one itemised quote. I also staged a short note to Orin saying which quote exists, why it is on hold, and that nothing is approved. Escalation is not needed because Ewan can answer this directly. There is no reported danger or hazard keyword, although the leak is ongoing, so I set P2. A follow-up is set for 48 hours. If Ewan says the address is correct and sends a consistent itemised quote, route it to the landlord for approval. [gate: documents disagree on property_address ('4 Thistlewick Rise, Larkcombe, ZZ1 1ZZ' vs '8 Wrenfold Mews, Brindlewick, ZZ1 1ZZ'); a person must confirm which is right]
+The landlord's latest message (event-23) asks which quote we mean, and he has approved nothing. Event-5 only authorised an inspection and a quote. The code's "approval in force £1,270" is wrong: event-23 is a question, not an approval. The quote PDF (bathroom-works-quotation.pdf, event-16) names 8 Wrenfold Mews, Brindlewick, but the job is 4 Thistlewick Rise, Larkcombe, so it is a property mismatch. We cannot route it for approval or instruct work on it. Ewan's breakdown in event-21 (materials £1,270, labour £1,170, plus VAT, 10% commission and a 50% deposit) gives no revised total and does not obviously reconcile with the £2,370 subtotal. This is a question for the sender, not a conflict needing a person, so I asked Ewan for the property confirmation and one corrected, itemised quote. I also sent Orin a short update that the quote is being clarified and nothing is approved. Escalation is not needed because Ewan can answer. The leak is ongoing but no danger is reported and the code raises no hazard flag, so P2. A corrected quote that is confirmed for 4 Thistlewick Rise should then go to the landlord for approval, since any figure is well over the £300 limit. [gate: documents disagree on property_address ('4 Thistlewick Rise, Larkcombe, ZZ1 1ZZ' vs '8 Wrenfold Mews, Brindlewick, ZZ1 1ZZ'); a person must confirm which is right]
 
 ## Actions taken
 
 - **HELD_FOR_REVIEW**: Message to landlord (update, P2) `message-1`. Held: code gates changed the decision to ESCALATE.
-- **HELD_FOR_REVIEW**: Follow-up at 2025-09-25T16:12:00+00:00, waiting on provider: Awaiting Hearthline confirmation of quote address and a single itemised quote `followup-2`. Held: code gates changed the decision to ESCALATE.
+- **HELD_FOR_REVIEW**: Follow-up at 2025-09-26T16:12:00+00:00, waiting on provider: Awaiting corrected, itemised quote and property confirmation from Hearthline `followup-2`. Held: code gates changed the decision to ESCALATE.
 - **HELD_FOR_REVIEW**: Message to provider (request_info, P2) `message-3`. Held: code gates changed the decision to ESCALATE.
 - **COMMITTED**: Escalation ticket P2 to property_manager `escalation-4`. Created automatically because the final decision is an escalation.
 
 ### Message to landlord `message-1`
 
-Hi Orin, sorry for the confusion. The only quote we hold is Hearthline's dated 18 September, totalling £2,844.00 including VAT. The PDF carries a different property address from yours, and the contractor's later breakdown doesn't add up to that total. We have asked Hearthline to confirm the address and send one corrected, itemised quote. We will send it to you for a decision once we have it. Nothing has been approved or started.
-
-Mira Sallow, Northbridge Lettings
+Hi Orin, thanks for checking. Apologies for the confusion. The only quotation so far is Hearthline's dated 18 September 2025 for £2,844.00 including VAT, but the PDF shows a different property address and the later breakdown does not add up to the same figure. We have asked Hearthline to confirm and send one corrected, itemised quote. We will send it to you for your decision. Please do not treat any figure as approved until then. Kind regards, Mira Sallow, Northbridge Lettings
 
 ### Message to provider `message-3`
 
-Hi Ewan, two points on your quotation NBL-001-Q1 dated 18 September 2025 before we can take it to the landlord.
-
-1. The PDF shows the property as 8 Wrenfold Mews, Brindlewick, ZZ1 1ZZ. Our job is for 4 Thistlewick Rise, Larkcombe, ZZ1 1ZZ (the shower leak you inspected). Please confirm which property the quote is for. If it is for Thistlewick Rise, please reissue it with the correct address.
-
-2. The quote shows a subtotal of £2,370.00, VAT of £474.00 and a total of £2,844.00. Your breakdown by email gave materials £1,270 and labour £1,170, and did not state a revised total. Please send one itemised quote showing materials, labour, VAT and the total, and explain how the 10% commission and the 50% deposit are calculated. Please also confirm which figure is the current price.
-
-We are not treating any quote as approved yet and nothing should be started. Thank you.
-
-Mira Sallow, Northbridge Lettings
+Hi Ewan, two points on your quotation NBL-001-Q1 dated 18 September 2025. 1) The PDF names the property as 8 Wrenfold Mews, Brindlewick, ZZ1 1ZZ, but the inspection was at 4 Thistlewick Rise, Larkcombe, ZZ1 1ZZ. Please confirm which property the quote is for and send a corrected copy if it is wrong. 2) The quote shows a £2,370.00 subtotal, but your later breakdown of materials £1,270 and labour £1,170 does not obviously match it, and it is unclear how the 10% commission applies. Please send one itemised quote with subtotal, VAT and total, and say how the 50% deposit is calculated. Nothing is approved yet, and we cannot instruct work until the landlord approves a single corrected quote. Kind regards, Mira Sallow, Northbridge Lettings
 
 ## Handover for the person taking over
 
-The landlord's latest message (event-23) asks which quote we mean. Event-5 approved only an inspection and a quote, and nothing has been approved since. The code's "approval in force" of £1,270 (event-23) is wrong: event-23 is a question, not an approval. The quote PDF (bathroom-works-quotation.pdf, event-16) names 8 Wrenfold Mews, Brindlewick, not our job address at 4 Thistlewick Rise, Larkcombe. That is a property mismatch under verify_claims, so we cannot route it for approval or instruct on it. The price is also unclear. The PDF total is £2,844.00 (£2,370 plus £474 VAT), while Ewan's email (event-21) gives materials £1,270 and labour £1,170, mentions commission and a 50% deposit, and states no revised total. The quote is above the £300 limit and the agency cannot approve spend. I asked Ewan to confirm the address and send one itemised quote. I also staged a short note to Orin saying which quote exists, why it is on hold, and that nothing is approved. Escalation is not needed because Ewan can answer this directly. There is no reported danger or hazard keyword, although the leak is ongoing, so I set P2. A follow-up is set for 48 hours. If Ewan says the address is correct and sends a consistent itemised quote, route it to the landlord for approval. [gate: documents disagree on property_address ('4 Thistlewick Rise, Larkcombe, ZZ1 1ZZ' vs '8 Wrenfold Mews, Brindlewick, ZZ1 1ZZ'); a person must confirm which is right]
+The landlord's latest message (event-23) asks which quote we mean, and he has approved nothing. Event-5 only authorised an inspection and a quote. The code's "approval in force £1,270" is wrong: event-23 is a question, not an approval. The quote PDF (bathroom-works-quotation.pdf, event-16) names 8 Wrenfold Mews, Brindlewick, but the job is 4 Thistlewick Rise, Larkcombe, so it is a property mismatch. We cannot route it for approval or instruct work on it. Ewan's breakdown in event-21 (materials £1,270, labour £1,170, plus VAT, 10% commission and a 50% deposit) gives no revised total and does not obviously reconcile with the £2,370 subtotal. This is a question for the sender, not a conflict needing a person, so I asked Ewan for the property confirmation and one corrected, itemised quote. I also sent Orin a short update that the quote is being clarified and nothing is approved. Escalation is not needed because Ewan can answer. The leak is ongoing but no danger is reported and the code raises no hazard flag, so P2. A corrected quote that is confirmed for 4 Thistlewick Rise should then go to the landlord for approval, since any figure is well over the £300 limit. [gate: documents disagree on property_address ('4 Thistlewick Rise, Larkcombe, ZZ1 1ZZ' vs '8 Wrenfold Mews, Brindlewick, ZZ1 1ZZ'); a person must confirm which is right]
 
 Respond by 2025-09-24T16:12:00+00:00 (P2, route property_manager).
 
@@ -272,9 +263,11 @@ Known:
 - Request: The tenant reports a continuing leak behind the shower and moisture coming through the bathroom wall covering. A previous tightening of the pipe did not hold, and the visible wall deterioration has worsened. (request)
 
 Not known:
-- Whether the quote is really for 4 Thistlewick Rise
-- Actual total and basis of commission and deposit
-- Whether the landlord will approve
+- Which property the quote is for
+- Correct itemised subtotal, VAT and total
+- How the 10% commission and 50% deposit are calculated
+- Whether the landlord will approve the corrected quote
+- Whether the inspection actually took place at 4 Thistlewick Rise
 - Which conflicting value is right (see conflicts)
 
 Tried:

@@ -2,8 +2,8 @@
 
 - Decided by: the model, checked by code
 - Events seen: 17
-- Model: claude-sonnet-5-5, 3 turn(s), 38756 tokens
-- Evidence cited: event-001, event-016, event-017, event-015
+- Model: claude-sonnet-5-5, 3 turn(s), 39628 tokens
+- Evidence cited: event-001, event-016, event-017, event-005
 - Model confidence: 0.80
 
 ## 1. Decision and next action
@@ -15,17 +15,16 @@
 
 ## 2. Why
 
-The landlord (event-001) only asked for the current solar readings. This is an information request with no fault, no contractor and no spend. We have asked the tenant four times (events 6, 10, 13, 16) and found no reading in the case. The tenant replied in event-17 saying the readings were supplied about two weeks earlier by his wife by phone and email. He gave no figures or image. That claim is unverified: nothing in this case's correspondence shows it (events 9, 12 and 15 record no reply). I am not chasing, because the tenant has now replied. I am not escalating, because there is no danger, dispute or authority issue; this is a single missing fact the tenant holds. I staged a polite request for the figure or a photo, and for the approximate date of the wife's contact so the office can check other inboxes and call logs. The landlord has not been updated and has had no reading since 3 Sept. Follow-up is set for 72 hours. If office records show the readings were received, pass them to the landlord instead.
+The landlord (event-001) only wants the current solar generation readings. It is an information request with no fault, deadline or contractor, so no approval or provider is involved. We have asked the tenant four times (events 6, 10, 13, 16). In event-17 he says the readings were supplied about two weeks ago by his wife, by phone and email. No figures or image are in the case, and nothing in the request shows a reading received. That is a claim I cannot verify, and it is not a safety or fraud issue. The tenant has just replied, so chasing again or waiting is not appropriate. Escalating is not needed yet. I have asked him to resend the figure or a photo and to say when and from which address his wife emailed, so that staff can trace the earlier message. The case should not close and the landlord should not be told it is done, as no reading is in the case. If a reading turns up in another mailbox or call log, we can pass it to Edwin. If there is still no reading after this reply, a person should check the office inbox and call log. Event-005 also marked approval as given without any landlord approval message; this is moot because no work is being instructed.
 
-Evidence cited by the model: event-001, event-016, event-017, event-015
+Evidence cited by the model: event-001, event-016, event-017, event-005
 
 ## 3. Missing information and conflicting facts
 
 Not known:
 
-- Whether the tenant's wife actually phoned or emailed the readings
+- Whether the wife's earlier call or email exists and where it was logged
 - The actual kWh reading
-- Whether the readings sit in another inbox or case
 
 ### Inconsistencies and mismatches
 
@@ -36,8 +35,8 @@ Checked: addresses, invoice amounts against quotes and approval, completion agai
 
 ## Document consistency check
 
-- landlord_name [flag, similarity 0.66, confidence 0.96]: 'Edwin Vale' (event-001); 'Edwin' (event-001, event-005, event-006, event-013)
-- tenant_name [flag, similarity 0.67, confidence 0.97]: 'Ivo Mercer' (event-004, event-006, event-010, event-013, event-014, event-016, event-017); 'Ivo' (event-006, event-017)
+- landlord_name [flag, similarity 0.66, confidence 0.98]: 'Edwin Vale' (event-001); 'Edwin' (event-001, event-005, event-006, event-013)
+- tenant_name [flag, similarity 0.67, confidence 0.96]: 'Ivo Mercer' (event-004, event-006, event-010, event-013, event-014, event-016, event-017); 'Ivo' (event-006, event-017)
 
 Input warnings:
 
@@ -48,7 +47,6 @@ Input warnings:
 EXECUTED means the action was committed. PROPOSED, NOT SENT means it was staged and then held because the final decision changed or a person must approve it first.
 
 - **EXECUTED**: Message to tenant (request_info, P3) `message-1`. Recorded in the local outbox (no external delivery connected).
-- **PROPOSED, NOT SENT**: Follow-up at 2025-09-21T17:42:00+00:00, waiting on tenant: Awaiting solar reading/photo from tenant; also check office records for earlier phone/email from tenant's wife and update landlord. `followup-2`. Held: not part of the final action ASK_TENANT; a person can release it.
 
 Checks applied by code:
 
@@ -65,7 +63,7 @@ No person is needed for this step; the system handles it autonomously within the
 ## Uncertainty
 
 - Model confidence: 0.80
-- Open questions: 3
+- Open questions: 2
 - Code overrides: none
 - Safety hazard flagged: no
 
@@ -73,15 +71,15 @@ No person is needed for this step; the system handles it autonomously within the
 
 - Full decision record: `decision.json` in this folder
 - Run-level log: `../trace.jsonl` and `../manifest.json`
-- Idempotency key: `bc28f718d70a9812`
+- Idempotency key: `170503ad8039726e`
 
 ## Tool trace
 
 Every tool call the agent made, in order, with the code's response.
 
 0. `consistency_check(null)` -> `{"status": "ok", "checks": ["landlord_name:flag", "tenant_name:flag"], "dropped": 0, "error": null}`
-1. `search_case({"query": "reading"})` -> `{"status": "ok", "hits": "10 item(s)"}`
-1. `check_policy({"topic": "chasing,communication,scope,data"})` -> `{"status": "ok"}`
-2. `send_message({"to": "tenant", "purpose": "request_info", "body": "Dear Ivo, thank you for your reply, and apologies for the repeated messages. We cannot see the readings against this request, so they may have been filed elsewhere. Could you please reply with the current kWh figure from the generation meter or inverter display, or a photo of the screen? If your wife can also tell us roughly when she phoned or emailed, we will check our records. Kind regards, Maya Chen, Northbridge Lettings", "evidence_refs": ["event-017", "event-016", "event-009", "event-012"], "priority": "P3"})` -> `{"status": "staged", "id": "message-1", "note": "Staged. Committed only if the final decision passes code checks."}`
-2. `schedule_followup({"after_hours": 72, "waiting_on": "tenant", "reason": "Awaiting solar reading/photo from tenant; also check office records for earlier phone/email from tenant's wife and update landlord."})` -> `{"status": "staged", "id": "followup-2", "note": "Staged. Committed only if the final decision passes code checks."}`
-3. `submit_decision({"action": "ASK_TENANT", "priority": "P3", "reason": "The landlord (event-001) only asked for the current solar readings. This is an information request with no fault, no contractor and no spend. We have asked the tenant four times (events 6, 10, 13, 16) and found no reading in the case. The tenant replied in event-17 saying the readings were supplied about two weeks earlier by his wife by phone and email. He gave no figures or image. That claim is unverified: nothing in this case's correspondence shows it (events 9, 12 and 15 record no reply). I am not chasing, because the tenant has now replied. I am not escalating, because there is no danger, dispute or authority issue; this is a single missing fact the tenant holds. I staged a polite request for the figure or a photo, and for the appro)` -> `{"status": "accepted"}`
+1. `search_case({"query": "wife"})` -> `{"status": "ok", "hits": "1 item(s)"}`
+1. `search_case({"query": "kWh"})` -> `{"status": "ok", "hits": "1 item(s)"}`
+1. `check_policy({"topic": "verify_claims,communication,scope,closing"})` -> `{"status": "ok"}`
+2. `send_message({"to": "tenant", "purpose": "request_info", "body": "Dear Ivo, thank you for your reply, and apologies for the repeated messages. We cannot see the readings against this request, so they may have been logged elsewhere. Could you or your wife resend the current kWh figure from the generation meter or inverter display, or a photo of the screen? If you can, please also tell us roughly what date and which email address your wife used, so we can trace the earlier message. Kind regards, Maya Chen, Northbridge Lettings", "evidence_refs": ["event-017", "event-016", "event-006"], "priority": "P3"})` -> `{"status": "staged", "id": "message-1", "note": "Staged. Committed only if the final decision passes code checks."}`
+3. `submit_decision({"action": "ASK_TENANT", "priority": "P3", "reason": "The landlord (event-001) only wants the current solar generation readings. It is an information request with no fault, deadline or contractor, so no approval or provider is involved. We have asked the tenant four times (events 6, 10, 13, 16). In event-17 he says the readings were supplied about two weeks ago by his wife, by phone and email. No figures or image are in the case, and nothing in the request shows a reading received. That is a claim I cannot verify, and it is not a safety or fraud issue. The tenant has just replied, so chasing again or waiting is not appropriate. Escalating is not needed yet. I have asked him to resend the figure or a photo and to say when and from which address his wife emailed, so that staff can trace the )` -> `{"status": "accepted"}`

@@ -48,7 +48,7 @@
 - **Confidence:** 0.80
 - **Decided by:** model
 - **As of:** 2025-09-14T09:20:00+00:00
-- **Evidence cited:** event-022, tap-works-invoice.pdf, event-001, event-004, event-014, event-015, event-020, event-021
+- **Evidence cited:** event-022, tap-works-invoice.pdf, event-020, event-004, event-014, event-015, event-005
 
 ### Case card (machine-readable)
 
@@ -171,12 +171,11 @@
     "evidence_refs": [
       "event-022",
       "tap-works-invoice.pdf",
-      "event-001",
+      "event-020",
       "event-004",
       "event-014",
       "event-015",
-      "event-020",
-      "event-021"
+      "event-005"
     ]
   },
   "calls": [],
@@ -191,15 +190,16 @@ Initial request: The tenant reports that the kitchen tap drips and the bathroom 
 
 ## Decision
 
-The invoice (event-022, tap-works-invoice.pdf) from the assigned provider Copper Finch lists the property as Flat 4, 28 Larkspur Quay, Brindlewick. Our job is Flat 4, 8-12 Juniper Mews, Vellumford (event-001). That is a property mismatch under verify_claims, so I will not close, pay, forward the invoice or report the work as done on it. The invoice also shows no amount, and no quote or cost approval exists. The landlord approved only attendance (event-004). The contractor's completion messages are contradictory: "job done today" on 11 Sept (event-014) was corrected the next message (event-015), and the visit took place on 12 Sept (event-020). Nothing in the case shows the vent leak or bedroom damp were investigated (event-021). Damp has been reported with no health impact or vulnerable occupants, and no active danger is stated, so I set P2 rather than P1. The right step is a specific question to the invoice's sender, not escalation: ask which property it relates to, request a corrected itemised invoice, and ask for the visit report on the vent and damp. The landlord's separate requests about insurance and roof-leak history (event-004) have no recorded follow-up. The case cannot close while the damp and vent issues are unresolved. If the provider confirms the wrong property or disputes the address, a person should review it.
+The invoice (event-022, tap-works-invoice.pdf) is for Flat 4, 28 Larkspur Quay, Brindlewick. Our job is Flat 4, 8-12 Juniper Mews, Vellumford (index, event-020), so the property check failed. The invoice also states no amount, and the landlord approval (event-004) is a general "proceed" with no figure. The invoice covers only the two taps. Nothing records any investigation of the bathroom vent leak or the bedroom damp, and the damp was never triaged for health impact. The completion signal (event-014) was retracted in event-015, so it is not proof. I am not closing, paying or telling the landlord the work is done. The question for Gareth is a single one, which property the invoice is for, so asking him is enough and escalation isn't needed yet. I also asked him for an itemised amount and a visit report on the vent and damp. Priority is P2: there is no reported danger, but the water ingress and damp are unresolved. A follow-up is set for 72 hours. Open items that need their own handling: the landlord's insurance and roof-leak history requests (event-004, event-005) are still undone, and the landlord has had no update since event-012. A person should pick these up, and should escalate if the damp turns out to affect health.
 
 ## Actions taken
 
 - **COMMITTED**: Message to provider (request_info, P2) `message-1`. Recorded in the local outbox (no external delivery connected).
+- **HELD_FOR_REVIEW**: Follow-up at 2025-09-17T09:20:00+00:00, waiting on provider: Awaiting property confirmation, corrected itemised invoice and visit report from Copper Finch `followup-2`. Held: not part of the final action ASK_PROVIDER; a person can release it.
 
 ### Message to provider `message-1`
 
-Hi Gareth, thanks for invoice NBL-003-INV-14 dated 14 September 2025. It lists the property as Flat 4, 28 Larkspur Quay, Brindlewick, ZZ1 1ZZ. Our job, and your visit on Friday 12 September, was for Flat 4, 8-12 Juniper Mews, Vellumford, ZZ1 1ZZ. Please confirm which property the invoice relates to and, if it is the wrong one, send a corrected invoice for Juniper Mews. We can't process it until this is clear. The invoice also shows no amounts. Please include an itemised cost on the corrected version. Separately, your visit report is still outstanding. Please tell us whether you looked at the rainwater coming through the bathroom vent and the damp patches in the smaller bedroom, and what you found. Kind regards, Priya Nair, Northbridge Lettings
+Hi Gareth, thanks for the invoice NBL-003-INV-14 dated 14 September. It shows the property as Flat 4, 28 Larkspur Quay, Brindlewick, ZZ1 1ZZ. Our job, and your visit on Friday 12 September, was for Flat 4, 8-12 Juniper Mews, Vellumford, ZZ1 1ZZ. Please confirm which property the invoice is for, and send a corrected invoice if it is wrong. The invoice also shows no amount. Please include an itemised total. Please also send your visit report. It should say what you found on the bathroom vent rainwater leak and the smaller bedroom damp, and whether any further work is needed. We can't process the invoice until this is confirmed. Kind regards, Priya Nair, Northbridge Lettings
 
 ## Inconsistencies and mismatches
 

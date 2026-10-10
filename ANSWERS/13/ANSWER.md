@@ -40,7 +40,7 @@
 - **Confidence:** 0.80
 - **Decided by:** model
 - **As of:** 2025-09-10T10:10:00+00:00
-- **Evidence cited:** event-023, event-010, event-011, event-012, event-021, event-014, glazing-invoice.pdf
+- **Evidence cited:** event-023, event-021, event-010, event-011, event-009, event-022, glazing-invoice.pdf
 
 ### Case card (machine-readable)
 
@@ -139,11 +139,11 @@
     "as_of": "2025-09-10T10:10:00+00:00",
     "evidence_refs": [
       "event-023",
+      "event-021",
       "event-010",
       "event-011",
-      "event-012",
-      "event-021",
-      "event-014",
+      "event-009",
+      "event-022",
       "glazing-invoice.pdf"
     ]
   },
@@ -159,15 +159,16 @@ Initial request: The kitchen glazing has been misted between the panes for some 
 
 ## Decision
 
-Clearfirth (assigned, event-6) invoice NBL-013-INV-09 (event-23, glazing-invoice.pdf) matches the property and the work description, but the Amount is blank, so I cannot compare it with the approval. The landlord's approval is ambiguous: event-10 was conditional on £180 being the total, while event-11 described £150 plus VAT, and event-12 recorded approval. Both come to £180 including VAT, so the invoice must show £180 or less. There is also no completion evidence: the last provider contact (event-21) said the glass had not arrived, and no visit was arranged. The tenant wanted to be present (event-14), and the 'awaiting post-visit documents' note (event-22) is internal and not proof. I am therefore not closing and not forwarding the invoice. I am asking the provider for an invoice with the amount and VAT shown, and for confirmation of whether the pane was fitted, when, and who was present. Escalating is not needed: this is a routine missing fact held by the provider. The damp and cold concern (event-1) has no health impact or vulnerable occupant reported and was never assessed (event-5). It should be raised with the landlord or a person after the glazing is done, since fitting a pane does not itself resolve damp. If the invoice exceeds £180 it goes back to the landlord for approval.
+The invoice (glazing-invoice.pdf, event-23) is from the assigned provider, Clearfirth Glazing. It names the correct property and its reference is consistent, but its Amount field is blank. We therefore cannot compare it with the landlord's approval. The landlord's conditional reply (event-10) was happy if £180 was the total. Our own request (event-11) then stated £150 plus VAT, so the approval record is somewhat ambiguous, although £180 including VAT is consistent with £150 plus VAT (event-9). Nothing in the case confirms the work was done. The last provider contact (event-21, 2 Sept) said the glass had still not arrived, and no visit or appointment is recorded. The note at event-22 moving the case to post-visit documents is not proof of completion. The tenant also wanted to be present for the visit (event-14). Closing is therefore not possible. Routing for approval is not possible either without an amount. The provider holds both facts, so I asked for an itemised invoice with the amount and for confirmation of fitting. Escalation is not needed. Nothing is unsafe: the sash locks, and the damp concern is not a reported health impact. The earlier damp concern has no site assessment recorded (event-5). That is a point to revisit once the glass is fitted. I scheduled a follow-up in 72 hours. The decision would change if the invoice amount exceeds £180, which would go back to the landlord, or if the provider says the work was not done.
 
 ## Actions taken
 
 - **COMMITTED**: Message to provider (request_info, P2) `message-1`. Recorded in the local outbox (no external delivery connected).
+- **HELD_FOR_REVIEW**: Follow-up at 2025-09-13T10:10:00+00:00, waiting on provider: Awaiting invoice with amount and confirmation that the glass was fitted `followup-2`. Held: not part of the final action ASK_PROVIDER; a person can release it.
 
 ### Message to provider `message-1`
 
-Hello Sella, we have received Clearfirth Glazing invoice NBL-013-INV-09 dated 10 September 2025 for 8 Brackenmere Walk (supply and fit 1 pane of glass to the kitchen glazing). The amount field on our copy is blank, so please send a copy showing the amount, with any VAT itemised. Our last update (2 September) was that the glass had not arrived and no appointment had been arranged. Please also confirm whether the pane has been fitted, and if so on what date and who was present, as the tenant asked to be at the visit. If it has not been fitted yet, please give the expected delivery and fitting dates. Kind regards, Tamsin Rook, Northbridge Lettings
+Hello Sella, we have received invoice NBL-013-INV-09 dated 10 September 2025 for 8 Brackenmere Walk (supply and fit 1 pane of glass to the kitchen glazing). The amount field is blank, so we cannot check it against the landlord's approval. Please could you send a copy showing the amount, with VAT shown separately? Please also confirm whether the glass has arrived and the pane has been fitted. If it has, tell us the date of the visit. If it has not, tell us the expected delivery and fitting date. The tenant asked to be present for the visit. Thank you, Tamsin Rook, Northbridge Lettings
 
 ## Inconsistencies and mismatches
 
@@ -177,4 +178,4 @@ Checked: addresses, invoice amounts against quotes and approval, completion agai
 
 ## Separate issues to raise as new requests
 
-- Tenant's wider damp and cold concern in the kitchen was never assessed; follow up after the glazing is complete
+- Tenant's wider damp and cold concern in the kitchen has had no site assessment (event-5)

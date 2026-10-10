@@ -31,7 +31,7 @@
 - **Confidence:** 0.80
 - **Decided by:** model
 - **As of:** 2025-09-18T17:42:00+00:00
-- **Evidence cited:** event-001, event-016, event-017, event-015
+- **Evidence cited:** event-001, event-016, event-017, event-005
 
 ### Case card (machine-readable)
 
@@ -118,7 +118,7 @@
       "event-001",
       "event-016",
       "event-017",
-      "event-015"
+      "event-005"
     ]
   },
   "calls": [],
@@ -133,16 +133,15 @@ Initial request: The landlord asked for the current solar generation readings fo
 
 ## Decision
 
-The landlord (event-001) only asked for the current solar readings. This is an information request with no fault, no contractor and no spend. We have asked the tenant four times (events 6, 10, 13, 16) and found no reading in the case. The tenant replied in event-17 saying the readings were supplied about two weeks earlier by his wife by phone and email. He gave no figures or image. That claim is unverified: nothing in this case's correspondence shows it (events 9, 12 and 15 record no reply). I am not chasing, because the tenant has now replied. I am not escalating, because there is no danger, dispute or authority issue; this is a single missing fact the tenant holds. I staged a polite request for the figure or a photo, and for the approximate date of the wife's contact so the office can check other inboxes and call logs. The landlord has not been updated and has had no reading since 3 Sept. Follow-up is set for 72 hours. If office records show the readings were received, pass them to the landlord instead.
+The landlord (event-001) only wants the current solar generation readings. It is an information request with no fault, deadline or contractor, so no approval or provider is involved. We have asked the tenant four times (events 6, 10, 13, 16). In event-17 he says the readings were supplied about two weeks ago by his wife, by phone and email. No figures or image are in the case, and nothing in the request shows a reading received. That is a claim I cannot verify, and it is not a safety or fraud issue. The tenant has just replied, so chasing again or waiting is not appropriate. Escalating is not needed yet. I have asked him to resend the figure or a photo and to say when and from which address his wife emailed, so that staff can trace the earlier message. The case should not close and the landlord should not be told it is done, as no reading is in the case. If a reading turns up in another mailbox or call log, we can pass it to Edwin. If there is still no reading after this reply, a person should check the office inbox and call log. Event-005 also marked approval as given without any landlord approval message; this is moot because no work is being instructed.
 
 ## Actions taken
 
 - **COMMITTED**: Message to tenant (request_info, P3) `message-1`. Recorded in the local outbox (no external delivery connected).
-- **HELD_FOR_REVIEW**: Follow-up at 2025-09-21T17:42:00+00:00, waiting on tenant: Awaiting solar reading/photo from tenant; also check office records for earlier phone/email from tenant's wife and update landlord. `followup-2`. Held: not part of the final action ASK_TENANT; a person can release it.
 
 ### Message to tenant `message-1`
 
-Dear Ivo, thank you for your reply, and apologies for the repeated messages. We cannot see the readings against this request, so they may have been filed elsewhere. Could you please reply with the current kWh figure from the generation meter or inverter display, or a photo of the screen? If your wife can also tell us roughly when she phoned or emailed, we will check our records. Kind regards, Maya Chen, Northbridge Lettings
+Dear Ivo, thank you for your reply, and apologies for the repeated messages. We cannot see the readings against this request, so they may have been logged elsewhere. Could you or your wife resend the current kWh figure from the generation meter or inverter display, or a photo of the screen? If you can, please also tell us roughly what date and which email address your wife used, so we can trace the earlier message. Kind regards, Maya Chen, Northbridge Lettings
 
 ## Inconsistencies and mismatches
 

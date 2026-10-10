@@ -28,10 +28,10 @@
 
 - **Action:** Ask the tenant for more information
 - **Priority:** P2
-- **Confidence:** 0.75
+- **Confidence:** 0.80
 - **Decided by:** model
 - **As of:** 2025-09-06T18:42:00+00:00
-- **Evidence cited:** event-001, event-005, event-007, event-012, event-014
+- **Evidence cited:** event-001, event-007, event-009, event-012, event-014
 
 ### Case card (machine-readable)
 
@@ -108,14 +108,14 @@
   "decision": {
     "action": "ASK_TENANT",
     "priority": "P2",
-    "confidence": 0.75,
+    "confidence": 0.8,
     "decided_by": "model",
     "cause": null,
     "as_of": "2025-09-06T18:42:00+00:00",
     "evidence_refs": [
       "event-001",
-      "event-005",
       "event-007",
+      "event-009",
       "event-012",
       "event-014"
     ]
@@ -132,21 +132,16 @@ Initial request: The smoke alarm on the upstairs landing kept beeping despite at
 
 ## Decision
 
-The landlord said he would do the work himself (event-007, event-010). On 6 Sept he claimed completion on 31 August (event-012) and added details on the sockets and a dehumidifier (event-014). This is a claim, not proof. There is no invoice, photo or contractor detail, and no assigned provider. The claim is also thin: it says nothing about a replacement smoke alarm or closing the ceiling opening. Only one back-bedroom socket and one kitchen socket are mentioned, though the tenant reported several sockets (event-005). The dehumidifier suggests a possible damp issue in the bathroom that was never reported to us, so I need severity and health impact (damp_mould policy). The tenant has not been heard from since event-001. A working smoke alarm is a legal requirement, so I am not closing, and I am not escalating because nothing reports active danger and the tenant can supply the facts. I asked the tenant to confirm the alarm, ceiling, sockets and bathroom, and asked the landlord for detail and evidence. Follow-up in 72 hours. If the tenant says the alarm is missing, sockets are still loose or there is mould with health impact, escalate. The agency has not approved or instructed anything. The record update the landlord asked for should wait for confirmation.
+The landlord said he would do the work himself (event-7, event-10). On 6 Sept he claimed it was completed on 31 August (event-12) and added details about the sockets and a dehumidifier (event-14). This is only a claim. It gives no description of the alarm replacement, no contractor or certificate, and no evidence that the ceiling opening was closed. The tenant removed the alarm (event-1) and has not been heard from since 20 Aug. We told her we would check back on completion (event-9), so that promise is still open. I cannot close on the landlord's word alone. The tenant is the party who can confirm that a working alarm is fitted and the sockets are fixed, so I asked her (message-1). The property and landlord match the job, and no provider or invoice is involved, so there is no money or mismatch issue. I did not escalate because nothing shows danger or a dispute. A missing smoke alarm is a compliance concern, but the landlord reports it fixed, and the tenant never reported an immediate risk. The recorded alarm detail is still unverified. If the tenant says the alarm is still missing, or the sockets are still loose, or there is damp, I would escalate. The kitchen socket issue after boiler work in February and the dehumidifier/bathroom damp are possible separate issues to follow up.
 
 ## Actions taken
 
 - **COMMITTED**: Message to tenant (request_info, P2) `message-1`. Recorded in the local outbox (no external delivery connected).
-- **HELD_FOR_REVIEW**: Message to landlord (request_info, P2) `message-2`. Held: not part of the final action ASK_TENANT; a person can release it.
-- **HELD_FOR_REVIEW**: Follow-up at 2025-09-09T18:42:00+00:00, waiting on tenant: Awaiting tenant confirmation of smoke alarm, sockets, bathroom damp; and landlord detail on the work done `followup-3`. Held: not part of the final action ASK_TENANT; a person can release it.
+- **HELD_FOR_REVIEW**: Follow-up at 2025-09-09T18:42:00+00:00, waiting on tenant: Tenant confirmation of landlord's completion claim (alarm, ceiling, sockets, dehumidifier) `followup-2`. Held: not part of the final action ASK_TENANT; a person can release it.
 
 ### Message to tenant `message-1`
 
-Dear Nessa, the landlord has told us the work at 8 Brindlefern Walk was completed on 31 August. Before we update our record, could you please confirm: (1) Is a smoke alarm now fitted and working on the upstairs landing, and is the ceiling opening closed? (2) Have the loose plug sockets been fixed? If any are still coming away from the wall, please tell us which rooms. (3) The landlord says he gave you a dehumidifier for the bathroom. Is there damp or mould in the bathroom, and if so, how bad is it? Photos would help. Kind regards, Ivo Merrick, Northbridge Lettings
-
-### Message to landlord `message-2`
-
-Dear Tavian, thank you for the update. So we can record this correctly, could you confirm what was done on 31 August on the upstairs landing? Was a new smoke alarm fitted, and was the ceiling opening made good? Please also confirm whether all the loose sockets the tenant reported were dealt with. Your email mentions only one back-bedroom socket and one kitchen socket. If you have an invoice, photos or an electrician's confirmation, please send them. We have also asked the tenant to confirm. Kind regards, Ivo Merrick, Northbridge Lettings
+Dear Nessa, the landlord has told us he completed the work at 8 Brindlefern Walk on 31 August. Before we update our record, please could you confirm the following: (1) Is a working smoke alarm now fitted on the upstairs landing, and is the opening in the ceiling closed? (2) Have the loose plug sockets been fixed, including the kitchen and back bedroom, or are any still coming away from the wall? (3) Did you receive a portable dehumidifier for the bathroom, and is there any damp or mould there? If any alarm is missing or a socket is still loose, please tell us and we will follow it up. Kind regards, Ivo Merrick, Northbridge Lettings
 
 ## Inconsistencies and mismatches
 
@@ -156,5 +151,5 @@ Checked: addresses, invoice amounts against quotes and approval, completion agai
 
 ## Separate issues to raise as new requests
 
-- Plug sockets coming away from walls (electrical safety)
-- Possible bathroom damp/dehumidifier issue
+- Loose plug sockets (kitchen and back bedroom) reported alongside the alarm
+- Possible bathroom damp, with a dehumidifier supplied by the landlord on 6 August

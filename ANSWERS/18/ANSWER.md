@@ -154,21 +154,21 @@ Initial request: The tenant reports rat activity in the kitchen after returning 
 
 ## Decision
 
-The landlord said he would arrange the works himself (event-007), and no contractor, scope or date has been given in the 24 days since. The tenant says the expected contractors did not attend on 8 September and the openings are still unsealed (event-010, event-017). The earlier note said pest control made a final visit on 7 September (event-014), but the intended scope is unclear: under-sink openings versus the wall area. Nothing confirms completion (event-018). The three-day waiting period has expired (event-015, event-018), so a chase is due. We hold no approval to instruct a provider, so INSTRUCT_PROVIDER and ROUTE_FOR_APPROVAL do not apply. Escalation is not yet needed: no danger is reported, the landlord is reachable, and no chase has gone unanswered. The tenant reported rats indoors, but no health hazard or vulnerable occupant is stated, so P2. If the landlord stays silent after this chase, escalate to the property manager or place a call. The wait notes in events 13 and 16 were not a chase. [gate: model wants to chase the landlord but the timeline is not waiting on them]
+The landlord said he would arrange the pest works directly (event-007, event-008). Our 18 Aug email asked for a completion date, and 24 days later there has been no reply (event-007, facts). Chase timing (3 days) is met. The tenant reports the final pest-control visit on 7 Sep (event-014). The proofing contractor expected on 8 Sep did not attend (event-017). The tenant also described the scope in two ways: under-sink openings (event-010) and a wall area (event-014). That is a gap in our information rather than a dispute between parties, so I ask the landlord for contractor, scope and date. No contractor, quote or landlord approval is on file, so we cannot instruct a provider. A phone call was blocked by channel policy because only one written message is unanswered. Escalation is not yet justified: there is no reported danger (urgent_by_code false). The landlord is reachable and has not yet failed a chase. If there is no reply in 72 hours, place a call and escalate to the property manager. The tenant's wish for phone contact is noted. [gate: model wants to chase the landlord but the timeline is not waiting on them]
 
 ## Actions taken
 
 - **HELD_FOR_REVIEW**: Message to landlord (chase, P2) `message-1`. Held: code gates changed the decision to ESCALATE.
-- **HELD_FOR_REVIEW**: Follow-up at 2025-09-13T14:30:00+00:00, waiting on landlord: Chase sent for contractor, scope and date. If there is no reply, consider a call, since the tenant prefers phone and the landlord asked for a call earlier, and consider a handover to the property manager. `followup-2`. Held: code gates changed the decision to ESCALATE.
+- **HELD_FOR_REVIEW**: Follow-up at 2025-09-14T14:30:00+00:00, waiting on landlord: Chase sent; if no reply, place call to landlord and consider escalation to property manager `followup-2`. Held: code gates changed the decision to ESCALATE.
 - **COMMITTED**: Escalation ticket P2 to property_manager `escalation-3`. Created automatically because the final decision is an escalation.
 
 ### Message to landlord `message-1`
 
-Dear Mr Vale, we are following up on the rat activity at 14 Mosswold Crescent, Brindlewick. On 18 August we recorded that you would arrange the works directly, and we asked for an expected completion date and confirmation when complete. We have not had that. The tenant reports that pest control made what they understood to be a final visit on 7 September, but that the contractors expected to fill or work on the openings did not attend on 8 September, and the openings are still unsealed. Please could you tell us: (1) who your contractor is and what work is planned (the under-sink openings, the wall area or the external drain openings), (2) the date it will be done, and (3) whether you can share any pest-control report. If you would rather Northbridge Lettings arrange an inspection, please say so. We cannot instruct anyone without your written approval. Kind regards, Tara Wren, Northbridge Lettings
+Dear Mr Vale, following my email of 18 August, we have not yet had an expected completion date or confirmation of the pest works at 14 Mosswold Crescent. The tenant reports that pest control made its final visit on 7 September, but the contractor expected on 8 September to seal the openings did not attend, and the openings are still reported as unsealed. Could you please tell us: (1) which contractor is doing the proofing, (2) the scope (under-sink openings and/or the wall area), and (3) the date they will attend? The tenant has said a phone call is easiest for access. If you would prefer Northbridge Lettings to arrange the proofing, please say so and we will request a quote for your approval. Kind regards, Tara Wren, Northbridge Lettings
 
 ## Handover for the person taking over
 
-The landlord said he would arrange the works himself (event-007), and no contractor, scope or date has been given in the 24 days since. The tenant says the expected contractors did not attend on 8 September and the openings are still unsealed (event-010, event-017). The earlier note said pest control made a final visit on 7 September (event-014), but the intended scope is unclear: under-sink openings versus the wall area. Nothing confirms completion (event-018). The three-day waiting period has expired (event-015, event-018), so a chase is due. We hold no approval to instruct a provider, so INSTRUCT_PROVIDER and ROUTE_FOR_APPROVAL do not apply. Escalation is not yet needed: no danger is reported, the landlord is reachable, and no chase has gone unanswered. The tenant reported rats indoors, but no health hazard or vulnerable occupant is stated, so P2. If the landlord stays silent after this chase, escalate to the property manager or place a call. The wait notes in events 13 and 16 were not a chase. [gate: model wants to chase the landlord but the timeline is not waiting on them]
+The landlord said he would arrange the pest works directly (event-007, event-008). Our 18 Aug email asked for a completion date, and 24 days later there has been no reply (event-007, facts). Chase timing (3 days) is met. The tenant reports the final pest-control visit on 7 Sep (event-014). The proofing contractor expected on 8 Sep did not attend (event-017). The tenant also described the scope in two ways: under-sink openings (event-010) and a wall area (event-014). That is a gap in our information rather than a dispute between parties, so I ask the landlord for contractor, scope and date. No contractor, quote or landlord approval is on file, so we cannot instruct a provider. A phone call was blocked by channel policy because only one written message is unanswered. Escalation is not yet justified: there is no reported danger (urgent_by_code false). The landlord is reachable and has not yet failed a chase. If there is no reply in 72 hours, place a call and escalate to the property manager. The tenant's wish for phone contact is noted. [gate: model wants to chase the landlord but the timeline is not waiting on them]
 
 Respond by 2025-09-12T14:30:00+00:00 (P2, route property_manager).
 
@@ -178,24 +178,24 @@ Known:
 - Request: The tenant reports rat activity in the kitchen after returning from a short trip and asks for the issue to be addressed. They mention earlier pest-control visits and possible openings near the kitchen drain. (request)
 
 Not known:
-- Landlord's contractor and the scope of work
-- Whether the pest-control report exists
-- Whether any openings have been sealed
-- Which openings are meant: under the sink, the wall area or the external drain
+- Which contractor the landlord has engaged
+- Intended proofing scope (under-sink vs wall area)
+- Completion date
+- Whether the final pest-control visit happened and whether a report exists
 
 Tried:
 - Agent proposed CHASE_LANDLORD
 - model wants to chase the landlord but the timeline is not waiting on them
 
 Options:
-- Recommended: Wait for the landlord's reply
-- Place a call to the landlord if there is no reply in 48 hours
-- Escalate to the property manager to propose an agency inspection with landlord approval
+- Recommended: Review the timeline and decide the next step
+- Contact the party we are waiting on directly
 
-Recommended: Recommended: Wait for the landlord's reply
+Recommended: Recommended: Review the timeline and decide the next step
 
 ## What was blocked or failed
 
+- Tool gate refused `place_call`: only 1 unanswered written message(s) to the landlord so far; a call is for when 2 go unanswered, written contact bounces, or the matter is urgent
 - Final code check: model wants to chase the landlord but the timeline is not waiting on them
 
 ## Inconsistencies and mismatches

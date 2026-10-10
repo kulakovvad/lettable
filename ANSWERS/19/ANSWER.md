@@ -39,10 +39,10 @@
 
 - **Action:** Ask the provider for more information
 - **Priority:** P2
-- **Confidence:** 0.70
+- **Confidence:** 0.75
 - **Decided by:** model
 - **As of:** 2025-09-11T06:58:16+00:00
-- **Evidence cited:** event-005, event-008, event-013, event-014, event-016, remedial-works-invoice.pdf
+- **Evidence cited:** event-005, event-008, event-013, event-014, event-016, remedial-works-invoice.pdf, event-003
 
 ### Case card (machine-readable)
 
@@ -146,7 +146,7 @@
   "decision": {
     "action": "ASK_PROVIDER",
     "priority": "P2",
-    "confidence": 0.7,
+    "confidence": 0.75,
     "decided_by": "model",
     "cause": null,
     "as_of": "2025-09-11T06:58:16+00:00",
@@ -156,7 +156,8 @@
       "event-013",
       "event-014",
       "event-016",
-      "remedial-works-invoice.pdf"
+      "remedial-works-invoice.pdf",
+      "event-003"
     ]
   },
   "calls": [],
@@ -171,25 +172,19 @@ Initial request: Move-out inspection identified six maintenance items: a cracked
 
 ## Decision
 
-Alder & Finch (assigned provider, event-007/008) sent invoice NBL-019-INV-11 for £174 (event-014, remedial-works-invoice.pdf). The address and provider match the job. The only variation is the shortened address in event-002, which is not a real mismatch. However, we asked for a quotation only and told them not to start work until we issued written authority (event-008). Rowan said he misunderstood and had already done the work (event-013). The landlord's approval (event-005) was to proceed with the remedial works. It set no price and was given before any quote, so it does not clearly cover a specific amount. The £174 is below the £300 threshold but that is not an agency allowance. The invoice is a single lump sum with no itemisation, and there is no quote, no attendance date, no access details and no photos. The former tenant had returned the keys on 27 August (event-003) and the agency held a set, so how access was gained is unexplained. Completion is only the provider's claim, so I am not closing or paying, and I am not telling the landlord the work is done. I chose a specific question to the provider over escalation because the provider holds the missing facts. If the answers show unauthorised access or a dispute, or if the landlord questions the cost, route it to a person. Once the details are in, route the invoice to the landlord for approval of £174, or check completion with the landlord. The tenant has left, so the closing check on completion must come from the provider or landlord. No hazard is reported.
+Alder & Finch is the assigned provider (event-7, event-8) and the invoice matches the property address (the "18 Brindle Row" in event-2 is a shortened form, not a mismatch). But the invoice (event-14, event-16, remedial-works-invoice.pdf) is a single unitemised £174.00 line, and the work was done without the quote and written authority we required (event-8). The landlord's approval (event-5) was a general go-ahead with no price, and no quote exists. The £174 is under the £300 threshold, but the agency cannot approve spend. There is no evidence of completion beyond the contractor's own claim: no visit date, no access details (the tenant left on 27 August and keys were returned, event-3, so how access was gained is unknown), and no photos. The invoice also says a new Venetian blind was supplied, where the request was for a blind repair, which is a scope variation nobody approved. I am asking the provider for an itemised breakdown, visit date, access details, photos and the reason for the blind replacement, and not treating the invoice as payable meanwhile. I am not closing: the invoice position and approval do not match, and completion is unverified. Escalation is not needed yet because the provider can supply these facts. Once the provider replies, the likely next step is routing to the landlord for approval of the invoice, or a person if the access or authorisation answers are disputed. The agency should also tell the landlord about the invoice once its details are clarified.
 
 ## Actions taken
 
 - **COMMITTED**: Message to provider (request_info, P2) `message-1`. Recorded in the local outbox (no external delivery connected).
-- **HELD_FOR_REVIEW**: Follow-up at 2025-09-13T06:58:16+00:00, waiting on provider: Awaiting itemised invoice, attendance/access details and photos from Alder & Finch before routing the £174 invoice to the landlord. `followup-2`. Held: not part of the final action ASK_PROVIDER; a person can release it.
+- **HELD_FOR_REVIEW**: Follow-up at 2025-09-13T06:58:16+00:00, waiting on provider: Awaiting itemised invoice, visit date/access details and photos before routing the invoice to landlord. `followup-2`. Held: not part of the final action ASK_PROVIDER; a person can release it.
 
 ### Message to provider `message-1`
 
-Hello Rowan, thank you for sending invoice NBL-019-INV-11 (£174.00) for 18 Brindle Row. Before we can take it to the landlord, please send us the following:
-1. An itemised breakdown of the £174.00 across the six items (floorboard and carpet, new Venetian blind, cupboard handle, kitchen blind, toilet seat, gate hinge), including materials and labour.
-2. The date and time you attended, and how you got access to the property. The former tenant vacated on 27 August, and we had asked for inspection windows and access details first.
-3. Any before and after photos of the work.
-To confirm, our request was for a quotation only. No price has been agreed and no written authority to start work was issued. The invoice is not approved or payable at this stage. We will put it to the landlord once we have this information.
-Kind regards,
-Maya Chen, Northbridge Lettings
+Hello Rowan, thank you for sending invoice NBL-019-INV-11 (£174.00) for 18 Brindle Row, Larkspur Vale, ZZ1 1ZZ. Before we can take it to the landlord, please send: (1) an itemised breakdown of the £174.00 for each of the six items, including labour and materials; (2) the date of the visit and how you got access to the property; (3) before/after photos of the completed work, if you have them. Please also confirm whether the lounge blind was replaced with a new Venetian blind rather than repaired, and why. As set out in our email of 7 September, we asked for a quotation only, and written authority had not been issued, so the invoice is not approved for payment at this stage. Kind regards, Maya Chen, Northbridge Lettings
 
 ## Inconsistencies and mismatches
 
-- **document consistency** (flag): property address differs between documents: '18 Brindle Row, Larkspur Vale, ZZ1 1ZZ' vs '18 Brindle Row' (similarity 0.677). [event-002, index, remedial-works-invoice.pdf]
+- **document consistency** (flag): property address differs between documents: '18 Brindle Row, Larkspur Vale, ZZ1 1ZZ' vs '18 Brindle Row' (similarity 0.683). [event-002, index, remedial-works-invoice.pdf]
 
 Checked: addresses, invoice amounts against quotes and approval, completion against later reports, contact details; document consistency check on.

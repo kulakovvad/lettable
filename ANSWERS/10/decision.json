@@ -1,21 +1,22 @@
 {
   "case_id": "10",
-  "action": "WAIT",
-  "reason": "The landlord was sent the full-kitchen figures only minutes ago (event-025), so a reply is not due; the chase threshold is 3 days. The recorded approval covers only the original laminate-repair scope (event-006). The landlord's later messages requested estimates, not approval (event-004, event-016). The contractor's quote (event-024) is £4,850 + VAT supply, £3,800 + VAT fitting and £230 + VAT waste, with an electrical estimate of £380 + VAT. It is far above the £300 limit, and the commission basis, cap and VAT-inclusive total are unconfirmed (event-022, event-023). So I cannot instruct the contractor, and I cannot say the work is approved. The cupboards-and-doors-only estimate is still missing, and the landlord already knows this (event-025). I am not routing the quote for approval again because the forwarded email already asked for the landlord's decision, and the quote is incomplete: it has no doors-only option and no confirmed total. I am not escalating because there is no safety hazard (the cuts are minor, and no active danger is reported), no dispute and no fraud. The landlord is reachable and has not yet had time to reply. I have staged a holding update to the tenant. The tenant has had no update since 9 September, and the offered visit dates passed (event-021). I did not instruct the contractor or promise approval. If there is no landlord reply in 3 days, chase. If the contractor stays silent on the doors-only estimate, ask the contractor for it. A person should settle the commission and VAT basis. I made a verbal instruction about it in event-023 without any authority to set it.",
+  "action": "ASK_PROVIDER",
+  "reason": "The only landlord approval on record is for the original laminate-repair scope (event-6). The landlord later asked for two estimates, a full kitchen and cupboards and doors only (event-16), and that did not approve replacement. The contractor's full-kitchen figures (event-24) total £4,850 + £3,800 + £230 plus VAT, with a £380 electrical estimate. All are far above the £300 threshold and no approval covers them. Nia has already forwarded these to the landlord (event-25), so a second route_for_approval would be a duplicate, and the landlord's reply is not overdue because we only wrote minutes ago. The cupboards-and-doors-only estimate is missing from event-24, and only the contractor holds it, so I asked Kellan for it (message-1). I also asked what the electrical item covers, and told him not to order or start work. I offered to arrange a site visit if he needs one. The tenant's offered dates (event-10) have passed (event-21). No hazard keywords were flagged. The cuts from sharp edges (event-1) are a minor injury risk with no imminent danger, so P2 applies and escalation is not needed. Unresolved: the commission basis, any cap and the VAT total from the call in event-22/23 are unsettled. The commission instruction in event-23 was given without any documented basis, so a person should review it if it affects the quoted price. A follow-up is set for 72 hours. A decision on the quote should wait for the landlord's reply and the second estimate.",
   "source": "model",
-  "message": "",
+  "message": "Hello Kellan, thank you for the full-kitchen figures (your email of 24 September). The landlord has asked for two estimates, and we have only received the first. Could you please send the estimate for replacing the cupboards and doors only, keeping the existing appliances, worktops and flooring? An itemised breakdown like the one you sent would be ideal, stating clearly whether each figure is plus VAT. Please also confirm what the electrical item of £380 plus VAT covers and what needs checking. Please note that nothing in the full-kitchen quote has been approved by the landlord yet, so please do not order materials or start any work. The tenant's earlier visit dates have passed, so please also tell us if you need a site visit to firm up the figures and we will arrange new access with the tenant, who has two dogs to secure. Kind regards, Nia Calder, Northbridge Lettings",
   "unknowns": [
-    "Landlord decision on the full-kitchen quote",
-    "Cupboards-and-doors-only estimate not received",
-    "Commission basis, cap, VAT-inclusive total unconfirmed",
-    "Electrical work estimate needs checking",
-    "No access appointment or dog arrangements"
+    "Cupboards-and-doors-only estimate",
+    "Commission basis, cap and VAT-inclusive total",
+    "What the £380 electrical item covers",
+    "Landlord decision on full-kitchen quote",
+    "New access date and dog arrangements with tenant"
   ],
   "options": [
-    "Wait for the landlord's reply, then chase after 3 days",
-    "Ask the contractor for the doors-only estimate and a confirmed VAT-inclusive total"
+    "Wait for the second estimate and the landlord's reply",
+    "Escalate to the property manager if the commission or pricing dispute affects the quote",
+    "Arrange a site visit with the tenant"
   ],
-  "confidence": 0.8,
+  "confidence": 0.7,
   "hazard": false,
   "waiting_on": null,
   "waiting_days": null,
@@ -23,56 +24,54 @@
   "gate_notes": [],
   "proposed_action": null,
   "cause": null,
-  "idempotency_key": "12b402d93e71ec1f",
+  "idempotency_key": "576b9dc1c02309ea",
   "decided_at": "2025-09-24T14:36:22+00:00",
   "warnings": [],
-  "priority": "P3",
+  "priority": "P2",
   "title": "",
   "request": "Tenant reports peeling laminate on kitchen cabinets, with sharp edges that have caused cuts, and several cabinet doors that do not close properly. Two dogs are at the property, so access needs to be arranged in advance.",
   "as_of": "2025-09-24T14:36:22+00:00",
   "model": "claude-sonnet-5-5",
   "steps": 3,
-  "tokens": 49605,
+  "tokens": 50520,
   "evidence_refs": [
     "event-006",
     "event-016",
-    "event-021",
+    "event-024",
+    "event-025",
     "event-022",
     "event-023",
-    "event-024",
-    "event-025"
+    "event-021"
   ],
   "unrelated_issues": [
-    "Contractor commission basis, cap and VAT query (event-022): the agency's commercial terms need a person to settle them"
+    "Contractor's query about the 15% commission basis, cap and VAT treatment (event-22) needs a person to confirm the commercial terms"
   ],
   "actions": [
     {
       "id": "message-1",
       "kind": "message",
-      "idempotency_key": "f113d15f4111",
-      "state": "held_for_review",
-      "to": "tenant",
-      "purpose": "update",
-      "priority": "P3",
-      "body": "Hello Elowen, an update on the kitchen cabinets. The 16-18 September windows you offered passed without a visit, and I am sorry for the delay. The contractor has now sent us figures for replacing the kitchen. I passed them to the landlord today and we are waiting for their decision. No visit or work is booked yet and nothing is approved. Once we know the next step we will contact you to arrange a date and how to secure the dogs. In the meantime, please take care around the peeling edges. If you can, cover them with strong tape. Let us know if anything gets worse or anyone is hurt. Northbridge Lettings (Nia Calder)",
+      "idempotency_key": "ad6884c12b87",
+      "state": "committed",
+      "to": "provider",
+      "purpose": "request_info",
+      "priority": "P2",
+      "body": "Hello Kellan, thank you for the full-kitchen figures (your email of 24 September). The landlord has asked for two estimates, and we have only received the first. Could you please send the estimate for replacing the cupboards and doors only, keeping the existing appliances, worktops and flooring? An itemised breakdown like the one you sent would be ideal, stating clearly whether each figure is plus VAT. Please also confirm what the electrical item of £380 plus VAT covers and what needs checking. Please note that nothing in the full-kitchen quote has been approved by the landlord yet, so please do not order materials or start any work. The tenant's earlier visit dates have passed, so please also tell us if you need a site visit to firm up the figures and we will arrange new access with the tenant, who has two dogs to secure. Kind regards, Nia Calder, Northbridge Lettings",
       "evidence_refs": [
-        "event-001",
-        "event-010",
-        "event-021",
         "event-024",
+        "event-016",
         "event-025"
       ],
-      "note": "Held: not part of the final action WAIT; a person can release it."
+      "note": "Recorded in the local outbox (no external delivery connected)."
     },
     {
       "id": "followup-2",
       "kind": "followup",
-      "idempotency_key": "64077af5375e",
-      "state": "committed",
+      "idempotency_key": "690e3f85d0bc",
+      "state": "held_for_review",
       "review_at": "2025-09-27T14:36:22+00:00",
-      "waiting_on": "landlord",
-      "reason": "Full-kitchen figures forwarded to landlord (event-025); no reply yet. Chase if no response after 3 days. Still need doors-only estimate and commission/VAT basis from contractor.",
-      "note": "Recorded in the local outbox (no external delivery connected)."
+      "waiting_on": "provider",
+      "reason": "Cupboards-and-doors-only estimate outstanding; landlord decision on full-kitchen quote (event-25) also awaited.",
+      "note": "Held: not part of the final action ASK_PROVIDER; a person can release it."
     }
   ],
   "blocked": [],
@@ -83,7 +82,7 @@
       "result": {
         "status": "ok",
         "checks": [],
-        "dropped": 5,
+        "dropped": 0,
         "error": null
       }
     },
@@ -91,7 +90,7 @@
       "step": 1,
       "tool": "check_policy",
       "args": {
-        "topic": "verify_claims,amounts,authority,escalation,chasing,safety"
+        "topic": "verify_claims,amounts,safety,escalation,authority,chasing"
       },
       "result": {
         "status": "ok"
@@ -101,17 +100,15 @@
       "step": 2,
       "tool": "send_message",
       "args": {
-        "to": "tenant",
-        "purpose": "update",
-        "body": "Hello Elowen, an update on the kitchen cabinets. The 16-18 September windows you offered passed without a visit, and I am sorry for the delay. The contractor has now sent us figures for replacing the kitchen. I passed them to the landlord today and we are waiting for their decision. No visit or work is booked yet and nothing is approved. Once we know the next step we will contact you to arrange a date and how to secure the dogs. In the meantime, please take care around the peeling edges. If you can, cover them with strong tape. Let us know if anything gets worse or anyone is hurt. Northbridge Lettings (Nia Calder)",
+        "to": "provider",
+        "purpose": "request_info",
+        "body": "Hello Kellan, thank you for the full-kitchen figures (your email of 24 September). The landlord has asked for two estimates, and we have only received the first. Could you please send the estimate for replacing the cupboards and doors only, keeping the existing appliances, worktops and flooring? An itemised breakdown like the one you sent would be ideal, stating clearly whether each figure is plus VAT. Please also confirm what the electrical item of £380 plus VAT covers and what needs checking. Please note that nothing in the full-kitchen quote has been approved by the landlord yet, so please do not order materials or start any work. The tenant's earlier visit dates have passed, so please also tell us if you need a site visit to firm up the figures and we will arrange new access with the tenant, who has two dogs to secure. Kind regards, Nia Calder, Northbridge Lettings",
         "evidence_refs": [
-          "event-001",
-          "event-010",
-          "event-021",
-          "event-024",
-          "event-025"
+          "event-24",
+          "event-16",
+          "event-25"
         ],
-        "priority": "P3"
+        "priority": "P2"
       },
       "result": {
         "status": "staged",
@@ -120,12 +117,12 @@
       }
     },
     {
-      "step": 2,
+      "step": 3,
       "tool": "schedule_followup",
       "args": {
         "after_hours": 72,
-        "waiting_on": "landlord",
-        "reason": "Full-kitchen figures forwarded to landlord (event-025); no reply yet. Chase if no response after 3 days. Still need doors-only estimate and commission/VAT basis from contractor."
+        "waiting_on": "provider",
+        "reason": "Cupboards-and-doors-only estimate outstanding; landlord decision on full-kitchen quote (event-25) also awaited."
       },
       "result": {
         "status": "staged",
@@ -137,32 +134,33 @@
       "step": 3,
       "tool": "submit_decision",
       "args": {
-        "action": "WAIT",
-        "priority": "P3",
-        "reason": "The landlord was sent the full-kitchen figures only minutes ago (event-025), so a reply is not due; the chase threshold is 3 days. The recorded approval covers only the original laminate-repair scope (event-006). The landlord's later messages requested estimates, not approval (event-004, event-016). The contractor's quote (event-024) is £4,850 + VAT supply, £3,800 + VAT fitting and £230 + VAT waste, with an electrical estimate of £380 + VAT. It is far above the £300 limit, and the commission basis, cap and VAT-inclusive total are unconfirmed (event-022, event-023). So I cannot instruct the contractor, and I cannot say the work is approved. The cupboards-and-doors-only estimate is still missing, and the landlord already knows this (event-025). I am not routing the quote for approval again because the forwarded email already asked for the landlord's decision, and the quote is incomplete: it has no doors-only option and no confirmed total. I am not escalating because there is no safety hazard (the cuts are minor, and no active danger is reported), no dispute and no fraud. The landlord is reachable and has not yet had time to reply. I have staged a holding update to the tenant. The tenant has had no update since 9 September, and the offered visit dates passed (event-021). I did not instruct the contractor or promise approval. If there is no landlord reply in 3 days, chase. If the contractor stays silent on the doors-only estimate, ask the contractor for it. A person should settle the commission and VAT basis. I made a verbal instruction about it in event-023 without any authority to set it.",
-        "confidence": 0.8,
+        "action": "ASK_PROVIDER",
+        "priority": "P2",
+        "confidence": 0.7,
+        "reason": "The only landlord approval on record is for the original laminate-repair scope (event-6). The landlord later asked for two estimates, a full kitchen and cupboards and doors only (event-16), and that did not approve replacement. The contractor's full-kitchen figures (event-24) total £4,850 + £3,800 + £230 plus VAT, with a £380 electrical estimate. All are far above the £300 threshold and no approval covers them. Nia has already forwarded these to the landlord (event-25), so a second route_for_approval would be a duplicate, and the landlord's reply is not overdue because we only wrote minutes ago. The cupboards-and-doors-only estimate is missing from event-24, and only the contractor holds it, so I asked Kellan for it (message-1). I also asked what the electrical item covers, and told him not to order or start work. I offered to arrange a site visit if he needs one. The tenant's offered dates (event-10) have passed (event-21). No hazard keywords were flagged. The cuts from sharp edges (event-1) are a minor injury risk with no imminent danger, so P2 applies and escalation is not needed. Unresolved: the commission basis, any cap and the VAT total from the call in event-22/23 are unsettled. The commission instruction in event-23 was given without any documented basis, so a person should review it if it affects the quoted price. A follow-up is set for 72 hours. A decision on the quote should wait for the landlord's reply and the second estimate.",
         "evidence_refs": [
-          "event-006",
-          "event-016",
-          "event-021",
-          "event-022",
-          "event-023",
-          "event-024",
-          "event-025"
+          "event-6",
+          "event-16",
+          "event-24",
+          "event-25",
+          "event-22",
+          "event-23",
+          "event-21"
         ],
         "unknowns": [
-          "Landlord decision on the full-kitchen quote",
-          "Cupboards-and-doors-only estimate not received",
-          "Commission basis, cap, VAT-inclusive total unconfirmed",
-          "Electrical work estimate needs checking",
-          "No access appointment or dog arrangements"
+          "Cupboards-and-doors-only estimate",
+          "Commission basis, cap and VAT-inclusive total",
+          "What the £380 electrical item covers",
+          "Landlord decision on full-kitchen quote",
+          "New access date and dog arrangements with tenant"
         ],
         "options": [
-          "Wait for the landlord's reply, then chase after 3 days",
-          "Ask the contractor for the doors-only estimate and a confirmed VAT-inclusive total"
+          "Wait for the second estimate and the landlord's reply",
+          "Escalate to the property manager if the commission or pricing dispute affects the quote",
+          "Arrange a site visit with the tenant"
         ],
         "unrelated_issues": [
-          "Contractor commission basis, cap and VAT query (event-022): the agency's commercial terms need a person to settle them"
+          "Contractor's query about the 15% commission basis, cap and VAT treatment (event-22) needs a person to confirm the commercial terms"
         ],
         "amount_gbp": null
       },
@@ -175,7 +173,7 @@
     "status": "ok",
     "model": "jev-1.13.0",
     "checks": [],
-    "dropped": 5
+    "dropped": 0
   },
   "answer": "",
   "red_flags": [],
@@ -276,20 +274,20 @@
     },
     "attachments": [],
     "decision": {
-      "action": "WAIT",
-      "priority": "P3",
-      "confidence": 0.8,
+      "action": "ASK_PROVIDER",
+      "priority": "P2",
+      "confidence": 0.7,
       "decided_by": "model",
       "cause": null,
       "as_of": "2025-09-24T14:36:22+00:00",
       "evidence_refs": [
         "event-006",
         "event-016",
-        "event-021",
+        "event-024",
+        "event-025",
         "event-022",
         "event-023",
-        "event-024",
-        "event-025"
+        "event-021"
       ]
     },
     "calls": [],

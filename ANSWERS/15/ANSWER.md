@@ -43,7 +43,7 @@
 - **Confidence:** 0.80
 - **Decided by:** model
 - **As of:** 2025-09-25T08:34:11+00:00
-- **Evidence cited:** event-006, event-007, event-008, event-009, event-010, event-011, event-012, event-016, event-018, event-020, event-021
+- **Evidence cited:** event-006, event-007, event-008, event-009, event-010, event-011, event-012, event-016, event-021
 
 ### Case card (machine-readable)
 
@@ -184,8 +184,6 @@
       "event-011",
       "event-012",
       "event-016",
-      "event-018",
-      "event-020",
       "event-021"
     ]
   },
@@ -201,7 +199,7 @@ Initial request: Please arrange post-tenancy sanitation, removal of waste left i
 
 ## Decision
 
-The job is the post-tenancy clean, waste removal and garden clearance at 18 Thistlevaunt Lane, with Brindlewick's £665 quote (event-006, property-preparation-quotation.pdf). Property, provider and amount match the job. The reference differs between the two PDFs (NBL-015-INSPECTION and NBL-015-Q1), but they are different document types, so I did not treat that as a mismatch. The landlord's approval (event-008, event-010) is conditional on recovering the cost from the former tenants' bond. That is a deposit matter, which policy says we never act on or decide, and the code flagged it (event-012, legal red flag). Event-009 told the contractor the quote was approved without that condition. Event-016 ("approved quote") does not say which quote it means. Event-007 also described the work only generally. The contractor is on hold (event-012, event-015), and the work depends on separate major maintenance with no completion date (event-018, event-020, event-021). A new tenant wants to move in on 28 September, so there is time pressure but no safety hazard, hence P2. A routine INSTRUCT_PROVIDER is not safe because the approval is ambiguous and conditional. Waiting or chasing is not suitable because the deposit topic cannot be waited on, and the blocker is a person's judgement. A person should confirm the landlord's approval and the bond condition, and sort out the maintenance sequencing. Nothing in the case tried to change my process.
+The landlord's approval of the £665 quote is conditional on bond recovery (event-8, event-10). That makes the case a deposit matter, which is a never_touch topic, and the code flagged it at event-12 (forcing escalation). Event-16, "approved quote", does not say which quote it covers or whether the bond condition still applies. It may refer to the separate maintenance quote. Event-9 told the contractor the quote was approved without the condition, so the instructions are inconsistent. Event-7 did not list the carpet or garden tasks, and the quote does not expressly cover the disturbed soil (event-6). The work is on hold until separate maintenance is scheduled (event-15, 18, 20, 21), and nothing is booked. A tenant wants to move in on 28 September. Waiting would not resolve the deposit or approval ambiguity, and instructing the contractor would risk work the landlord has not clearly approved. Escalating to the property manager is therefore the right step, not a chase. The quote's address matches the job, and the reference mismatch only reflects two different document types, so no document fraud is suspected. There is no safety hazard, so priority is P2 because of the move-in date. If the landlord confirms unconditional approval of the £665 quote and the maintenance is scheduled, the contractor can be instructed.
 
 ## Actions taken
 
@@ -209,7 +207,7 @@ The job is the post-tenancy clean, waste removal and garden clearance at 18 This
 
 ## Handover for the person taking over
 
-Post-tenancy clean/waste/garden job at 18 Thistlevaunt Lane (Brindlewick, £665 quote) is stalled. The landlord's approval is tied to recovering the cost from the former tenants' bond, which is a deposit matter we cannot act on. Landlord's later "approved quote" is ambiguous. Work is on hold for separate maintenance with no date, and a new tenant wants to move in on 28 Sept.
+Post-tenancy sanitation/waste/garden job at 18 Thistlevaunt Lane is on hold. The landlord's approval of the £665 quote is tied to bond recovery, which is a deposit matter the agent cannot decide. Their later "approved quote" (event-16) is ambiguous. A prospective tenant wants to move in on 28 September, and the work is still not booked.
 
 Respond by 2025-09-26T08:34:11+00:00 (P2, route property_manager).
 
@@ -217,48 +215,42 @@ Conflicts:
 - reference_number: NBL-015-INSPECTION (move-out-inspection-report.pdf) vs NBL-015-Q1 (property-preparation-quotation.pdf)
 
 Known:
-- Quote £665 from Brindlewick (event-006, property-preparation-quotation.pdf, NBL-015-Q1) for the correct property; it does not expressly cover making good the disturbed rear-garden soil from the inspection.
-- Approval request (event-007) described the work only generally, without listing the carpet and garden tasks.
-- Landlord (event-008, event-010): approval is conditional on recovery from the former tenants' bond. Our message to the contractor (event-009) said 'approved' without that condition.
-- Event-011: costs plus damage exceed the £650 deposit held; a full-deposit claim is being prepared; final itemised figures awaited.
-- Event-012: contractor told not to book 'while the deposit dispute is being handled'; contractor has been on hold since (event-013, event-014, event-015).
-- Event-016: landlord sent 'approved quote' with no identification of which quote; it may refer to this £665 quote or to the separate maintenance quote.
-- Events 18, 19, 20 and 21: sanitation is held until the separate major maintenance is scheduled and completed. No maintenance completion date is recorded, no visit is booked, and the contractor has given no slot. Event-21 says wait three more working days.
-- Prospective tenant wants to move in 28 Sept (event-015). Property is vacant. No safety hazard reported.
+- Quote £665 from Brindlewick Turnover Services (event-6, property-preparation-quotation.pdf), property address matches the job.
+- Landlord event-8 and event-10: approval only if costs are recovered from the former tenants' bond. Event-9 told the contractor the quote was approved without mentioning that condition.
+- Event-11: agency told the landlord that costs plus damage exceed the £650 deposit and that a full-deposit claim was being prepared. Event-12: contractor told to hold because of the deposit dispute.
+- Event-16 (17 Sep): landlord wrote only 'approved quote', with no quote identified and no statement on the bond condition. It may refer to the separate maintenance quote.
+- Event-7: the approval request did not list the carpet or garden tasks. Quote scope does not expressly cover making good the disturbed soil (event-6).
+- Event-15/18/20/21: work is held until separate major maintenance is scheduled, and no completion date is recorded. Contractor has offered no confirmed slot (event-19, event-20).
+- Inspection report (event-4/5): wrong report was first sent to the contractor and corrected in event-5. The current report is attached. Reference numbers differ only because the documents are different types.
 - Property: 18 Thistlevaunt Lane, Orvelune, ZZ1 1ZZ (index)
 - Request: Please arrange post-tenancy sanitation, removal of waste left inside the property, and clearance of the rear garden. (request)
 
 Not known:
-- Which quote the landlord meant in event-016.
-- Whether the landlord's bond-recovery condition still stands. Deposit handling is for a person.
-- Status and date of the separate major maintenance, and whether the landlord has approved its quote.
-- Whether the 28 Sept move-in is still planned and the clean can be done before it.
-- Whether the soil making-good is in scope or needs a separate quote.
-- Which quote event-016 approves
-- Whether the bond-recovery condition still applies
-- Date and approval status of the separate maintenance
+- ["Whether event-16 'approved quote' refers to the £665 sanitation quote or to the separate maintenance quote", "Whether the landlord still makes approval conditional on bond recovery, and the outcome of the deposit claim", "Status and date of the separate major maintenance", "Whether the soil making-good is in scope", "Whether the 28 September move-in is still on"]</unknown>
+<parameter name="tried
+- Which quote event-16 approves
+- Whether bond-recovery condition still applies
+- Date of the separate maintenance
+- Whether soil making-good is in scope
+- Which conflicting value is right (see conflicts)
 
 Tried:
-- Quote requested and received (event-002, event-006).
-- Landlord approval requested (event-007) and replied to (event-008, event-010, event-016).
-- Contractor put on hold (event-012), then asked for dates (event-017) and called (event-019). No slot given.
-- No contact attempted with the landlord since event-011, apart from their own update at event-016.
 - Agent proposed ESCALATE
 
 Options:
-- Recommended: Ask the landlord to confirm in writing that event-016 approves the £665 Brindlewick quote, and whether the bond condition still applies. Handle the deposit claim separately through the deposit process. Then instruct the contractor.
-- Chase the separate maintenance approval and scheduling so a sanitation slot can be fixed before 28 Sept. Tell the landlord if the move-in date is at risk.
-- If the landlord will not approve without bond recovery, hold the work and have the landlord decide whether to proceed at their own cost. Ask the contractor whether the soil making-good needs a separate quote.
+- Recommended: Confirm in writing with the landlord which quote event-16 approved, and whether the £665 is approved without the bond condition. The deposit side stays with a person. Then instruct the contractor.
+- Keep the hold until the deposit claim and the maintenance schedule are settled, and tell the contractor and landlord about the likely delay to the 28 September move-in.
+- Ask the contractor to quote for the disturbed-soil making good and the carpet scope, then route the revised figure to the landlord.
 
-Recommended: Recommended: Ask the landlord to confirm in writing that event-016 approves the £665 Brindlewick quote, and whether the bond condition still applies. Handle the deposit claim separately through the deposit process. Then instruct the contractor.
+Recommended: Recommended: Confirm in writing with the landlord which quote event-16 approved, and whether the £665 is approved without the bond condition. The deposit side stays with a person. Then instruct the contractor.
 
 ## Inconsistencies and mismatches
 
-- **document consistency** (flag): reference number differs between documents: 'NBL-015-INSPECTION' vs 'NBL-015-Q1' (similarity 0.41). [move-out-inspection-report.pdf, property-preparation-quotation.pdf]
+- **document consistency** (flag): reference number differs between documents: 'NBL-015-INSPECTION' vs 'NBL-015-Q1' (similarity 0.383). [move-out-inspection-report.pdf, property-preparation-quotation.pdf]
 
 Checked: addresses, invoice amounts against quotes and approval, completion against later reports, contact details; document consistency check on.
 
 ## Separate issues to raise as new requests
 
-- Separate major maintenance quote and scheduling, still awaiting landlord approval and no date
-- Former tenants' deposit claim (person to handle)
+- Separate major maintenance work awaiting landlord quote approval and scheduling
+- Deposit claim (£650) handled through the deposit process

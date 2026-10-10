@@ -33,10 +33,10 @@
 
 - **Action:** Send for landlord approval
 - **Priority:** P3
-- **Confidence:** 0.72
+- **Confidence:** 0.70
 - **Decided by:** model
 - **As of:** 2025-09-17T09:04:05+00:00
-- **Evidence cited:** event-001, event-002, event-003, event-004, event-005, event-007, event-015, event-016, event-018, event-019
+- **Evidence cited:** event-002, event-003, event-005, event-007, event-015, event-016, event-019
 
 ### Case card (machine-readable)
 
@@ -125,20 +125,17 @@
   "decision": {
     "action": "ROUTE_FOR_APPROVAL",
     "priority": "P3",
-    "confidence": 0.72,
+    "confidence": 0.7,
     "decided_by": "model",
     "cause": null,
     "as_of": "2025-09-17T09:04:05+00:00",
     "evidence_refs": [
-      "event-001",
       "event-002",
       "event-003",
-      "event-004",
       "event-005",
       "event-007",
       "event-015",
       "event-016",
-      "event-018",
       "event-019"
     ]
   },
@@ -154,15 +151,18 @@ Initial request: The tenant reports that a Samsung television in an upstairs bed
 
 ## Decision
 
-The electrician (Rian Sol, Bracken Spark Services) proposed 29 September after 15:00 (event-019). That date is within the tenant's availability (event-016). The landlord's only written approval is "Please sort it" (event-003). It answered a request about the TV alone (event-002) and did not cover the downstairs light, which the tenant raised (event-001) and we added to the record (event-005). The landlord is also unsure the TV is theirs, and the tenant is open to it being discarded (event-015). No instruction on disposal or repair was ever given, and no spending limit was set (event-004). The landlord's last reply was an out-of-office message (event-007). I did not instruct or confirm the appointment, because the approval does not clearly cover the combined scope. I did not escalate, because the landlord is the right party to decide and is reachable. I did not wait, because the proposed slot needs a decision. No quote exists, so no amount is routed. Priority is P3: the TV is unplugged, the tenant is using a lamp and can manage without the light (event-015), and no hazard is reported beyond the tenant-reported light flicker and pop. Unrelated issue: the rear-door handle came off. It was raised on the call only, and the tenant has agreed to submit it as a separate request (events 015 and 018). The case should not close until that is done. What would change the decision: if the landlord approves the scope, we instruct Bracken Spark and confirm the slot with the tenant. If the light worsens, for example visible sparking or burning smells, treat it as P0.
+The tenant reported a TV fault and a flickering, popping downstairs light (event-1). The landlord's "Please sort it" (event-3) answered a request about the TV only (event-2). It did not cover the downstairs light (event-5), and it did not settle who owns the TV or whether it can be disposed of. The landlord has since sent an away auto-reply (event-7). Bracken Spark Services proposed 29 September after 15:00 (event-19), which falls within the tenant's availability (event-16). No exact time is given, nothing is confirmed, and there is no quote. Because there is no landlord approval for the combined electrical visit, I should not instruct the provider yet. Policy says the agency cannot approve work itself. I have routed the visit approval and the TV ownership question to the landlord. Nothing is overdue, so escalation is not needed. The tenant is using a lamp, the TV is unplugged, and there is no reported danger or sparking, so this is P3. A follow-up is set for 72 hours. The rear-door handle is a separate issue, and the tenant agreed to submit it separately (event-15, event-18). Nothing in the case tries to change my process. If the landlord approves, I would instruct Bracken Spark and confirm the booking with the tenant, including the request to call on arrival because of the dog.
 
 ## Actions taken
 
-- **COMMITTED**: Approval request to landlord to attend or quote, no cost (Bracken Spark Services electrician visit at 8 Vellum Court: downstairs bedroom light (flickering/popping) plus tenant-reported TV fault; proposed slot 29 September after 15:00) `approval_request-1`. Recorded in the local outbox (no external delivery connected).
+- **COMMITTED**: Approval request to landlord to attend or quote, no cost (Bracken Spark Services electrician visit (proposed 29 Sept after 15:00) to inspect the downstairs bedroom light and the upstairs TV fault; confirm TV ownership/disposal) `approval_request-1`. Recorded in the local outbox (no external delivery connected).
+- **HELD_FOR_REVIEW**: Follow-up at 2025-09-20T09:04:05+00:00, waiting on landlord: Landlord approval for combined electrical visit (light + TV) and TV ownership; landlord had auto-away reply 7 Sept; 29 Sept slot proposed and unconfirmed. `followup-2`. Held: not part of the final action ROUTE_FOR_APPROVAL; a person can release it.
 
 ### Message to landlord `approval_request-1`
 
-Hi Corin, Bracken Spark Services (electrician) has proposed attending 8 Vellum Court on 29 September after 15:00, which fits the tenant's availability. Two points need your decision before we confirm. (1) Your earlier "Please sort it" covered the TV only. The tenant also reported a downstairs bedroom light that flickers and pops when switched on. Please confirm you approve the electrician attending for the light as well. No quote or cost has been received yet, and we will come back to you for approval of any quote. (2) You said you don't remember leaving a TV. The tenant now believes the TV's main board has failed and is open to it being removed or discarded. Please tell us whether the TV is yours and whether you want it repaired, left, or removed, or whether the electrician should only look at the light and the circuit. Thanks, Oren Pike, Northbridge Lettings
+Hello Corin, this is Oren Pike at Northbridge Lettings regarding 8 Vellum Court, Brindlewick. You replied "Please sort it" (5 Sept) to our request about the tenant's TV fault. The tenant also reported a downstairs bedroom light that flickers and pops when switched on, which was not in that request. Bracken Spark Services (electrician) has proposed attending on 29 September after 15:00, within the tenant's availability, to look at both. No quote or cost has been given yet.
+
+Please could you confirm: (1) that you approve the electrician attending to inspect the downstairs light and the TV fault, with any repair quote to come back to you for approval before work; (2) whether the TV is yours. You mentioned you don't remember leaving one, and the tenant says it may not be worth repairing and is open to it being removed. Please also say whether you want us to deal with its removal, or whether it is the tenant's own. We won't instruct the visit until we hear from you. Thanks, Oren Pike, Northbridge Lettings
 
 ## Inconsistencies and mismatches
 
@@ -172,4 +172,4 @@ Checked: addresses, invoice amounts against quotes and approval, completion agai
 
 ## Separate issues to raise as new requests
 
-- Rear-door handle has come off: the tenant should submit a separate request; no handyman is assigned (events 015 and 018)
+- Rear-door handle has come off (raised by phone in event-15). Tenant to submit a separate request; no record or handyman assigned (event-18).

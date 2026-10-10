@@ -38,10 +38,10 @@
 
 - **Action:** Ask the provider for more information
 - **Priority:** P3
-- **Confidence:** 0.75
+- **Confidence:** 0.80
 - **Decided by:** model
 - **As of:** 2025-09-15T11:11:18+00:00
-- **Evidence cited:** event-022, event-019, event-020, event-021, event-003, event-016, event-018, event-012
+- **Evidence cited:** event-022, event-019, event-021, event-003, event-012, event-015, corrected-plumbing-invoice.pdf
 
 ### Case card (machine-readable)
 
@@ -142,19 +142,18 @@
   "decision": {
     "action": "ASK_PROVIDER",
     "priority": "P3",
-    "confidence": 0.75,
+    "confidence": 0.8,
     "decided_by": "model",
     "cause": null,
     "as_of": "2025-09-15T11:11:18+00:00",
     "evidence_refs": [
       "event-022",
       "event-019",
-      "event-020",
       "event-021",
       "event-003",
-      "event-016",
-      "event-018",
-      "event-012"
+      "event-012",
+      "event-015",
+      "corrected-plumbing-invoice.pdf"
     ]
   },
   "calls": [],
@@ -169,7 +168,7 @@ Initial request: The kitchen mixer tap is constantly dripping and wasting water.
 
 ## Decision
 
-The corrected invoice (event-22, corrected-plumbing-invoice.pdf) now shows the right property and the assigned provider, so the postcode query in event-19/20 is resolved. However we cannot close or forward it. The invoice shows no amount, and no quote or landlord-approved amount exists. Landlord approval (event-3) covered only general maintenance works and a visit, not a quote. No event records the visit date, completion, or that the new tap was fitted. The contractor was told he could collect the spare key (events 16, 18), and no event confirms its return. The cloudy-water concern and tenant's drawer defect (event-12) are unanswered. The boiler mention in event-21 is undocumented for this job. Escalation is not needed because the provider can supply these facts. I asked for the date, completion confirmation, an itemised amount and key return. The amount will then go to the landlord for approval if needed; the agency cannot approve spend. A tap replacement was not explicitly approved by the landlord either.
+The corrected invoice (event-22, corrected-plumbing-invoice.pdf) now has the right address and the right provider, so the earlier postcode problem (event-19, event-20) is resolved. It still can't be passed on or closed. It shows no amount, no VAT, no completion date and no itemisation. There is no quote in the case and no approval for any amount: the landlord's only approval (event-3) was for "maintenance works" generally. The case also contains no completion confirmation from the provider or the tenant, and nothing on whether the spare key was returned (event-15, event-16). The tenant's drawer defect (event-12) has had no reply. The boiler matter raised on the call (event-21) isn't part of this job, and I promised to check it. I am asking the provider for an itemised invoice, completion date, quote and key return. Escalation isn't needed, because the provider can supply these facts. Once I have them I can route the invoice to the landlord for approval, or ask the landlord if the amount is above the approved sum. Nothing can be paid or closed until then.
 
 ## Actions taken
 
@@ -177,7 +176,7 @@ The corrected invoice (event-22, corrected-plumbing-invoice.pdf) now shows the r
 
 ### Message to provider `message-1`
 
-Hello Ivo, thank you for the corrected invoice NBL-025-INV-15; the postcode now matches our record for 18 Thistlewick Row. Before we can process it, please could you send: (1) the date you attended and confirmation that the new mono kitchen tap was fitted and the drip is fixed; (2) the invoice amount itemised (labour, tap, VAT), as the document shows no amount and we hold no quote for it; (3) confirmation that you returned the spare key to our office. Please also confirm whether you noted anything about the cloudy water while you were there. Kind regards, Tessa Wren, Northbridge Lettings
+Hello Ivo, thank you for the corrected invoice NBL-025-INV-15. The postcode now matches 18 Thistlewick Row. Before we can pass it to the landlord, please send an itemised invoice that shows: (1) the total amount, with VAT shown separately, and the cost of the tap and of labour; (2) the date you attended and completed the tap replacement at 18 Thistlewick Row; (3) confirmation that the spare key has been returned to our office. We have no quote on file for this job, so please send any quote you gave. The invoice does not show a price. Nothing can be paid until we have this. Separately, we will check the boiler matter you mentioned with the relevant engineer. It is not part of this tap job. Kind regards, Tessa Wren, Northbridge Lettings
 
 ## Inconsistencies and mismatches
 
@@ -187,5 +186,5 @@ Checked: addresses, invoice amounts against quotes and approval, completion agai
 
 ## Separate issues to raise as new requests
 
-- Tenant reports loose top kitchen drawer with snapped metal brackets (event-12) needs its own request
-- Boiler matter mentioned on call (event-21) is separate; check with the relevant engineer
+- Tenant reports a loose top kitchen drawer with snapped metal front brackets (event-12), which needs its own request.
+- Boiler matter mentioned by the contractor on the call (event-21): I said I would check with the relevant engineer. It is not documented as part of this job.

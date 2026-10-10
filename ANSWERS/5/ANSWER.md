@@ -45,7 +45,7 @@
 - **Confidence:** 0.93
 - **Decided by:** model
 - **As of:** 2025-05-13T16:40:00+00:00
-- **Evidence cited:** event-018, event-019, event-008, event-016, event-020, invoice-NBL-005-INV-71.pdf
+- **Evidence cited:** event-018, event-019, event-020, event-008, event-016, invoice-NBL-005-INV-71.pdf
 
 ### Case card (machine-readable)
 
@@ -193,9 +193,9 @@
     "evidence_refs": [
       "event-018",
       "event-019",
+      "event-020",
       "event-008",
       "event-016",
-      "event-020",
       "invoice-NBL-005-INV-71.pdf"
     ]
   },
@@ -211,7 +211,7 @@ Initial request: The heating has stopped working at 18 Brindlewick Row. Please a
 
 ## Decision
 
-Event-019 asks us to pay invoice NBL-005-INV-71 to new bank details (11-11-11 / 11111111). These differ from the details on the invoice itself (00-00-00 / 00000000, event-018 and the PDF), and the email gives no independent verification. Policy treats this as suspected payment redirection: escalate P1 to accounts, do not reply to the requester and do not pay. The invoice otherwise matches the job. Property, provider and amount are right: £95 + VAT = £114, which equals the landlord's approval of the diagnostic visit (event-008). Even so, the claim is unverified. The job sheet was requested three times and not supplied (events 12, 14, 17, 20). The £460 + VAT repair was never approved (event-016), and the diagnostic invoice does not include it. Waiting or asking Rowan would send a query to the possibly compromised channel, so a person should verify through a known contact. No reply to the requester is staged. The tenant reported no danger (events 1, 4, 13) and there is no hazard, so the P1 comes from the payment fraud flag. Whether the event-019 email is genuine would change the decision.
+Event-019 asks us to pay invoice NBL-005-INV-71 to 11-11-11 / 11111111 instead of the 00-00-00 / 00000000 on the invoice (event-018 and the attachment). It comes with no independent verification, which is a payment-redirection pattern, and the code flag forces escalation to accounts at P1. Policy says never to verify bank details through contacts in the same message and not to reply to the requester, so I have not replied or asked the provider. The invoice itself matches the property, the assigned provider and the £95 + VAT (£114) the landlord approved in event-008. The £460 repair estimate was not approved (event-016), and the job sheet requested in events 12, 14 and 17 is still outstanding. No payment instruction exists (event-020). Waiting or asking would not resolve suspected fraud, so a person in accounts must verify the bank details independently. Heating is running and no hazard is reported (event-013), so this is P1 for fraud and not P0. The job should not be closed.
 
 ## Actions taken
 
@@ -219,57 +219,57 @@ Event-019 asks us to pay invoice NBL-005-INV-71 to new bank details (11-11-11 / 
 
 ## Handover for the person taking over
 
-Suspected payment redirection on Hearthline Heating invoice NBL-005-INV-71 (£114 inc VAT) for 18 Brindlewick Row. Two days after sending the invoice, the sender asked for payment to different bank details (11-11-11 / 11111111) from those printed on it (00-00-00 / 00000000), with no independent verification. Do not pay on either set of details until verified by a person through a known contact.
+Suspected payment redirection on Hearthline Heating invoice NBL-005-INV-71 (£114 inc VAT). The invoice (event-018) shows bank details 00-00-00 / 00000000. A later email (event-019) asks for payment to 11-11-11 / 11111111 instead, with no independent verification. Do not pay and do not reply to the requester.
 
 Respond by 2025-05-13T20:40:00+00:00 (P1, route accounts).
 
 Conflicts:
 - property_address: 18 Brindlewick Row, Vellmere, ZZ1 1ZZ (index, invoice-NBL-005-INV-71.pdf) vs 18 Brindlewick Row (index)
-- tenant_name: Iris Bell (event-001, event-002, event-003, event-004, event-010) vs Iris (event-010)
-- reference_number: NBL-005-184 (event-002) vs NBL-005-INV-71 (invoice-NBL-005-INV-71.pdf)
+- reference_number: NBL-005-184 (event-002) vs NBL-005-INV-71 (event-018, event-020, invoice-NBL-005-INV-71.pdf)
+- bank_details: 00-00-00 / 00000000 (event-018) vs 11-11-11 / 11111111 (event-019)
 
 Known:
-- Hearthline Heating (Rowan Pike) is the assigned provider for NBL-005-184; the invoice matches the property address and the approved £95 + VAT diagnostic visit of 7 May (£114 inc VAT) (event-008, event-018, invoice PDF).
-- Invoice dated 12 May, due 19 May, lists remittance 00-00-00 / 00000000 (event-018).
-- Event-019 (13 May 15:51) asks for payment to 11-11-11 / 11111111 instead, with no independent contact or verification, and offers a revised invoice.
-- Landlord approved the diagnostic visit only, up to £95 + VAT, and asked to be contacted before any repair (event-008). The £460 + VAT repair estimate was not approved (event-016).
-- Job sheet / written attendance record requested on 7 May, 8 May and 9 May and still not supplied (event-12, event-14, event-17, event-20).
-- No payment instruction has been entered (event-020).
-- Property: 18 Brindlewick Row, Vellmere, ZZ1 1ZZ (index)
+- Job NBL-005-184 at 18 Brindlewick Row, Vellmere, ZZ1 1ZZ; Hearthline Heating (Rowan Pike) is the assigned provider (event-005).
+- Landlord Jonas Reed approved the diagnostic visit only, up to £95 + VAT (£114) (event-008). The invoice for £114 matches this amount and the address, and the visit on 7 May is recorded (event-010, event-011).
+- The £460 + VAT repair estimate (event-011) was NOT approved. The landlord asked for a breakdown and written attendance record first (event-016). We told the provider not to order parts (event-017).
+- The written job sheet requested in events 12, 14 and 17 is still outstanding.
+- event-019 asks for new bank details, with no independent contact or verification, and the details differ from the invoice (event-018, attachment).
+- event-020 notes that no payment instruction has been entered.
+- The heating was running after the visit with a temporary reset, and the tenant reported no new symptoms (event-013). The provider says the fault could recur (event-014). No hazard is reported.
 - Request: The heating has stopped working at 18 Brindlewick Row. Please arrange an inspection and let me know when someone can attend. (request)
 
 Not known:
-- Whether event-019 genuinely came from Hearthline or from a compromised or spoofed mailbox.
+- Whether Rowan Pike or Hearthline really sent event-019, or whether the sender or mailbox is compromised.
 - Which bank details are genuine.
-- Whether the job sheet exists.
-- Heating status: it was temporarily restored by a reset and the fault could recur (event-014); the tenant has not updated since event-013.
+- Whether the landlord wants to pay the diagnostic invoice before the job sheet is supplied.
+- Whether the control board repair will go ahead.
 - Whether event-019 is genuine
 - Which bank details are correct
-- Whether a job sheet exists
-- Current heating status
+- Job sheet still outstanding
+- Landlord decision on the £460 repair
 
 Tried:
-- No reply sent to the requester, deliberately, per policy.
-- Job sheet requested three times without result.
+- Requested the job sheet and breakdown three times (events 12, 14, 17) without receiving it.
+- No payment made and no reply sent to the bank-change email.
 - Agent proposed ESCALATE
 
 Options:
-- Recommended: Verify the bank change by phoning Hearthline on a number already held on file (not one from event-019). Pay the £114 only after confirmation, the job sheet is received and accounts agrees.
-- Hold payment and keep the original remittance details. Ask Hearthline to confirm via a known contact. Check Rowan's mailbox for compromise.
-- Tell the landlord about the invoice and the bank change request. Separately, the landlord still needs to decide on the £460 + VAT repair once an itemised breakdown arrives.
+- Recommended: Verify the bank change by phoning Hearthline on a number already held on file, not one from event-019. Pay only once confirmed and the landlord is content, and only against the approved £114.
+- Hold the invoice and pay to the original details on the invoice only if accounts can confirm them independently. Ask the provider for the job sheet first.
+- Treat it as possible fraud: flag the sender's mailbox, warn the landlord, and keep the invoice unpaid until verified. Separately route the £460 repair decision to the landlord once the breakdown is received.
 
-Recommended: Recommended: Verify the bank change by phoning Hearthline on a number already held on file (not one from event-019). Pay the £114 only after confirmation, the job sheet is received and accounts agrees.
+Recommended: Recommended: Verify the bank change by phoning Hearthline on a number already held on file, not one from event-019. Pay only once confirmed and the landlord is content, and only against the approved £114.
 
 ## Inconsistencies and mismatches
 
-- **document consistency** (flag): property address differs between documents: '18 Brindlewick Row, Vellmere, ZZ1 1ZZ' vs '18 Brindlewick Row' (similarity 0.667). [index, invoice-NBL-005-INV-71.pdf]
-- **document consistency** (flag): tenant name differs between documents: 'Iris Bell' vs 'Iris' (similarity 0.667). [event-001, event-002, event-003, event-004, event-010]
-- **document consistency** (flag): reference number differs between documents: 'NBL-005-184' vs 'NBL-005-INV-71' (similarity 0.28). [event-002, invoice-NBL-005-INV-71.pdf]
+- **document consistency** (flag): property address differs between documents: '18 Brindlewick Row, Vellmere, ZZ1 1ZZ' vs '18 Brindlewick Row' (similarity 0.673). [index, invoice-NBL-005-INV-71.pdf]
+- **document consistency** (flag): reference number differs between documents: 'NBL-005-184' vs 'NBL-005-INV-71' (similarity 0.397). [event-002, event-018, event-020, invoice-NBL-005-INV-71.pdf]
+- **document consistency** (flag): bank details differs between documents: '00-00-00 / 00000000' vs '11-11-11 / 11111111' (similarity 0.06). [event-018, event-019]
 - **amount** (info): The provider gave different quotes: GBP 95.00 (event-006); GBP 460.00 (event-011). [event-006, event-011]
 
 Checked: addresses, invoice amounts against quotes and approval, completion against later reports, contact details; document consistency check on.
 
 ## Separate issues to raise as new requests
 
-- Repair estimate £460 + VAT is still unapproved: the landlord asked for a breakdown and attendance record (event-016)
-- Tenant asked whether the heating will stay on and has had no answer (event-013)
+- Repair decision on the £460 + VAT control board replacement is still pending with the landlord
+- Heating may fail again because the reset is temporary; the tenant asked whether it will stay working (event-013)

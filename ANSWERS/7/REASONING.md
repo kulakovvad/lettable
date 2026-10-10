@@ -2,9 +2,9 @@
 
 - Decided by: the model, checked by code
 - Events seen: 19
-- Model: claude-sonnet-5-5, 3 turn(s), 44885 tokens
-- Evidence cited: event-001, event-002, event-003, event-004, event-005, event-007, event-015, event-016, event-018, event-019
-- Model confidence: 0.72
+- Model: claude-sonnet-5-5, 3 turn(s), 44865 tokens
+- Evidence cited: event-002, event-003, event-005, event-007, event-015, event-016, event-019
+- Model confidence: 0.70
 
 ## 1. Decision and next action
 
@@ -15,18 +15,18 @@
 
 ## 2. Why
 
-The electrician (Rian Sol, Bracken Spark Services) proposed 29 September after 15:00 (event-019). That date is within the tenant's availability (event-016). The landlord's only written approval is "Please sort it" (event-003). It answered a request about the TV alone (event-002) and did not cover the downstairs light, which the tenant raised (event-001) and we added to the record (event-005). The landlord is also unsure the TV is theirs, and the tenant is open to it being discarded (event-015). No instruction on disposal or repair was ever given, and no spending limit was set (event-004). The landlord's last reply was an out-of-office message (event-007). I did not instruct or confirm the appointment, because the approval does not clearly cover the combined scope. I did not escalate, because the landlord is the right party to decide and is reachable. I did not wait, because the proposed slot needs a decision. No quote exists, so no amount is routed. Priority is P3: the TV is unplugged, the tenant is using a lamp and can manage without the light (event-015), and no hazard is reported beyond the tenant-reported light flicker and pop. Unrelated issue: the rear-door handle came off. It was raised on the call only, and the tenant has agreed to submit it as a separate request (events 015 and 018). The case should not close until that is done. What would change the decision: if the landlord approves the scope, we instruct Bracken Spark and confirm the slot with the tenant. If the light worsens, for example visible sparking or burning smells, treat it as P0.
+The tenant reported a TV fault and a flickering, popping downstairs light (event-1). The landlord's "Please sort it" (event-3) answered a request about the TV only (event-2). It did not cover the downstairs light (event-5), and it did not settle who owns the TV or whether it can be disposed of. The landlord has since sent an away auto-reply (event-7). Bracken Spark Services proposed 29 September after 15:00 (event-19), which falls within the tenant's availability (event-16). No exact time is given, nothing is confirmed, and there is no quote. Because there is no landlord approval for the combined electrical visit, I should not instruct the provider yet. Policy says the agency cannot approve work itself. I have routed the visit approval and the TV ownership question to the landlord. Nothing is overdue, so escalation is not needed. The tenant is using a lamp, the TV is unplugged, and there is no reported danger or sparking, so this is P3. A follow-up is set for 72 hours. The rear-door handle is a separate issue, and the tenant agreed to submit it separately (event-15, event-18). Nothing in the case tries to change my process. If the landlord approves, I would instruct Bracken Spark and confirm the booking with the tenant, including the request to call on arrival because of the dog.
 
-Evidence cited by the model: event-001, event-002, event-003, event-004, event-005, event-007, event-015, event-016, event-018, event-019
+Evidence cited by the model: event-002, event-003, event-005, event-007, event-015, event-016, event-019
 
 ## 3. Missing information and conflicting facts
 
 Not known:
 
-- Whether the landlord approves the electrician attending for the downstairs light
-- Whether the TV belongs to the landlord, and whether to repair, leave or remove it
-- Exact arrival time from the electrician
-- Cost of any visit or quote
+- Landlord approval for the downstairs light and the combined visit
+- Whether the TV belongs to the landlord or the tenant, and any disposal decision
+- Exact arrival time on 29 September
+- Whether the electrician will assess the appliance (the TV)
 
 ### Inconsistencies and mismatches
 
@@ -46,7 +46,8 @@ Input warnings:
 
 EXECUTED means the action was committed. PROPOSED, NOT SENT means it was staged and then held because the final decision changed or a person must approve it first.
 
-- **EXECUTED**: Approval request to landlord to attend or quote, no cost (Bracken Spark Services electrician visit at 8 Vellum Court: downstairs bedroom light (flickering/popping) plus tenant-reported TV fault; proposed slot 29 September after 15:00) `approval_request-1`. Recorded in the local outbox (no external delivery connected).
+- **EXECUTED**: Approval request to landlord to attend or quote, no cost (Bracken Spark Services electrician visit (proposed 29 Sept after 15:00) to inspect the downstairs bedroom light and the upstairs TV fault; confirm TV ownership/disposal) `approval_request-1`. Recorded in the local outbox (no external delivery connected).
+- **PROPOSED, NOT SENT**: Follow-up at 2025-09-20T09:04:05+00:00, waiting on landlord: Landlord approval for combined electrical visit (light + TV) and TV ownership; landlord had auto-away reply 7 Sept; 29 Sept slot proposed and unconfirmed. `followup-2`. Held: not part of the final action ROUTE_FOR_APPROVAL; a person can release it.
 
 Checks applied by code:
 
@@ -62,11 +63,11 @@ No person is needed for this step; the system handles it autonomously within the
 
 Separate issues to raise as new requests:
 
-- Rear-door handle has come off: the tenant should submit a separate request; no handyman is assigned (events 015 and 018)
+- Rear-door handle has come off (raised by phone in event-15). Tenant to submit a separate request; no record or handyman assigned (event-18).
 
 ## Uncertainty
 
-- Model confidence: 0.72
+- Model confidence: 0.70
 - Open questions: 4
 - Code overrides: none
 - Safety hazard flagged: no
@@ -83,5 +84,6 @@ Every tool call the agent made, in order, with the code's response.
 
 0. `consistency_check(null)` -> `{"status": "ok", "checks": [], "dropped": 0, "error": null}`
 1. `check_policy({"topic": "verify_claims,amounts,authority,safety,scope"})` -> `{"status": "ok"}`
-2. `route_for_approval({"amount_gbp": null, "scope": "Bracken Spark Services electrician visit at 8 Vellum Court: downstairs bedroom light (flickering/popping) plus tenant-reported TV fault; proposed slot 29 September after 15:00", "body": "Hi Corin, Bracken Spark Services (electrician) has proposed attending 8 Vellum Court on 29 September after 15:00, which fits the tenant's availability. Two points need your decision before we confirm. (1) Your earlier \"Please sort it\" covered the TV only. The tenant also reported a downstairs bedroom light that flickers and pops when switched on. Please confirm you approve the electrician attending for the light as well. No quote or cost has been received yet, and we will come back to you for approval of any quote. (2) You said you don't remember leaving a TV. The tenant no)` -> `{"status": "staged", "id": "approval_request-1", "note": "Staged. Committed only if the final decision passes code checks."}`
-3. `submit_decision({"action": "ROUTE_FOR_APPROVAL", "priority": "P3", "reason": "The electrician (Rian Sol, Bracken Spark Services) proposed 29 September after 15:00 (event-019). That date is within the tenant's availability (event-016). The landlord's only written approval is \"Please sort it\" (event-003). It answered a request about the TV alone (event-002) and did not cover the downstairs light, which the tenant raised (event-001) and we added to the record (event-005). The landlord is also unsure the TV is theirs, and the tenant is open to it being discarded (event-015). No instruction on disposal or repair was ever given, and no spending limit was set (event-004). The landlord's last reply was an out-of-office message (event-007). I did not instruct or confirm the appointment, because the approval does)` -> `{"status": "accepted"}`
+2. `route_for_approval({"amount_gbp": null, "scope": "Bracken Spark Services electrician visit (proposed 29 Sept after 15:00) to inspect the downstairs bedroom light and the upstairs TV fault; confirm TV ownership/disposal", "body": "Hello Corin, this is Oren Pike at Northbridge Lettings regarding 8 Vellum Court, Brindlewick. You replied \"Please sort it\" (5 Sept) to our request about the tenant's TV fault. The tenant also reported a downstairs bedroom light that flickers and pops when switched on, which was not in that request. Bracken Spark Services (electrician) has proposed attending on 29 September after 15:00, within the tenant's availability, to look at both. No quote or cost has been given yet.\n\nPlease could you confirm: (1) that you approve the electrician attending to inspect the downstairs light an)` -> `{"status": "staged", "id": "approval_request-1", "note": "Staged. Committed only if the final decision passes code checks."}`
+2. `schedule_followup({"after_hours": 72, "waiting_on": "landlord", "reason": "Landlord approval for combined electrical visit (light + TV) and TV ownership; landlord had auto-away reply 7 Sept; 29 Sept slot proposed and unconfirmed."})` -> `{"status": "staged", "id": "followup-2", "note": "Staged. Committed only if the final decision passes code checks."}`
+3. `submit_decision({"action": "ROUTE_FOR_APPROVAL", "priority": "P3", "reason": "The tenant reported a TV fault and a flickering, popping downstairs light (event-1). The landlord's \"Please sort it\" (event-3) answered a request about the TV only (event-2). It did not cover the downstairs light (event-5), and it did not settle who owns the TV or whether it can be disposed of. The landlord has since sent an away auto-reply (event-7). Bracken Spark Services proposed 29 September after 15:00 (event-19), which falls within the tenant's availability (event-16). No exact time is given, nothing is confirmed, and there is no quote. Because there is no landlord approval for the combined electrical visit, I should not instruct the provider yet. Policy says the agency cannot approve work itself. I have routed the visit)` -> `{"status": "accepted"}`
