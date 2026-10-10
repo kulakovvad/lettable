@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 from agent.config import Config
+from agent.consistency import CRITERIA, FIELDS, tier
 from agent.reality import _stage, choose_stt, discover, number_cases, run_reality
 from tests.helpers import WAITING_LANDLORD, make_case
 
@@ -176,6 +177,49 @@ class RunRealityTests(unittest.TestCase):
         self.root.mkdir(parents=True)
         with self.assertRaises(ValueError):
             run_reality(self.root, self.out, Config(), "fake", log=quiet)
+
+
+class RealityJevTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name) / "drop"
+        self.out = Path(self.tmp.name) / "ANSWERS"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_the_reality_config_classifies_conflicts_with_jev(self):
+        cfg = Config.load(Path(__file__).resolve().parents[1] / "reality.json")
+        self.assertTrue(cfg.consistency_check)
+        self.assertEqual(cfg.jev_model, "jev-1.13.0")
+        self.assertEqual(cfg.jev_pass, 0.85)
+        self.assertEqual(cfg.jev_escalate, 0.4)
+        self.assertEqual(cfg.jev_min_confidence, 0.6)
+        self.assertEqual(len(CRITERIA), 4)
+        self.assertIn("property_address", FIELDS)
+        self.assertIn("payee", FIELDS)
+        self.assertIn("bank_details", FIELDS)
+        self.assertEqual(tier(0.9, 0.9, cfg, "property_address"), "pass")
+        self.assertEqual(tier(0.2, 0.9, cfg, "property_address"), "escalate")
+        self.assertEqual(tier(0.2, 0.9, cfg, "tenant_name"), "flag")
+        self.assertEqual(tier(0.2, 0.3, cfg, "property_address"), "flag")
+
+    def test_a_missing_jev_key_skips_the_check_and_the_run_continues(self):
+        make_case(self.root, "001", WAITING_LANDLORD)
+        cfg = Config.load(Path(__file__).resolve().parents[1] / "reality.json")
+        cfg = Config(consistency_check=True, case_timeout_s=cfg.case_timeout_s, reality_resume_passes=0)
+        seen = {}
+
+        def fake_run_all(staging, out_dir, pcfg, backend, now_iso, resume=False):
+            seen["consistency_check"] = pcfg.consistency_check
+            return {"written": 1, "skipped": 0, "by_action": {}, "fallbacks": {}, "seconds": 0.0}
+
+        with mock.patch.dict(os.environ, {"TYPESAFE_API_KEY": ""}), mock.patch("agent.reality.run_all", fake_run_all):
+            summary = run_reality(self.root, self.out, cfg, "claude", log=quiet)
+        manifest = json.loads((self.out / "manifest.json").read_text())
+        self.assertFalse(seen["consistency_check"])
+        self.assertEqual(manifest["consistency_check"], "off: TYPESAFE_API_KEY is not set")
+        self.assertEqual(summary["total"], 1)
 
 
 if __name__ == "__main__":
