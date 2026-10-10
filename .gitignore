@@ -11,3 +11,5 @@ runs/
 results/
 .cache/
 interface/
+build/
+*.egg-info/
