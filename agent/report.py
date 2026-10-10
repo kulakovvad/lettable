@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any, Dict
 
@@ -155,6 +156,58 @@ def _mismatch_section(d: Dict[str, Any]) -> list:
     return out + ["", "Checked: %s; document consistency check %s." % (CHECKED, state), ""]
 
 
+_ANSWER_TURNS = 20
+_ROLE_LABEL = {"agent": "agent", "other_party": "other party"}
+
+
+def _fence(text: str) -> str:
+    """A code fence longer than any run of backticks inside the text, so nothing in it can close the block."""
+    longest = max([len(m) for m in re.findall(r"`+", text)] or [0])
+    return "`" * max(3, longest + 1)
+
+
+def _calls_section(d: Dict[str, Any]) -> list:
+    """## Calls: who was phoned, what was agreed, and the transcript as an inert quoted block (untrusted speech)."""
+    from agent import call_results
+
+    calls = d.get("calls") if isinstance(d.get("calls"), list) and d.get("calls") else call_results.call_entries(d.get("actions"))
+    if not calls:
+        return []
+    out = ["## Calls", ""]
+    for c in calls:
+        result = c.get("result") if isinstance(c.get("result"), dict) else None
+        status = ("not dialled (dry run)" if c.get("dry_run") else {"started": "placed", "failed": "could not be placed",
+                  "not_placed": "held, not placed"}.get(c.get("call_status"), c.get("call_status") or "unknown"))
+        out += ["### Call to the %s (%s) `%s`" % (c.get("party"), c.get("purpose"), c.get("id")), "",
+                "- Objective: %s" % (c.get("objective") or "not recorded"), "- Status: %s" % status]
+        if c.get("placed_at") and not c.get("dry_run"):
+            out.append("- Placed at: %s" % c["placed_at"])
+        if not result:
+            out += ["- Result: %s" % ("nothing to collect" if c.get("dry_run") else "waiting for the call result"), ""]
+            continue
+        dec = result.get("decisions") if isinstance(result.get("decisions"), dict) else {}
+        agreed = [("Visit date", dec.get("confirmed_date")), ("Date (exact)", dec.get("confirmed_date_iso")),
+                  ("Amount quoted (GBP)", dec.get("quoted_amount_gbp")), ("Call back on", dec.get("callback_number"))]
+        out.append("- Outcome: %s" % (result.get("outcome") or "not recorded"))
+        out += ["- %s: %s" % (k, v) for k, v in agreed if v not in (None, "")]
+        if dec.get("notes"):
+            out.append("- Notes: %s" % dec["notes"])
+        if result.get("duration_s") is not None:
+            out.append("- Duration: %s s" % result["duration_s"])
+        turns = [t for t in result.get("transcript") or [] if isinstance(t, dict) and t.get("message")]
+        if turns:
+            shown = turns[:_ANSWER_TURNS]
+            lines = ["%s: %s" % (_ROLE_LABEL.get(t.get("role"), "other party"), " ".join(str(t["message"]).split())) for t in shown]
+            body = "\n".join(lines)
+            fence = _fence(body)
+            out += ["", "Transcript (automatic, untrusted):", "", fence + "text", body, fence]
+            more = max(int(result.get("transcript_turns") or len(turns)), len(turns)) - len(shown)
+            if more > 0:
+                out.append("… %d more turn%s in %s" % (more, "" if more == 1 else "s", result.get("record") or "the stored call record"))
+        out.append("")
+    return out
+
+
 def answer_md(d: Dict[str, Any]) -> str:
     out = ["# Case %s%s" % (d["case_id"], ": %s" % d["title"] if d.get("title") else ""), ""]
     if str(d.get("answer") or "").strip():
@@ -176,6 +229,7 @@ def answer_md(d: Dict[str, Any]) -> str:
                 out += ["### %s `%s`" % ("Message to %s" % a.get("to"), a["id"]), "", a["body"], ""]
     elif d.get("message"):
         out += ["## Message to send", "", d["message"], ""]
+    out += _calls_section(d)
     escalations = [a for a in d.get("actions") or [] if a.get("kind") == "escalation"]
     if escalations:
         e = escalations[0]

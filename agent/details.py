@@ -288,13 +288,11 @@ def _timeline(case: Case, decision: Any) -> Dict[str, Any]:
 
 
 def _calls(decision: Any) -> List[Dict[str, Any]]:
-    out = []
-    for a in _get(decision, "actions") or []:
-        if isinstance(a, dict) and a.get("kind") == "call":
-            result = a.get("call_result") if isinstance(a.get("call_result"), dict) else {}
-            out.append({"party": a.get("to"), "status": a.get("call_status") or a.get("state"),
-                        "conversation_id": a.get("conversation_id"), "result_summary": result.get("summary")})
-    return out[:CAP]
+    """The calls on the card: party, status, outcome and what was agreed, with a reference to the stored transcript."""
+    from agent import call_results
+
+    return [call_results.card_entry(a) for a in _get(decision, "actions") or []
+            if isinstance(a, dict) and a.get("kind") == "call"][:CAP]
 
 
 def build(case: Case, decision: Any) -> Dict[str, Any]:

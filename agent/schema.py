@@ -118,6 +118,7 @@ class Decision:
     red_flags: List[Dict[str, Any]] = field(default_factory=list)  # agent.redflags, also on fallback
     details: Dict[str, Any] = field(default_factory=dict)  # agent.details: the factual block of ANSWER.md
     mismatches: List[Dict[str, Any]] = field(default_factory=list)  # agent.mismatches: things that do not match
+    calls: List[Dict[str, Any]] = field(default_factory=list)  # agent.call_results: one entry per phone call, with what was agreed
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)

@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from agent.config import Config
+from agent import call_results
 from agent.report import atomic_write, write_case
 from agent.timeline import Case, Event
 from agent.voice import CALL_RECORD_TAG, CallRequest, CallResult, Dialer
@@ -104,6 +105,7 @@ def place_pending(decision: Dict[str, Any], get_dialer: Callable[[], Dialer], cf
             else:
                 a["placed_at"] = now.isoformat()
                 a["note"] = "Call %s." % ("recorded, nothing dialled (dry run)" if result.status == "dry_run" else "placed")
+    call_results.sync(decision)  # the calls view and the case card now show what was placed
 
 
 def _result_path(case_out: Path, conversation_id: str) -> Path:
@@ -118,7 +120,13 @@ def _collect_case(case_out: Path, out_dir: Path, get_dialer, summary: Dict[str, 
     changed = False
     for a in decision.get("actions", []):
         cid = a.get("conversation_id")
-        if a.get("kind") != "call" or not cid or a.get("call_status") not in ("dry_run", "started") or a.get("call_result"):
+        if a.get("kind") != "call" or not cid or a.get("call_status") not in ("dry_run", "started"):
+            continue
+        if a.get("call_result"):
+            stored = _result_path(case_out, cid)
+            if "transcript" not in a["call_result"] and stored.is_file():  # collected before transcripts were kept: upgrade it
+                a["call_result"] = call_results.shape_result(json.loads(stored.read_text(encoding="utf-8")), "calls/" + stored.name)
+                changed = True
             continue
         if skip_dry_run and str(cid).startswith("dryrun-"):
             continue  # a rehearsal has nothing to fetch from the real service
@@ -141,9 +149,10 @@ def _collect_case(case_out: Path, out_dir: Path, get_dialer, summary: Dict[str, 
                       "transcript": [{"role": r, "message": m} for r, m in conv.transcript]}
             atomic_write(path, json.dumps(record, indent=2, ensure_ascii=False) + "\n")
             summary["collected"].append({"case_id": decision["case_id"], "conversation_id": cid})
-        a["call_result"] = {k: record.get(k) for k in ("status", "success", "summary", "data")}
+        a["call_result"] = call_results.shape_result(record, "calls/" + path.name)
         changed = True
     if changed:
+        call_results.sync(decision)
         write_case(out_dir, decision)
 
 
