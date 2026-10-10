@@ -40,7 +40,8 @@ def _action_line(a: Dict[str, Any]) -> str:
         if a.get("call_result"):
             head += ". Result: %s" % (a["call_result"].get("summary") or a["call_result"].get("status"))
     elif kind == "approval_request":
-        head = "Approval request to landlord for GBP %.2f (%s)" % (a.get("amount_gbp") or 0, a.get("scope", ""))
+        cost = "for GBP %.2f" % a["amount_gbp"] if a.get("amount_gbp") is not None else "to attend or quote, no cost"
+        head = "Approval request to landlord %s (%s)" % (cost, a.get("scope", ""))
     elif kind == "escalation":
         head = "Escalation ticket %s to %s" % (a.get("priority"), a.get("route"))
     elif kind == "followup":

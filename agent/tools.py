@@ -108,8 +108,8 @@ TOOL_SPECS: List[Dict[str, Any]] = [
          "evidence_refs": _STRS,
          "priority": _PRIORITY,
      }, ["party", "purpose", "objective", "facts", "evidence_refs", "priority"])},
-    {"name": "route_for_approval", "description": "Stage a request to the landlord to approve a quote or cost. The amount must appear in the case. Blocked if the landlord already approved it.",
-     "parameters": _schema({"amount_gbp": {"type": "number"}, "scope": _STR, "body": _STR, "evidence_refs": _STRS},
+    {"name": "route_for_approval", "description": "Stage a request to the landlord to approve a quote or cost, or (amount_gbp null) to approve a provider attending or quoting when nothing is approved yet. A stated amount must appear in the case. Blocked if the landlord already approved it.",
+     "parameters": _schema({"amount_gbp": {"type": ["number", "null"]}, "scope": _STR, "body": _STR, "evidence_refs": _STRS},
                            ["amount_gbp", "scope", "body", "evidence_refs"])},
     {"name": "schedule_followup", "description": "Record when to look at this case again and why (use with a WAIT decision).",
      "parameters": _schema({"after_hours": {"type": "number"}, "waiting_on": {"type": "string", "enum": list(PARTIES) + ["internal"]}, "reason": _STR},
@@ -155,12 +155,27 @@ _PRIMARY_NEEDS = {
 }
 
 
+def staged_action(s: Dict[str, Any]) -> Optional[str]:
+    """The primary action that would send this staged outbound request (None for updates, follow-ups, tickets)."""
+    if s["kind"] == "approval_request":
+        return "ROUTE_FOR_APPROVAL"
+    if s["kind"] not in ("message", "call"):
+        return None
+    purpose, to = s.get("purpose"), s.get("to")
+    if purpose == "request_info":
+        return "ASK_" + str(to).upper()
+    if purpose == "chase" and to in ("landlord", "provider"):
+        return "CHASE_" + to.upper()
+    return {"instruct_provider": "INSTRUCT_PROVIDER", "reminder": "SEND_REMINDER"}.get(purpose)
+
+
 class Toolbox:
     def __init__(self, case: Case, cfg: Config, now: datetime, folder: Optional[Path] = None) -> None:
         self.case, self.cfg, self.now, self.folder = case, cfg, now, folder
         self.staged: List[Dict[str, Any]] = []
         self.blocked: List[Dict[str, Any]] = []
         self.decision: Optional[Dict[str, Any]] = None
+        self._wait_confirmed = False
         self._by_index = {e.index: e for e in case.events}
         # Urgency comes from code, never from the model's own priority argument.
         self.hazards = gates.hazard_hits(case, cfg)
@@ -372,7 +387,9 @@ class Toolbox:
             out, inn = self._last(to, True), self._last(to, False)
             if out is None:
                 return self._blocked("nothing_to_chase", "we have not sent the %s anything yet" % to,
-                                     "Use purpose request_info or update for a first message.")
+                                     "This is a first message, not a chase: use purpose request_info (ASK_%s)%s."
+                                     % (to.upper(), ", or route_for_approval if the landlord must approve a visit or cost"
+                                        if to == "landlord" else ""))
             if inn is not None and inn.index > out.index:
                 return self._blocked("already_replied", "the %s replied at %s after our last message %s" % (to, ref(inn), ref(out)),
                                      "Act on their reply instead of chasing.")
@@ -496,28 +513,31 @@ class Toolbox:
         return result
 
     def _t_route_for_approval(self, args):
+        raw = args.get("amount_gbp")
         try:
-            amount = round(float(args.get("amount_gbp")), 2)
+            amount = None if raw in (None, "") else round(float(raw), 2)
         except (TypeError, ValueError):
-            return {"status": "error", "error": "amount_gbp must be a number"}
+            return {"status": "error", "error": "amount_gbp must be a number or null"}
         body = _s(args.get("body"), 3000)
         refs, bad = self._resolve_refs(args.get("evidence_refs"))
         known = set(_amounts(self._corpus))
-        if amount not in known and round(amount / 1.2, 2) not in known:
+        if amount is not None and amount not in known and round(amount / 1.2, 2) not in known:
             return self._blocked("amount_not_in_case", "GBP %.2f does not appear in the case" % amount,
-                                 "Use the exact quoted amount from the case, or ask the provider for a written quote.")
+                                 "Use the exact quoted amount from the case, or amount_gbp null to ask approval for a "
+                                 "provider to attend or quote.")
         if not self.party_exists("landlord"):
             return self._blocked("unknown_party", "no landlord appears in this case", "Escalate to the property manager.")
         fab = self._fabrication(body)
         if fab:
             return self._blocked("unverified_detail", fab, "Only use numbers and amounts from the case.")
-        if evidence.approval_covers(self.case, amount):
-            approval, cap = evidence.covering_approval(self.case)
-            return self._blocked("already_approved", "the landlord approval at %s already covers GBP %.2f" % (ref(approval), cap),
-                                 "Instruct the provider or wait for the work instead of asking again.")
+        approval, cap = evidence.covering_approval(self.case)
+        if approval is not None and (amount is None or evidence.approval_covers(self.case, amount)):
+            covers = "a provider attending" if cap is None else "GBP %.2f" % cap
+            return self._blocked("already_approved", "the landlord approval at %s already covers %s" % (ref(approval), covers),
+                                 "Instruct the provider, ask them for a quote, or wait for the work instead of asking again.")
         result = self._stage("approval_request", {"to": "landlord", "amount_gbp": amount, "scope": _s(args.get("scope"), 500),
                                                   "body": body, "evidence_refs": refs,
-                                                  "above_limit": amount > self.cfg.approval_limit_gbp})
+                                                  "above_limit": amount is not None and amount > self.cfg.approval_limit_gbp})
         if bad:
             result["ignored_refs"] = bad
         return result
@@ -607,6 +627,17 @@ class Toolbox:
             if not match:
                 return self._blocked("action_not_staged", "%s needs a staged %s%s first" % (action, kind, " to the %s" % party if party else ""),
                                      "Call the matching action tool, or choose WAIT/ESCALATE if it was blocked.")
+        if action == "WAIT" and not self._wait_confirmed:
+            pending = [(s["id"], staged_action(s)) for s in self.staged if staged_action(s)]
+            if pending:
+                # Refused once: a second WAIT is accepted and the staged requests stay held for a person.
+                self._wait_confirmed = True
+                names = sorted({a for _, a in pending})
+                return self._blocked("staged_not_submitted",
+                                     "WAIT holds what you staged (%s), so nothing would be sent" % ", ".join(
+                                         "%s as %s" % p for p in pending),
+                                     "Submit %s if it should go out now. Submit WAIT again only if it must not be sent yet."
+                                     % " or ".join(names))
         refs, bad = self._resolve_refs(args.get("evidence_refs"))
         try:
             confidence = min(1.0, max(0.0, float(args.get("confidence"))))

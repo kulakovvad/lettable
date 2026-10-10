@@ -191,7 +191,7 @@ Per-kind keys:
 |---|---|
 | `message` | `to` (`tenant`, `landlord`, `provider`), `purpose` (`chase`, `request_info`, `reminder`, `update`, `safety_advice`, `instruct_provider`), `priority`, `body`, `evidence_refs` |
 | `call` | `to` (`tenant`, `landlord`, `provider`), `purpose` (`chase`, `request_info`, `instruct_provider`, `update`, `safety_advice`), `priority`, `number` (E.164, taken from the case, never from the model), `objective`, `facts` (short strings the caller may rely on), `body` (`Phone call: <objective>`), `evidence_refs`, and after placing: `call_status` (`pending` \| `dry_run` \| `started` \| `failed` \| `not_placed`), `conversation_id`, `call_detail`, and after `calls collect`: `call_result` (`status`, `success`, `summary`, `data`) |
-| `approval_request` | `to` (`landlord`), `amount_gbp`, `scope`, `body`, `evidence_refs`, `above_limit` (amount over `approval_limit_gbp`, default 300) |
+| `approval_request` | `to` (`landlord`), `amount_gbp` (`null` asks approval for a provider to attend or quote, with no cost approved), `scope`, `body`, `evidence_refs`, `above_limit` (amount over `approval_limit_gbp`, default 300) |
 | `followup` | `review_at`, `waiting_on` (`tenant`, `landlord`, `provider`, `internal`), `reason` |
 | `escalation` | `priority`, `route` (`on_call_emergency`, `property_manager`, `accounts`, `complaints`), `summary`, `known`, `unknowns`, `tried`, `options`, `evidence_refs` |
 | `closure` | `completion_refs` (events where a provider, tenant or landlord says the job is done), `invoice_status` (`sent_to_landlord`, `landlord_pays_directly`, `no_charge`), `invoice_refs`, `keys_status` (`returned`, `not_applicable`), `key_refs`, `reason` |
@@ -222,7 +222,9 @@ Each item in `blocked` is a tool call a gate refused. The model saw the reason a
 | `no_confirmation`, `possibly_reopened`, `invoice_unknown`, `invoice_unverified`, `keys_unknown`, `keys_unverified` | `close_case` |
 | `empty_objective`, `unknown_party`, `unverified_detail`, `no_hazard`, `hazard_escalate`, `call_limit`, `too_early`, `already_replied`, `nothing_to_chase`, `wrong_purpose`, `no_landlord_approval`, `no_number` | `place_call` |
 | `call_failed` | added by the runner when a call could not be placed |
-| `action_not_staged` | `submit_decision` |
+| `action_not_staged`, `staged_not_submitted` | `submit_decision` |
+
+`staged_not_submitted` refuses the first `WAIT` while an outbound request (`request_info`, `chase`, `instruct_provider`, `reminder` or an approval request) is staged. Its hint names the action that would send it. A second `WAIT` is accepted and the request stays `held_for_review`.
 
 ## Trace
 
