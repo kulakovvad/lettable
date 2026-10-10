@@ -19,9 +19,12 @@ from agent.files import atomic_write
 
 STATIC_DIR = Path(__file__).parent / "ui_static"
 MAX_BODY = 16 * 1024
+MAX_FILE = 8 * 1024 * 1024
 MAX_TEXT = 2000
 REVIEW_CHOICES = ("option", "take_over", "new_case")
 ALLOWED_HOSTS = ("127.0.0.1", "localhost")
+CSP = ("default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; "
+       "img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 
 ACTION_LABELS = {
     "WAIT": "Wait, nothing to do yet",
@@ -42,11 +45,24 @@ _ITEMS = re.compile(r"^(\d+) item")
 _review_lock = threading.Lock()
 
 
-def _read_json(path: Path):
+def _read_json(path: Path, limit: int = MAX_FILE):
     try:
+        if path.stat().st_size > limit:
+            return None
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
+
+
+def _dict(value) -> dict:
+    return value if isinstance(value, dict) else {}
+
+
+def _real_child(out: Path, d: Path) -> bool:
+    """A real folder directly inside OUT_DIR holding a real decision.json (no symlinks anywhere)."""
+    dec = d / "decision.json"
+    return (not d.is_symlink() and d.is_dir() and d.resolve().parent == out.resolve()
+            and not dec.is_symlink() and dec.is_file())
 
 
 def case_dir(out: Path, cid: str) -> Optional[Path]:
@@ -54,9 +70,7 @@ def case_dir(out: Path, cid: str) -> Optional[Path]:
     if not cid or cid in (".", "..") or "/" in cid or "\\" in cid or "\x00" in cid:
         return None
     d = out / cid
-    if d.parent.resolve() != out.resolve() or not (d / "decision.json").is_file():
-        return None
-    return d
+    return d if _real_child(out, d) else None
 
 
 def _case_seconds(out: Path) -> dict:
@@ -82,9 +96,11 @@ def _sort_key(row: dict):
 
 def list_cases(out: Path) -> dict:
     cases = []
-    for d in sorted(p for p in out.iterdir() if p.is_dir()) if out.is_dir() else []:
+    for d in sorted(p for p in out.iterdir() if _real_child(out, p)) if out.is_dir() else []:
         dec = _read_json(d / "decision.json")
         if not isinstance(dec, dict):
+            cases.append({"id": d.name, "title": "", "priority": None, "action": None, "source": None,
+                          "hazard": False, "unreadable": True})
             continue
         cases.append({"id": d.name, "title": dec.get("title") or "", "priority": dec.get("priority"),
                       "action": dec.get("action"), "source": dec.get("source"), "hazard": bool(dec.get("hazard"))})
@@ -104,7 +120,7 @@ def _plural(n: str, word: str) -> str:
 
 def step_summary(step: dict) -> str:
     """One short line describing a tool call, as in the Reasoning column."""
-    tool, args, res = step.get("tool"), step.get("args") or {}, step.get("result") or {}
+    tool, args, res = step.get("tool"), _dict(step.get("args")), _dict(step.get("result"))
     if tool == "read_events":
         first, last = args.get("first"), args.get("last")
         text = "event %s" % first if first == last else "events %s–%s" % (first, last)
@@ -137,7 +153,8 @@ def step_summary(step: dict) -> str:
     elif tool == "close_case":
         text = "invoice %s · keys %s" % (args.get("invoice_status", "?"), args.get("keys_status", "?"))
     elif tool == "consistency_check":
-        text = ", ".join(res.get("checks") or []) or "no differences"
+        checks = res.get("checks")
+        text = ", ".join(str(c) for c in checks) if isinstance(checks, list) and checks else "no differences"
     elif not args:
         text = "—"
     else:
@@ -159,23 +176,46 @@ def _review(d: Path) -> dict:
     return {"latest": latest, "new_cases": new_cases}
 
 
+class UnreadableCase(Exception):
+    pass
+
+
+_LIST_FIELDS = ("unknowns", "options", "evidence_refs", "unrelated_issues", "gate_notes", "warnings", "actions", "blocked", "trace")
+_TEXT_FIELDS = ("reason", "title", "request", "message", "model", "as_of", "decided_at")
+
+
+def _load_decision(d: Path) -> dict:
+    """decision.json with list and text fields forced to the right type, so a hand-edited file cannot break the page."""
+    dec = _read_json(d / "decision.json")
+    if not isinstance(dec, dict):
+        raise UnreadableCase("decision.json could not be read (half-written, not UTF-8, not JSON or over %d MB)"
+                             % (MAX_FILE // (1024 * 1024)))
+    for k in _LIST_FIELDS:
+        dec[k] = dec[k] if isinstance(dec.get(k), list) else []
+    for k in ("unknowns", "options", "evidence_refs", "unrelated_issues", "gate_notes", "warnings"):
+        dec[k] = [str(x) for x in dec[k]]
+    for k in ("actions", "blocked", "trace"):
+        dec[k] = [x for x in dec[k] if isinstance(x, dict)]
+    for k in _TEXT_FIELDS:
+        dec[k] = dec[k] if isinstance(dec.get(k), str) else ""
+    return dec
+
+
 def case_view(out: Path, cid: str) -> Optional[dict]:
+    """None for an unknown case id; raises UnreadableCase when decision.json exists but cannot be read."""
     d = case_dir(out, cid)
     if d is None:
         return None
-    dec = _read_json(d / "decision.json")
-    if not isinstance(dec, dict):
-        return None
-    trace = [t for t in dec.get("trace") or [] if isinstance(t, dict)]
-    actions = [a for a in dec.get("actions") or [] if isinstance(a, dict)]
+    dec = _load_decision(d)
+    trace, actions = dec["trace"], dec["actions"]
     submit = next((t for t in reversed(trace) if t.get("tool") == "submit_decision"), None)
-    amount = (submit or {}).get("args", {}).get("amount_gbp")
+    amount = _dict((submit or {}).get("args")).get("amount_gbp")
     escalation = next((a for a in actions if a.get("kind") == "escalation"), None)
     steps = []
     for t in trace:
         if "tool" in t:
-            steps.append({"step": t.get("step"), "tool": t["tool"], "arg": step_summary(t),
-                          "status": (t.get("result") or {}).get("status", "")})
+            steps.append({"step": t.get("step"), "tool": str(t["tool"]), "arg": step_summary(t),
+                          "status": str(_dict(t.get("result")).get("status", ""))})
         elif "thought" in t:
             steps.append({"step": t.get("step"), "thought": str(t["thought"])})
     return {
@@ -184,9 +224,9 @@ def case_view(out: Path, cid: str) -> Optional[dict]:
             "action_label": ACTION_LABELS.get(dec.get("action"), dec.get("action") or "—"),
             "amount": amount if isinstance(amount, (int, float)) else None,
             "route": {"route": escalation.get("route"), "state": escalation.get("state")} if escalation else None,
-            "followup_missing": any(t.get("tool") == "schedule_followup" and (t.get("result") or {}).get("status") == "skipped"
+            "followup_missing": any(t.get("tool") == "schedule_followup" and _dict(t.get("result")).get("status") == "skipped"
                                     for t in trace),
-            "reason_parts": split_refs(dec.get("reason", "")),
+            "reason_parts": split_refs(dec["reason"]),
             "seconds": _case_seconds(out).get(d.name),
             "steps": steps,
             "calls": sum(1 for t in trace if "tool" in t),
@@ -196,20 +236,25 @@ def case_view(out: Path, cid: str) -> Optional[dict]:
 
 
 class ReviewError(ValueError):
-    pass
+    def __init__(self, message: str, status: int = 400):
+        super().__init__(message)
+        self.status = status
 
 
 def save_review(out: Path, cid: str, payload) -> dict:
     """Append a person's choice to <case>/review.json and return the new review view."""
     d = case_dir(out, cid)
     if d is None:
-        raise ReviewError("unknown case")
+        raise ReviewError("unknown case", 404)
     if not isinstance(payload, dict) or payload.get("choice") not in REVIEW_CHOICES:
         raise ReviewError("choice must be one of %s" % ", ".join(REVIEW_CHOICES))
-    dec = _read_json(d / "decision.json") or {}
+    try:
+        dec = _load_decision(d)
+    except UnreadableCase as exc:
+        raise ReviewError(str(exc), 422)
     entry = {"choice": payload["choice"], "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
     if entry["choice"] == "option":
-        options = dec.get("options") or []
+        options = dec["options"]
         n = payload.get("option")
         if not isinstance(n, int) or isinstance(n, bool) or not 1 <= n <= len(options):
             raise ReviewError("option must be a number from 1 to %d" % len(options))
@@ -243,6 +288,7 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Content-Security-Policy", CSP)
         self.end_headers()
         self.wfile.write(body)
 
@@ -258,6 +304,23 @@ class _Handler(BaseHTTPRequestHandler):
         return parts
 
     def do_GET(self):
+        self._safely(self._get)
+
+    def do_POST(self):
+        self._safely(self._post)
+
+    def _safely(self, handler) -> None:
+        try:
+            handler()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        except Exception as exc:
+            try:
+                self._json(500, {"error": "%s: %s" % (type(exc).__name__, str(exc)[:300])})
+            except OSError:
+                pass
+
+    def _get(self):
         if not self._host_ok():
             return self._json(403, {"error": "forbidden host"})
         out, parts = self.server.out_dir, self._route()
@@ -268,11 +331,14 @@ class _Handler(BaseHTTPRequestHandler):
         if parts == ["api", "run"]:
             return self._json(200, list_cases(out))
         if len(parts) == 3 and parts[:2] == ["api", "cases"]:
-            view = case_view(out, parts[2])
+            try:
+                view = case_view(out, parts[2])
+            except UnreadableCase as exc:
+                return self._json(422, {"error": str(exc)})
             return self._json(200, view) if view else self._json(404, {"error": "unknown case"})
         self._json(404, {"error": "not found"})
 
-    def do_POST(self):
+    def _post(self):
         if not self._host_ok():
             return self._json(403, {"error": "forbidden host"})
         parts = self._route()
@@ -293,7 +359,7 @@ class _Handler(BaseHTTPRequestHandler):
         try:
             review = save_review(self.server.out_dir, parts[2], payload)
         except ReviewError as exc:
-            return self._json(404 if str(exc) == "unknown case" else 400, {"error": str(exc)})
+            return self._json(exc.status, {"error": str(exc)})
         self._json(200, review)
 
     def _static(self, name: str) -> None:

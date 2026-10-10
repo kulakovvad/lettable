@@ -17,6 +17,7 @@ function h(tag, attrs, ...children) {
   for (const [k, v] of Object.entries(attrs || {})) {
     if (v == null || v === false) continue;
     if (k === "class") el.className = v;
+    else if (k === "style") el.style.cssText = v;
     else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
     else el.setAttribute(k, v === true ? "" : v);
   }
@@ -128,7 +129,8 @@ function renderList() {
         h("span", { class: "case-meta" },
           h("span", { class: "mono" }, [c.id, c.priority].filter(Boolean).join(" · ")),
           h("span", { class: "case-action" },
-            h("span", { class: `mark mark-${c.action}`, "aria-hidden": "true" }), dash(c.action)))));
+            h("span", { class: `mark mark-${c.unreadable ? "UNREADABLE" : c.action}`, "aria-hidden": "true" }),
+            c.unreadable ? "UNREADABLE" : dash(c.action)))));
   }));
 }
 

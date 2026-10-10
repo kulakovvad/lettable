@@ -85,6 +85,7 @@ button:disabled, input:disabled { cursor: not-allowed; }
 .mark-ESCALATE { background: var(--amber); }
 .mark-WAIT { background: #8A919E; }
 .mark-CLOSE { background: #2E8B57; }
+.mark-UNREADABLE { background: #B3261E; }
 
 /* Info */
 .info-top { padding: 14px 18px 18px; }

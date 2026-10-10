@@ -252,6 +252,8 @@ There is no status field. These groupings come from the fields above.
 
 The latest `option` or `take_over` entry is the current choice.
 
+`text` and `option_text` are stored as given and are not scrubbed for phone numbers, names or secrets. Treat `review.json` like the case files it sits next to.
+
 ## Examples
 
 These were produced by running PR 5's own code on public case 003 with the scripted test backends in `tests/`. No model was called.

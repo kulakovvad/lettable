@@ -120,7 +120,7 @@ python3 -m agent calls collect out/ --backend elevenlabs             # bring fin
 python3 -m agent ui out/ --open      # http://127.0.0.1:8765/  (--port to change)
 ```
 
-A local page over a finished run: the case list, the case info and what is not known, the decision with its reasoning and evidence refs, and the model's tool calls. It reads `decision.json`, `summary.json` and `trace.jsonl` and never changes them. "Go with option N", "Take over case" and "Open as new case" record a person's choice in `<case>/review.json` ([docs/output-format.md](docs/output-format.md#review)); nothing is sent anywhere. The server listens on 127.0.0.1 only and needs no dependencies.
+A local page over a finished run: the case list, the case info and what is not known, the decision with its reasoning and evidence refs, and the model's tool calls. It reads `decision.json`, `summary.json` and `trace.jsonl` and never changes them. "Go with option N", "Take over case" and "Open as new case" record a person's choice in `<case>/review.json` ([docs/output-format.md](docs/output-format.md#review)); nothing is sent anywhere. The server listens on 127.0.0.1 only, ignores symlinked case folders and needs no dependencies. A case whose `decision.json` cannot be read is listed as `UNREADABLE` rather than hidden.
 
 **Export the results for submission.**
 

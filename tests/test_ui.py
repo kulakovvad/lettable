@@ -5,7 +5,8 @@ import threading
 import unittest
 from pathlib import Path
 
-from agent.ui import ReviewError, case_dir, case_view, list_cases, make_server, save_review, step_summary
+from agent.ui import (MAX_FILE, ReviewError, UnreadableCase, case_dir, case_view, list_cases, make_server, save_review,
+                      step_summary)
 
 
 def decision(cid, **over):
@@ -99,6 +100,55 @@ class AdapterTests(unittest.TestCase):
             self.assertIsNone(case_view(out, bad), bad)
         self.assertIsNotNone(case_dir(out, "015"))
 
+    def test_symlinked_case_folders_and_files_are_ignored(self):
+        out = make_run(self.root, [decision("015")])
+        elsewhere = self.root / "elsewhere"
+        elsewhere.mkdir()
+        (elsewhere / "decision.json").write_text(json.dumps(decision("999")))
+        (out / "link").symlink_to(elsewhere, target_is_directory=True)
+        (out / "016").mkdir()
+        (out / "016" / "decision.json").symlink_to(elsewhere / "decision.json")
+        for cid in ("link", "016"):
+            self.assertIsNone(case_dir(out, cid), cid)
+            with self.assertRaises(ReviewError):
+                save_review(out, cid, {"choice": "take_over"})
+        self.assertEqual([c["id"] for c in list_cases(out)["cases"]], ["015"])
+        self.assertFalse((elsewhere / "review.json").exists())
+
+    def test_unreadable_decision_is_listed_not_hidden(self):
+        out = make_run(self.root, [decision("015")])
+        (out / "020").mkdir()
+        (out / "020" / "decision.json").write_bytes(b'{"case_id": "020", "act')
+        (out / "021").mkdir()
+        (out / "021" / "decision.json").write_bytes(b"\xff\xfe not utf-8")
+        rows = {c["id"]: c for c in list_cases(out)["cases"]}
+        self.assertTrue(rows["020"].get("unreadable"))
+        self.assertTrue(rows["021"].get("unreadable"))
+        self.assertNotIn("unreadable", rows["015"])
+        with self.assertRaises(UnreadableCase):
+            case_view(out, "020")
+        with self.assertRaises(ReviewError) as ctx:
+            save_review(out, "020", {"choice": "take_over"})
+        self.assertEqual(ctx.exception.status, 422)
+
+    def test_oversized_decision_is_unreadable(self):
+        out = make_run(self.root, [decision("015", reason="x" * (MAX_FILE + 1))])
+        self.assertTrue(list_cases(out)["cases"][0].get("unreadable"))
+
+    def test_malformed_trace_and_fields_do_not_break_the_view(self):
+        trace = [{"step": 1, "tool": "read_events", "args": "s", "result": "r"},
+                 {"step": 2, "tool": "consistency_check", "args": {}, "result": {"checks": "bad"}},
+                 {"step": 3, "tool": "submit_decision", "args": ["x"]}, "not a dict", 7]
+        out = make_run(self.root, [decision("015", trace=trace, options="oops", unknowns=None, reason=5,
+                                            actions=[{"kind": "escalation"}, "x"])])
+        view = case_view(out, "015")
+        self.assertEqual([s["tool"] for s in view["derived"]["steps"]], ["read_events", "consistency_check", "submit_decision"])
+        self.assertEqual(view["derived"]["steps"][1]["arg"], "no differences")
+        self.assertEqual(view["decision"]["options"], [])
+        self.assertEqual(view["decision"]["unknowns"], [])
+        self.assertEqual(view["derived"]["reason_parts"], [])
+        self.assertIsNone(view["derived"]["amount"])
+
 
 class ReviewTests(unittest.TestCase):
     def setUp(self):
@@ -182,6 +232,38 @@ class ServerTests(unittest.TestCase):
         for path in ("/api/cases/%2e%2e", "/api/cases/..%2Fsummary.json", "/static/..%2Fui.py", "/static/.hidden",
                      "/../agent/ui.py", "/api/cases/missing", "/nope"):
             self.assertEqual(self.request("GET", path)[0], 404, path)
+
+    def test_csp_header_is_sent(self):
+        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        conn.request("GET", "/")
+        res = conn.getresponse()
+        res.read()
+        conn.close()
+        self.assertIn("default-src 'self'", res.getheader("Content-Security-Policy"))
+
+    def test_broken_case_files_get_json_errors_not_dropped_connections(self):
+        (self.out / "020").mkdir()
+        (self.out / "020" / "decision.json").write_bytes(b"{half")
+        status, ctype, body = self.request("GET", "/api/cases/020")
+        self.assertEqual(status, 422)
+        self.assertIn("could not be read", json.loads(body)["error"])
+        (self.out / "021").mkdir()
+        (self.out / "021" / "decision.json").write_text(json.dumps(decision("021", trace=[{"tool": "read_events", "args": "s"}])))
+        self.assertEqual(self.request("GET", "/api/cases/021")[0], 200)
+        status, _, body = self.request("POST", "/api/cases/020/review", '{"choice": "take_over"}', {"Content-Type": "application/json"})
+        self.assertEqual(status, 422)
+
+    def test_unexpected_errors_become_500_json(self):
+        import agent.ui as ui
+
+        original = ui.list_cases
+        ui.list_cases = lambda out: 1 / 0
+        try:
+            status, ctype, body = self.request("GET", "/api/run")
+        finally:
+            ui.list_cases = original
+        self.assertEqual(status, 500)
+        self.assertIn("ZeroDivisionError", json.loads(body)["error"])
 
     def test_foreign_host_is_refused(self):
         self.assertEqual(self.request("GET", "/api/run", headers={"Host": "evil.example"})[0], 403)
