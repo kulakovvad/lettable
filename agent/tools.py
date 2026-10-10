@@ -596,8 +596,9 @@ class Toolbox:
             if gates.later_followup(self.case) == "side":
                 return self._blocked("side_unanswered",
                                      "a later tenant message is about something else and nobody has answered it",
-                                     "List it in unrelated_issues. The case does not close while that message is "
-                                     "unanswered. This is routine, not a reason to escalate.")
+                                     "Ask the tenant about it (ASK_TENANT) and list it in unrelated_issues. "
+                                     "Do not close, and do not WAIT: nobody is working on that message while the case waits. "
+                                     "ESCALATE if you cannot ask.")
             return self._blocked("possibly_reopened",
                                  "a later tenant message reports a fault or asks about this job, so it may be reopened",
                                  "ASK_TENANT whether the fix worked. This is a routine question, not a reason to escalate.")

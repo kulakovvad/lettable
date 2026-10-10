@@ -198,7 +198,7 @@ def apply(case: Case, proposal: Proposal, cfg: Config, now: datetime,
     if action in ("CHASE_LANDLORD", "CHASE_PROVIDER"):
         party = "landlord" if action == "CHASE_LANDLORD" else "provider"
         if wait is None or wait.party != party:
-            stricter("WAIT", "not waiting on the %s, so there is nothing to chase yet" % party)
+            stricter("ESCALATE", "model wants to chase the %s but the timeline is not waiting on them" % party)
         elif days is not None and days < cfg.chase_after_days:
             stricter("WAIT", "waiting on the %s for %.1f days; chase after %.1f" % (party, days, cfg.chase_after_days))
 
@@ -213,8 +213,8 @@ def apply(case: Case, proposal: Proposal, cfg: Config, now: datetime,
 
     if action == "CLOSE" and confirmed_completion(case) is None:
         if later_followup(case) == "side":
-            stricter("WAIT", "a later message is about something else and is still unanswered; list it in "
-                     "unrelated_issues and do not close yet")
+            stricter("ESCALATE", "a later message is about something else and is still unanswered; "
+                     "ask the tenant (ASK_TENANT) or hand it to a person")
         else:
             stricter("ESCALATE", "close proposed but no confirmed completion (missing, negated, or a tenant follow-up that is not a clear all-clear)")
 

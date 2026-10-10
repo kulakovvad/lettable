@@ -40,11 +40,11 @@ class GateTests(unittest.TestCase):
         self.assertEqual(d.proposed_action, "CHASE_LANDLORD")
         self.assertEqual(d.message, "")
 
-    def test_chasing_a_party_we_are_not_waiting_on_waits(self):
+    def test_chasing_a_party_we_are_not_waiting_on_escalates(self):
         d = gates.apply(self.case, prop("CHASE_PROVIDER"), CFG, SINCE + timedelta(days=9))
-        self.assertEqual(d.action, "WAIT")
+        self.assertEqual(d.action, "ESCALATE")
         self.assertEqual(d.proposed_action, "CHASE_PROVIDER")
-        self.assertIn("nothing to chase", d.gate_notes[0])
+        self.assertIn("not waiting", d.gate_notes[0])
 
     def test_message_required(self):
         d = gates.apply(self.case, prop("CHASE_LANDLORD", message=""), CFG, SINCE + timedelta(days=9))
