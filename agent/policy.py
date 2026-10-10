@@ -110,19 +110,13 @@ def policy_topics(cfg: Config) -> Dict[str, str]:
         "closing": (
             "Close only when all of these hold: the assigned provider, or this property's landlord or tenant, "
             "confirms the work is complete for this property (see verify_claims); nothing later reopens it; the "
-            "invoice position is known (sent to landlord, paid directly by landlord, or no charge) and no "
-            "readable invoiced amount differs from the approved amount (see amounts); keys are returned where the "
-            "provider held them; and no step the agency promised is left undone (e.g. 'we will check it when you "
-            "are back'). An invoice file that cannot be read has unknown contents, not a mismatch: if an event "
-            "shows it was sent and nobody disputes it, the invoice position is known. A completion report from "
-            "the provider, landlord or tenant is enough unless someone says the fault continues; do not hold the "
-            "close for testing or extra confirmation. Do not close while the latest message from any party asks "
-            "a question or reports a defect about this job that nobody has answered, or while a 'confirm the "
-            "address' request is unresolved. A message about something else is a side issue: list it in "
-            "unrelated_issues; it does not hold this close. Asking the landlord to confirm before closing is a "
-            "normal step. Agency/system notes alone are not proof. If the invoice, keys or confirmation is "
-            "missing, ask the party who has it (ASK_PROVIDER, ASK_LANDLORD or ASK_TENANT) rather than closing "
-            "or escalating."
+            "invoice position is known (sent to landlord, paid directly by landlord, or no charge) and any "
+            "invoiced amount matches the approved amount (see amounts); keys are returned where the provider "
+            "held them; and no step the agency promised is left undone (e.g. 'we will check it when you are "
+            "back'). Do not close while the latest message from any party asks a question or reports a new "
+            "defect that nobody has answered, or while a 'confirm the address' request is unresolved. Asking the "
+            "landlord to confirm before closing is a normal step. Agency/system notes alone are not proof. If "
+            "anything is missing, ask for it rather than closing."
         ),
         "communication": (
             "Write short, polite UK-English messages signed with our agency's name as it appears in the case. "
@@ -152,8 +146,8 @@ def policy_topics(cfg: Config) -> Dict[str, str]:
         ),
         "scope": (
             "Handle one job per case. If the thread raises an unrelated new issue, do not silently fold it in: "
-            "list it in unrelated_issues and recommend a separate request; it does not hold this job's close "
-            "(see closing). If the tenant fixed it themselves or the landlord used their "
+            "list it in unrelated_issues and recommend a separate request; the case does not close while that "
+            "message is unanswered (see closing). If the tenant fixed it themselves or the landlord used their "
             "own contractor, confirm the outcome rather than sending our provider."
         ),
         "data": (

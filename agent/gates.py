@@ -21,10 +21,10 @@ from agent.schema import (
 )
 from agent.timeline import Case, WaitState
 
-# A later tenant message reopens a completed job unless every sentence is a clear all-clear
-# or a side issue: one that names another household or tenancy subject (parking, rent, a
-# different appliance) and nothing from this job. A sentence saying the fault is back or not
-# fixed always reopens.
+# A later tenant message blocks a close unless every sentence is a clear all-clear.
+# A sentence about another household subject (parking, rent, a different appliance) is a
+# side issue: policy says the case does not close while that message is unanswered.
+# A sentence saying the fault is back, or that names this job, reopens it.
 _HARMLESS_RE = re.compile(
     r"\b(thank(?:s| you)|all (?:fixed|good|fine|sorted|done)|fixed|resolved|sorted|working (?:now|fine|well)|"
     r"works (?:now|fine)|perfect|great|happy with|(?:now )?clear)\b",
@@ -81,36 +81,66 @@ def job_topic(case: Case) -> set:
     return _words(text) | _subjects(text)
 
 
-def reopens(body: str, topic: set) -> bool:
-    """Whether a tenant message after a completion may reopen the job (see the comment above _HARMLESS_RE)."""
+def followup(body: str, topic: set) -> str:
+    """How a tenant message after completion relates to the job: clear, side, or reopen.
+
+    clear: a short all-clear. side: only other household subjects, still unanswered.
+    reopen: a defect, a question about this job, or anything that does not name another subject.
+    """
     if _is_harmless(body):
-        return False
+        return "clear"
+    kind = "clear"
     for sentence in re.split(r"(?<=[.!?])\s+|\n+", body):
         if not sentence.strip() or _is_harmless(sentence):
             continue
         if _REGRESSION_RE.search(sentence):
-            return True
+            return "reopen"
         subjects = _subjects(sentence)
         if not subjects or subjects & topic or _words(sentence) & topic:
-            return True
-    return False
+            return "reopen"
+        kind = "side"
+    return kind
+
+
+def reopens(body: str, topic: set) -> bool:
+    """Whether a tenant message after a completion blocks the close (see the comment above _HARMLESS_RE)."""
+    return followup(body, topic) != "clear"
+
+
+def later_followup(case: Case) -> Optional[str]:
+    """clear, side, or reopen for tenant messages after the latest completion report, or None if none exists."""
+    events = case.events
+    topic = job_topic(case)
+    for i in range(len(events) - 1, -1, -1):
+        if not evidence.reports_completion(events[i]):
+            continue
+        kind = "clear"
+        for later in events[i + 1:]:
+            if "tenant" not in later.sender.lower():
+                continue
+            step = followup(later.body, topic)
+            if step == "reopen":
+                return "reopen"
+            if step == "side":
+                kind = "side"
+        return kind
+    return None
 
 
 def confirmed_completion(case: Case) -> Optional[int]:
     """Position of the latest event in which a provider, tenant or landlord reports the job done, or None.
 
     Agency/system notes, negated mentions ("not completed") and questions ("has it
-    been completed?") do not count. A later tenant message that may reopen the job
-    (reopens) cancels it; a side issue about something else does not.
+    been completed?") do not count. A later tenant message blocks the close when it
+    reopens the job or leaves a side issue unanswered.
     This is the single definition of completion; the close_case tool uses it too.
     """
+    if later_followup(case) != "clear":
+        return None
     events = case.events
-    topic = job_topic(case)
     for i in range(len(events) - 1, -1, -1):
-        if not evidence.reports_completion(events[i]):
-            continue
-        reopened = any("tenant" in later.sender.lower() and reopens(later.body, topic) for later in events[i + 1:])
-        return None if reopened else i
+        if evidence.reports_completion(events[i]):
+            return i
     return None
 
 
@@ -163,7 +193,7 @@ def apply(case: Case, proposal: Proposal, cfg: Config, now: datetime,
     if action in ("CHASE_LANDLORD", "CHASE_PROVIDER"):
         party = "landlord" if action == "CHASE_LANDLORD" else "provider"
         if wait is None or wait.party != party:
-            stricter("ESCALATE", "model wants to chase the %s but the timeline is not waiting on them" % party)
+            stricter("WAIT", "not waiting on the %s, so there is nothing to chase yet" % party)
         elif days is not None and days < cfg.chase_after_days:
             stricter("WAIT", "waiting on the %s for %.1f days; chase after %.1f" % (party, days, cfg.chase_after_days))
 
@@ -177,7 +207,11 @@ def apply(case: Case, proposal: Proposal, cfg: Config, now: datetime,
         stricter("ESCALATE", "instructing the provider without a landlord approval in force (missing, negated, or older than the latest quote)")
 
     if action == "CLOSE" and confirmed_completion(case) is None:
-        stricter("ESCALATE", "close proposed but no confirmed completion (missing, negated, or a tenant follow-up that is not a clear all-clear)")
+        if later_followup(case) == "side":
+            stricter("WAIT", "a later message is about something else and is still unanswered; list it in "
+                     "unrelated_issues and do not close yet")
+        else:
+            stricter("ESCALATE", "close proposed but no confirmed completion (missing, negated, or a tenant follow-up that is not a clear all-clear)")
 
     landlord_covered = (action == "INSTRUCT_PROVIDER" and proposal.amount_gbp is not None
                         and evidence.approval_covers(case, proposal.amount_gbp))

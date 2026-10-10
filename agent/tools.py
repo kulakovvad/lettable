@@ -593,10 +593,14 @@ class Toolbox:
                                  "to confirm completion.")
         done = gates.confirmed_completion(self.case)
         if done is None or self.case.events[done].index < max(e.index for e in confirmers):
+            if gates.later_followup(self.case) == "side":
+                return self._blocked("side_unanswered",
+                                     "a later tenant message is about something else and nobody has answered it",
+                                     "List it in unrelated_issues. The case does not close while that message is "
+                                     "unanswered. This is routine, not a reason to escalate.")
             return self._blocked("possibly_reopened",
                                  "a later tenant message reports a fault or asks about this job, so it may be reopened",
-                                 "ASK_TENANT whether the fix worked. A message about something else does not block a "
-                                 "close: list it in unrelated_issues.")
+                                 "ASK_TENANT whether the fix worked. This is a routine question, not a reason to escalate.")
         invoice = _s(args.get("invoice_status"), 30)
         invoice_refs, _ = self._resolve_refs(args.get("invoice_refs"))
         routine = " This is a routine question, not a reason to escalate."

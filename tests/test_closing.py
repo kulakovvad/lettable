@@ -63,13 +63,17 @@ class CloseCaseTests(unittest.TestCase):
     def close(self, case, **extra):
         return Toolbox(case, CFG, NOW).call("close_case", close_args(**extra))
 
-    def test_tenant_side_issue_after_completion_does_not_block_close(self):
+    def test_unanswered_side_issue_blocks_close_without_escalating(self):
         case = self.case([("2026-01-06 10:00:00", "Email", "Tenant", "Agency",
                            "Thanks. Do I need to register for a parking space in the garage?")])
-        self.assertIsNotNone(gates.confirmed_completion(case))
-        self.assertEqual(self.close(case)["status"], "staged")
+        self.assertIsNone(gates.confirmed_completion(case))
+        result = self.close(case)
+        self.assertEqual(result["code"], "side_unanswered")
+        self.assertIn("unrelated_issues", result["hint"])
+        self.assertIn("not a reason to escalate", result["hint"])
         d = gates.apply(case, Proposal.from_dict(dict(action="CLOSE", reason="r", confidence=0.9)), CFG, NOW)
-        self.assertEqual(d.action, "CLOSE")
+        self.assertEqual(d.action, "WAIT")
+        self.assertEqual(d.proposed_action, "CLOSE")
 
     def test_tenant_message_about_the_job_still_reopens(self):
         for text in ("Thanks, but the bath is draining slowly again.", "When will the drain be looked at?",
