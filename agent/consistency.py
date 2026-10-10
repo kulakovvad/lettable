@@ -7,8 +7,10 @@
       -> pass / flag / escalate per field, thresholds from Config
 
 Flags are shown to the loop model. An escalate-tier field makes the gates escalate.
-Any failure leaves the report "unavailable" and the case continues: an outage of the
-check must not escalate every case.
+Name, phone, email and reference mismatches are capped at flag: they caused false
+escalations. Only a clearly different property address, or a payee or bank-details
+change, can escalate. Any failure leaves the report "unavailable" and the case
+continues: an outage of the check must not escalate every case.
 """
 
 from __future__ import annotations
@@ -31,6 +33,14 @@ FIELDS = {
     "landlord_phone": "landlord's phone number",
     "landlord_email": "landlord's email address",
     "reference_number": "case or job reference number",
+    "payee": "person or firm to be paid",
+    "bank_details": "bank account, sort code or payment destination",
+}
+
+# Variants of these are never an escalation, however sure the scorer is.
+_FLAG_ONLY = {
+    "tenant_name", "landlord_name", "tenant_phone", "tenant_email",
+    "landlord_phone", "landlord_email", "reference_number",
 }
 
 CRITERIA = ["Different entities", "Probably different", "Same entity, minor variation (typo, abbreviation, formatting)",
@@ -140,12 +150,17 @@ def ask_jev(differing: Dict[str, Dict[str, Any]], cfg: Config) -> Dict[str, Any]
     return answers
 
 
-def tier(score: float, confidence: float, cfg: Config) -> str:
+def tier(score: float, confidence: float, cfg: Config, field: str = "") -> str:
+    """pass / flag / escalate. Identity and contact fields never escalate."""
     if score >= cfg.jev_pass:
-        return "pass"
-    if score < cfg.jev_escalate and confidence >= cfg.jev_min_confidence:
-        return "escalate"
-    return "flag"
+        result = "pass"
+    elif score < cfg.jev_escalate and confidence >= cfg.jev_min_confidence:
+        result = "escalate"
+    else:
+        result = "flag"
+    if field in _FLAG_ONLY and result == "escalate":
+        return "flag"
+    return result
 
 
 def check(case: Case, chat: ChatBackend, cfg: Config) -> Tuple[Dict[str, Any], int]:
@@ -163,7 +178,7 @@ def check(case: Case, chat: ChatBackend, cfg: Config) -> Tuple[Dict[str, Any], i
                 score = round(float(a["score"]) / levels, 3)
                 confidence = float(a.get("confidence", 0.0))
                 report["checks"].append({"field": f, "values": d["values"], "refs": d["refs"], "score": score,
-                                         "confidence": confidence, "tier": tier(score, confidence, cfg)})
+                                         "confidence": confidence, "tier": tier(score, confidence, cfg, f)})
     except Exception as exc:  # noqa: BLE001 - the check is advisory; the loop must still run
         report.update(status="unavailable", error="%s: %s" % (type(exc).__name__, str(exc)[:300]))
     return report, tokens

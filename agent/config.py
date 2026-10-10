@@ -55,6 +55,8 @@ class Config:
 
     # Document consistency check (agent/consistency.py): one extraction call, then Jev scores fields whose
     # values differ. Scores are normalised to 0..1. Below jev_min_confidence a mismatch is only flagged.
+    # Name, phone and email mismatches never escalate. A Reality Test config should set this when
+    # TYPESAFE_API_KEY is present.
     consistency_check: bool = False
     jev_model: str = "jev-1.13.0"
     jev_pass: float = 0.85

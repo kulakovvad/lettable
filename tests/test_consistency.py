@@ -71,23 +71,53 @@ class ConsistencyTests(unittest.TestCase):
         self.assertEqual(d.consistency["checks"], [])
         post.assert_not_called()
 
-    def test_clear_mismatch_forces_escalation(self):
+    def test_clear_address_mismatch_forces_escalation(self):
         events = list(EVENTS)
-        events[1] = events[1][:4] + ("Can you approve a repair for Michael Brennan?",)
-        turn = facts(("tenant_name", "Sarah Okafor", "event-001"), ("tenant_name", "Michael Brennan", "event-002"))
-        jev = lambda url, headers, body, cfg: {"answers": {"tenant_name": jev_answer(0.1)}}
+        events[0] = events[0][:4] + ("The dishwasher leaks at Flat 1, 2 Test Road.",)
+        events[1] = events[1][:4] + ("Please attend Flat 9, 44 Other Street instead.",)
+        turn = facts(("property_address", "Flat 1, 2 Test Road", "event-001"),
+                     ("property_address", "Flat 9, 44 Other Street", "event-002"))
+        jev = lambda url, headers, body, cfg: {"answers": {"property_address": jev_answer(0.1)}}
         d, _, post = self.run_case([turn] + WAIT_TURNS, events=events, jev=jev)
         self.assertEqual(d.action, "ESCALATE")
         self.assertEqual(d.proposed_action, "WAIT")
-        self.assertTrue(any("tenant_name" in n for n in d.gate_notes))
+        self.assertTrue(any("property_address" in n for n in d.gate_notes))
         self.assertEqual(d.consistency["checks"][0]["tier"], "escalate")
         reasoning = reasoning_md(d.to_dict())
         self.assertIn("## Document consistency check", reasoning)
-        self.assertIn("Michael Brennan", reasoning)
+        self.assertIn("44 Other Street", reasoning)
         body = post.call_args[0][2]
         self.assertEqual(body["model"], "jev-1.13.0")
-        self.assertEqual(set(body["questions"]), {"tenant_name"})
-        self.assertEqual(body["questions"]["tenant_name"]["instructions"]["values"], ["Sarah Okafor", "Michael Brennan"])
+        self.assertEqual(set(body["questions"]), {"property_address"})
+
+    def test_name_phone_and_email_mismatches_are_flagged_not_escalated(self):
+        events = list(EVENTS)
+        events[0] = events[0][:4] + ("Sarah Okafor, 07700 900123, sarah@example.com. The dishwasher leaks.",)
+        events[1] = events[1][:4] + ("Contact Michael Brennan on 07700 900999 or michael@example.com.",)
+        turn = facts(
+            ("tenant_name", "Sarah Okafor", "event-001"), ("tenant_name", "Michael Brennan", "event-002"),
+            ("tenant_phone", "07700 900123", "event-001"), ("tenant_phone", "07700 900999", "event-002"),
+            ("tenant_email", "sarah@example.com", "event-001"), ("tenant_email", "michael@example.com", "event-002"),
+        )
+        jev = lambda url, headers, body, cfg: {"answers": {f: jev_answer(0.05) for f in body["questions"]}}
+        d, chat, _ = self.run_case([turn] + WAIT_TURNS, events=events, jev=jev)
+        self.assertEqual(d.action, "WAIT")
+        tiers = {c["field"]: c["tier"] for c in d.consistency["checks"]}
+        self.assertEqual(tiers, {"tenant_name": "flag", "tenant_phone": "flag", "tenant_email": "flag"})
+        self.assertIn("Michael Brennan", chat.seen[1][0]["text"])
+
+    def test_payee_or_bank_change_forces_escalation(self):
+        events = list(EVENTS)
+        events[0] = events[0][:4] + ("Pay Riverside Maintenance, sort code 20-00-00 account 11111111.",)
+        events[1] = events[1][:4] + ("Pay BrightServe Ltd, sort code 30-00-00 account 22222222.",)
+        turn = facts(("payee", "Riverside Maintenance", "event-001"), ("payee", "BrightServe Ltd", "event-002"),
+                     ("bank_details", "sort code 20-00-00 account 11111111", "event-001"),
+                     ("bank_details", "sort code 30-00-00 account 22222222", "event-002"))
+        jev = lambda url, headers, body, cfg: {"answers": {f: jev_answer(0.1) for f in body["questions"]}}
+        d, _, _ = self.run_case([turn] + WAIT_TURNS, events=events, jev=jev)
+        self.assertEqual(d.action, "ESCALATE")
+        tiers = {c["field"]: c["tier"] for c in d.consistency["checks"]}
+        self.assertEqual(tiers, {"payee": "escalate", "bank_details": "escalate"})
 
     def test_minor_variation_is_flagged_to_the_model_and_does_not_override(self):
         events = list(EVENTS)
