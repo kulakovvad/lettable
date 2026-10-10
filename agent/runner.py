@@ -24,6 +24,7 @@ from agent.fallback import fallback_decision
 from agent.llm import make_backend
 from agent.report import atomic_write, write_case
 from agent.schema import ACTIONS
+from agent.stt import make_transcriber
 from agent.timeline import load_case
 
 
@@ -37,7 +38,7 @@ def parse_now(value: Optional[str]) -> datetime:
 def _child(conn, path: str, cfg: Dict[str, Any], backend: str, now_iso: str, cut: Optional[int] = None) -> None:
     try:
         config = Config.from_dict(cfg)
-        case = load_case(Path(path), config)
+        case = load_case(Path(path), config, make_transcriber(config))  # audio is transcribed here, inside the time limit
         folder: Optional[Path] = Path(path)
         if cut is not None:
             case = case.cut(cut)  # replay: later events do not exist for this run

@@ -29,6 +29,8 @@ def main(argv=None) -> int:
     r.add_argument("--deadline", type=float, help="seconds allowed for the whole run")
     r.add_argument("--concurrency", type=int)
     r.add_argument("--resume", action="store_true", help="skip cases already decided by the model")
+    r.add_argument("--stt", choices=["off", "fake", "elevenlabs"],
+                   help="transcribe audio files in cases (paid with elevenlabs; default: config or LETTABLE_STT)")
     rp = sub.add_parser("replay", help="cut finished cases at chosen points and compare with what happened next")
     rp.add_argument("input_dir")
     rp.add_argument("out_dir")
@@ -55,7 +57,8 @@ def main(argv=None) -> int:
     cfg = Config.load(Path(args.config) if args.config else None)
     as_of = args.as_of or ("now" if args.now else None)
     overrides = {k: v for k, v in (("case_timeout_s", args.timeout), ("run_deadline_s", args.deadline),
-                                   ("concurrency", args.concurrency), ("as_of", as_of)) if v is not None}
+                                   ("concurrency", args.concurrency), ("as_of", as_of),
+                                   ("stt_backend", args.stt)) if v is not None}
     cfg = dataclasses.replace(cfg, **overrides)
 
     summary = run_all(Path(args.input_dir), Path(args.out_dir), cfg, args.backend, args.now, args.resume)
