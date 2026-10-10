@@ -110,7 +110,7 @@ def _result_path(case_out: Path, conversation_id: str) -> Path:
     return case_out / "calls" / (_UNSAFE.sub("_", conversation_id) + ".json")
 
 
-def _collect_case(case_out: Path, out_dir: Path, get_dialer, summary: Dict[str, Any]) -> None:
+def _collect_case(case_out: Path, out_dir: Path, get_dialer, summary: Dict[str, Any], skip_dry_run: bool = False) -> None:
     f = case_out / "decision.json"
     if not f.is_file():
         return
@@ -120,6 +120,8 @@ def _collect_case(case_out: Path, out_dir: Path, get_dialer, summary: Dict[str, 
         cid = a.get("conversation_id")
         if a.get("kind") != "call" or not cid or a.get("call_status") not in ("dry_run", "started") or a.get("call_result"):
             continue
+        if skip_dry_run and str(cid).startswith("dryrun-"):
+            continue  # a rehearsal has nothing to fetch from the real service
         path = _result_path(case_out, cid)
         if path.is_file():
             record = json.loads(path.read_text(encoding="utf-8"))
@@ -140,13 +142,13 @@ def _collect_case(case_out: Path, out_dir: Path, get_dialer, summary: Dict[str, 
         write_case(out_dir, decision)
 
 
-def collect(out_dir: Path, get_dialer: Callable[[], Dialer]) -> Dict[str, Any]:
+def collect(out_dir: Path, get_dialer: Callable[[], Dialer], skip_dry_run: bool = False) -> Dict[str, Any]:
     """Fetch the result of every placed call that has none yet. Idempotent; one bad case never stops the rest."""
     out_dir = Path(out_dir)
     summary: Dict[str, Any] = {"collected": [], "pending": [], "errors": []}
     for case_out in sorted(p for p in out_dir.iterdir() if p.is_dir()):
         try:
-            _collect_case(case_out, out_dir, get_dialer, summary)
+            _collect_case(case_out, out_dir, get_dialer, summary, skip_dry_run)
         except Exception as exc:
             summary["errors"].append({"case_id": case_out.name, "error": "%s: %s" % (type(exc).__name__, str(exc)[:200])})
     return summary

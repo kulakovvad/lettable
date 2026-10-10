@@ -6,6 +6,8 @@ dialer supplies every name in VARIABLES, so no placeholder is ever left empty.
 
 from __future__ import annotations
 
+import re
+
 from typing import Any, Dict
 
 from agent.voice import CallRequest
@@ -38,7 +40,8 @@ safety (gas smell, fire, flooding, injury), or asks for a human, say that a coll
 - If you reach voicemail, the voicemail tool leaves the standard short message for you; add nothing, and never say \
 the objective, a price or any personal detail to a machine.
 - If someone phones you (you did not start the call), say this is an automated line that cannot take requests, ask \
-them to contact the agency directly, then end the call politely.
+them to contact the agency directly, then end the call politely. If they report a danger (gas smell, fire, flooding, \
+injury), tell them to call the emergency services on 999 now and then contact the agency.
 - Never claim anything that is not in what you know."""
 
 # One short sentence of context, then the agent waits for the person. No question, so nobody is asked to confirm who they are.
@@ -49,14 +52,16 @@ FIRST_MESSAGE = "Hello, this is an automated assistant calling for {{agency_name
 MAX_CALL_SECONDS = 180
 MAX_CALL_MESSAGE = "I need to end the call now. A colleague will follow up. Goodbye."
 
-# What a machine hears: only the agency and the topic (both already on the call), no objective, price or personal detail.
-VOICEMAIL_MESSAGE = ("Hello, this is an automated assistant calling for {{agency_name}} about {{job}}. "
+# What a machine hears. A voicemail is a durable recording, so it carries no case-derived text except the agency name
+# (cleaned and capped, see _speakable): no job, objective, price, name or number.
+VOICEMAIL_MESSAGE = ("Hello, this is an automated assistant calling for {{agency_name}} about a maintenance job. "
                      "We will follow up another way. Thank you.")
 
 # Spoken defaults for every variable, used when someone phones the number back and no call set the values.
 PLACEHOLDERS: Dict[str, str] = {
     "agency_name": "the letting agency", "party": "the contact", "job": "a maintenance job",
-    "objective": "Find out where the job stands.", "known_facts": "nothing further", "case_id": "none",
+    "objective": "This is an automated line: ask the caller to contact the agency directly.",
+    "known_facts": "nothing further", "case_id": "none",
 }
 
 # Plain, non-expressive voice: the expressive models read stage directions such as [sad] aloud.
@@ -88,25 +93,42 @@ DATA_COLLECTION: Dict[str, Dict[str, str]] = {
 }
 
 
-JOB_WORDS = 80
+JOB_CHARS = 80
+AGENCY_CHARS = 60
 DEFAULT_JOB = "a maintenance job"  # spoken when the case supplies no short description of the job
+UNNAMED_AGENCY = "the letting agency"  # said when the case does not name the agency; "the agency" alone sounds odd aloud
+
+_EMAIL = re.compile(r"\S+@\S+")
+_URL = re.compile(r"(?i)\b(?:https?://|www\.)\S+")
+_MONEY = re.compile(r"(?i)(?:£|GBP\s?)\s?\d[\d,]*(?:\.\d+)?|\d[\d,]*(?:\.\d+)?\s?(?:GBP|pounds)\b")
+_LONG_NUMBER = re.compile(r"\+?\d[\d\s().-]{4,}\d")  # phone numbers, references, account numbers
+
+
+def _speakable(text: str, limit: int) -> str:
+    """Case-derived words that are spoken aloud (and recorded): no amounts, numbers, emails or links, and short.
+    Words only; whatever is not clearly harmless is dropped rather than read out."""
+    for pattern in (_EMAIL, _URL, _MONEY, _LONG_NUMBER):
+        text = pattern.sub(" ", text)
+    text = " ".join(text.replace("£", " ").split())
+    if len(text) > limit:
+        text = text[:limit].rsplit(" ", 1)[0]
+    return text.strip(" ,;:-")
 
 
 def _job(facts: Dict[str, str]) -> str:
     """What the call is about, in a few words. Only the 'job' fact is used: the objective is an instruction
     ("Confirm a visit date...") and does not read as a topic when spoken."""
-    job = " ".join(facts.get("job", "").split())
-    if len(job) > JOB_WORDS:
-        job = job[:JOB_WORDS].rsplit(" ", 1)[0]
-    return job or DEFAULT_JOB
-
-
-UNNAMED_AGENCY = "the letting agency"  # said when the case does not name the agency; "the agency" alone sounds odd aloud
+    return _speakable(facts.get("job", ""), JOB_CHARS) or DEFAULT_JOB
 
 
 def _agency(facts: Dict[str, str]) -> str:
-    name = " ".join(facts.get("agency_name", "").split())
-    return UNNAMED_AGENCY if name in ("", "the agency") else name  # "the agency" is the case-reading code's own placeholder
+    """The agency's name as spoken. A real name is short and plain, so one that had to be cleaned or cut (a number,
+    an amount, a link, too long) is not trusted: the neutral wording is spoken instead."""
+    raw = " ".join(facts.get("agency_name", "").split())
+    name = _speakable(raw, AGENCY_CHARS)
+    if name != raw or name in ("", "the agency"):  # "the agency" is the case-reading code's own placeholder
+        return UNNAMED_AGENCY
+    return name
 
 
 def dynamic_variables(req: CallRequest) -> Dict[str, Any]:

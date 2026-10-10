@@ -141,18 +141,20 @@ def run_all(
                 dialer.append(make_dialer(cfg.call_backend, cfg))
             return dialer[0]
 
-    # Results of calls placed by an earlier run are fetched first, so this run's decisions can see what was said.
-    collected = {"collected": [], "pending": [], "errors": []}
-    if cfg.collect_calls and cfg.call_backend != "dry_run" and out_dir.is_dir():
-        try:
-            collected = calls.collect(out_dir, get_dialer)
-        except Exception as exc:  # never let the call results stop the cases
-            collected["errors"].append({"error": "%s: %s" % (type(exc).__name__, str(exc)[:200])})
-
     def trace(row: Dict[str, Any]) -> None:
         with lock:
             with open(trace_path, "a", encoding="utf-8") as fh:
                 fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+    # Results of calls placed by an earlier run are fetched first, so this run's decisions can see what was said.
+    collected = {"collected": [], "pending": [], "errors": []}
+    if cfg.collect_calls and cfg.call_backend != "dry_run":
+        try:
+            collected = calls.collect(out_dir, get_dialer, skip_dry_run=True)
+        except Exception as exc:  # never let the call results stop the cases
+            collected["errors"].append({"error": "%s: %s" % (type(exc).__name__, str(exc)[:200])})
+        if any(collected.values()):
+            trace({"event": "collect_calls", **collected})
 
     def one(path: Path) -> Dict[str, Any]:
         case_id = path.name

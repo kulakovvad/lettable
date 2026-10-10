@@ -68,8 +68,9 @@ Create and update send the same configuration. `--create-agent` and `--update-ag
 - **During the call:** one or two short sentences per turn, one question at a time, it stops when interrupted, and it offers a colleague's callback if the person cannot talk. It writes plain words only (no bracketed tags such as `[sad]`).
 - **Voice:** a non-expressive English model (`eleven_flash_v2`, expressive mode off). The expressive models read stage directions aloud.
 - **Limits:** a call ends by itself after 3 minutes (the agent says "A colleague will follow up. Goodbye."), and the phone stops ringing after 30 seconds (`call_ring_timeout_s`).
-- **Voicemail:** if a machine answers, the standard message plays: only the agency name and the job, no objective, price or personal detail. The outcome is `no_answer`.
-- **Someone phones the number back:** every field has a spoken default ("the letting agency", "a maintenance job"), and the agent says this is an automated line that cannot take requests and asks them to contact the agency.
+- **Voicemail:** if a machine answers, a fixed message plays: the agency name and "a maintenance job", nothing from the case (no job text, objective, price, name or number). The outcome is `no_answer`.
+- **What is spoken from the case:** the job (a short phrase) and the agency name have amounts, numbers, emails and links removed. A name that needed cleaning or was too long is replaced by "the letting agency"; the job is cut to 80 characters.
+- **Someone phones the number back:** every field has a spoken default ("the letting agency", "a maintenance job"), and the agent says this is an automated line that cannot take requests and asks them to contact the agency. If the caller reports a danger (gas, fire, flooding, injury) it tells them to call 999 first.
 - **Dates:** `confirmed_date` is what was said ("Tuesday morning"). `confirmed_date_iso` is filled only when an exact calendar date was given, and is empty otherwise: a relative day is never turned into a date.
 - **Outcome after the call** (one of): `confirmed`, `declined`, `no_answer` (nobody picked up or only voicemail), `callback_requested`, `needs_human`, `unclear` (a person answered but gave no usable answer). A call that a person answered is never `no_answer`.
 
@@ -98,4 +99,4 @@ Use a phone you control and say so to whoever answers. Keep the number out of ev
 - The live path (real STT, real call) has only been tested against mocked HTTP.
 - Calling hours and the run cap are checked in the runner and again inside the dialer; dry runs skip the hours check, so they do not rehearse an out-of-hours hold.
 - Voicemail uses ElevenLabs' built-in detection only; Twilio's own machine detection is not turned on.
-- `calls collect` rewrites `decision.json` without a lock, so run it when no `run` is writing the same output folder.
+- `calls collect`, by hand or automatically at the start of a live run, rewrites `decision.json` without a lock, so do not run two runs on the same output folder at once.
