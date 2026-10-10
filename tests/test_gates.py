@@ -62,6 +62,52 @@ class GateTests(unittest.TestCase):
         d = gates.apply(case, prop("CLOSE", message=""), CFG, SINCE)
         self.assertEqual(d.action, "CLOSE")
 
+    def test_negated_completion_does_not_allow_close(self):
+        for text in ("The repair is not completed; please send someone.", "It hasn't been completed yet", "Still not all done"):
+            events = WAITING_LANDLORD + [("2026-01-05 10:00:00", "SMS", "Tenant", "Agency", text)]
+            case = load_case(make_case(self.root, "neg%d" % abs(hash(text) % 1000), events))
+            d = gates.apply(case, prop("CLOSE", message=""), CFG, SINCE)
+            self.assertEqual(d.action, "ESCALATE", text)
+
+    def test_reopened_job_does_not_allow_close(self):
+        events = WAITING_LANDLORD + [
+            ("2026-01-05 10:00:00", "Email", "Contractor", "Agency", "Job completed, invoice attached."),
+            ("2026-01-06 10:00:00", "SMS", "Tenant", "Agency", "The leak is back, please send someone."),
+        ]
+        case = load_case(make_case(self.root, "reopen", events))
+        d = gates.apply(case, prop("CLOSE", message=""), CFG, SINCE)
+        self.assertEqual(d.action, "ESCALATE")
+
+    def test_attachment_only_hazard_is_found(self):
+        from dataclasses import replace
+        from agent.timeline import Attachment
+        events = WAITING_LANDLORD + [("2026-01-02 10:00:00", "Email", "Tenant", "Agency", "Please review attached report")]
+        case = load_case(make_case(self.root, "att", events))
+        case = replace(case, attachments=(Attachment("report.pdf", "There is a gas leak in the flat."),))
+        d = gates.apply(case, prop("WAIT", message=""), CFG, SINCE)
+        self.assertEqual(d.action, "ESCALATE")
+        self.assertTrue(d.hazard)
+
+    def test_old_unresolved_hazard_outside_the_window_still_counts(self):
+        filler = [("2026-01-0%d 10:00:00" % (i + 3), "Update", "Agency / system", "Not specified", "note %d" % i) for i in range(6)]
+        events = WAITING_LANDLORD + [("2026-01-02 10:00:00", "SMS", "Tenant", "Agency", "I can smell gas")] + filler
+        case = load_case(make_case(self.root, "old", events))
+        self.assertTrue(gates.apply(case, prop("WAIT", message=""), CFG, SINCE).hazard)
+
+    def test_old_hazard_is_dropped_once_the_job_is_confirmed_done(self):
+        filler = [("2026-01-0%d 10:00:00" % (i + 4), "Update", "Agency / system", "Not specified", "note %d" % i) for i in range(6)]
+        events = (WAITING_LANDLORD
+                  + [("2026-01-02 10:00:00", "SMS", "Tenant", "Agency", "I can smell gas"),
+                     ("2026-01-03 10:00:00", "Email", "Contractor", "Agency", "Gas fixed, job completed.")]
+                  + filler)
+        case = load_case(make_case(self.root, "fixed", events))
+        self.assertFalse(gates.apply(case, prop("WAIT", message=""), CFG, SINCE).hazard)
+
+    def test_low_confidence_wait_without_a_pending_party_escalates(self):
+        case = load_case(make_case(self.root, "nowait", WAITING_LANDLORD[:2]))
+        d = gates.apply(case, prop("WAIT", confidence=0.01, message=""), CFG, SINCE)
+        self.assertEqual(d.action, "ESCALATE")
+
     def test_spend_above_limit_escalates_unless_routed_for_approval(self):
         d = gates.apply(self.case, prop("CLOSE", amount_gbp=900, message=""), CFG, SINCE)
         self.assertEqual(d.action, "ESCALATE")

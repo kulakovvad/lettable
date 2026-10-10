@@ -21,15 +21,44 @@ from agent.schema import (
 from agent.timeline import Case, WaitState
 
 _DONE_RE = re.compile(r"\b(completed|all done|job complete|works? complete|finished the work)\b", re.I)
+_NEGATION_RE = re.compile(r"\b(not|never|no|yet to|still|incomplete|unfinished)\b|n't", re.I)
 _SPEND_OK = ("ROUTE_FOR_APPROVAL", "ESCALATE")
 
 
+def confirmed_completion(case: Case) -> Optional[int]:
+    """Position of the latest event that reports the job done, or None.
+
+    A mention does not count when it is negated ("not completed") or when the
+    tenant wrote again afterwards (the job was reopened).
+    """
+    events = case.events
+    for i in range(len(events) - 1, -1, -1):
+        for m in _DONE_RE.finditer(events[i].body):
+            before = re.split(r"[.!?\n]", events[i].body[: m.start()])[-1][-40:]
+            if _NEGATION_RE.search(before):
+                continue
+            reopened = any("tenant" in later.sender.lower() for later in events[i + 1:])
+            return None if reopened else i
+    return None
+
+
 def find_hazard(case: Case, cfg: Config) -> Optional[str]:
-    """Return the matched phrase if recent events mention a safety hazard."""
-    window = case.events[-cfg.hazard_window:] if cfg.hazard_window > 0 else case.events
-    text = "\n".join(e.body for e in window) + "\n" + case.request
+    """Return the matched phrase if the case mentions a safety hazard that is still open.
+
+    Checked: the request, the text of every attachment, the latest events, and
+    any older event unless the job was confirmed done after it.
+    """
+    events = case.events
+    window = cfg.hazard_window if cfg.hazard_window > 0 else len(events)
+    split = max(0, len(events) - window)
+    done_at = confirmed_completion(case)
+    texts = [case.request]
+    texts += [a.text for a in case.attachments if a.text]
+    texts += [e.body for e in events[split:]]
+    texts += [e.body for j, e in enumerate(events[:split]) if done_at is None or done_at < j]
+    blob = "\n".join(texts)
     for pattern in cfg.hazard_patterns:
-        m = re.search(pattern, text, re.I)
+        m = re.search(pattern, blob, re.I)
         if m:
             return m.group(0)
     return None
@@ -55,9 +84,10 @@ def apply(case: Case, proposal: Proposal, cfg: Config, now: datetime) -> Decisio
         notes.append(note)
 
     if hazard and action != "ESCALATE":
-        stricter("ESCALATE", "possible hazard in recent events (%r); a person must decide" % hazard)
+        stricter("ESCALATE", "possible open hazard (%r); a person must decide" % hazard)
 
-    if action != "ESCALATE" and proposal.confidence < cfg.min_confidence and action != "WAIT":
+    verified_wait = action == "WAIT" and wait is not None
+    if action != "ESCALATE" and proposal.confidence < cfg.min_confidence and not verified_wait:
         stricter("ESCALATE", "model confidence %.2f is below %.2f" % (proposal.confidence, cfg.min_confidence))
 
     if action != "ESCALATE" and action in NEEDS_MESSAGE and not message:
@@ -70,8 +100,8 @@ def apply(case: Case, proposal: Proposal, cfg: Config, now: datetime) -> Decisio
         elif days is not None and days < cfg.chase_after_days:
             stricter("WAIT", "waiting on the %s for %.1f days; chase after %.1f" % (party, days, cfg.chase_after_days))
 
-    if action == "CLOSE" and not any(_DONE_RE.search(e.body) for e in case.events):
-        stricter("ESCALATE", "close proposed but no completion is recorded in the timeline")
+    if action == "CLOSE" and confirmed_completion(case) is None:
+        stricter("ESCALATE", "close proposed but no confirmed completion (missing, negated, or reopened by the tenant)")
 
     if (
         proposal.amount_gbp is not None
