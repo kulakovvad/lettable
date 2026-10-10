@@ -15,6 +15,7 @@ Source of truth: `Decision` in `agent/schema.py`, staged actions in `agent/tools
     ANSWER.md
     REASONING.md
     calls/<conversation_id>.json   # only after `python -m agent calls collect`
+    review.json         # only after a person picks something in `python -m agent ui`
 ```
 
 `<case_id>` is the case folder name, for example `003`. It is not prefixed with the dataset name.
@@ -229,6 +230,29 @@ There is no status field. These groupings come from the fields above.
 | Outbound queued | Any `actions[].state == "committed"` with `kind` `message`, `call` or `approval_request` |
 | Call failed | Any `actions[].state == "call_failed"` |
 | Held | Any `actions[].state == "held_for_review"` |
+
+## Review
+
+`python -m agent ui <out_dir>` writes `<case_id>/review.json` when a person picks an option, takes a case over or asks for a separate issue to become a new case. Entries are appended, never edited. `decision.json` is not changed and the agent does not read this file yet.
+
+```json
+{"case_id": "015", "entries": [
+  {"choice": "option", "at": "2026-10-10T12:01:00+00:00", "option": 1, "option_text": "Ask Alder Homes to confirm attendance ..."},
+  {"choice": "new_case", "at": "2026-10-10T12:02:00+00:00", "text": "Event-016: the door at Flat 10, 110 Meadow Row ..."},
+  {"choice": "take_over", "at": "2026-10-10T12:03:00+00:00"}
+]}
+```
+
+| Field | Meaning |
+|---|---|
+| `choice` | `option` (go with one of `options`), `take_over` (a person handles the case) or `new_case` (open a separate issue as its own case) |
+| `at` | UTC time of the choice |
+| `option`, `option_text` | Only for `option`: the 1-based number and the text as it was in `options` |
+| `text` | Only for `new_case`: the separate issue, usually one of `unrelated_issues` |
+
+The latest `option` or `take_over` entry is the current choice.
+
+`text` and `option_text` are stored as given and are not scrubbed for phone numbers, names or secrets. Treat `review.json` like the case files it sits next to.
 
 ## Examples
 
