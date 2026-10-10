@@ -90,7 +90,7 @@ TOOL_SPECS: List[Dict[str, Any]] = [
      "parameters": _schema({}, [])},
     {"name": "read_case_file", "description": "Read a text file in the case folder by relative path (capped). Summary/outcome sections are removed.",
      "parameters": _schema({"path": _STR}, ["path"])},
-    {"name": "check_policy", "description": "Read the agency operating policy. Topics: authority, chasing, safety, damp_mould, compliance, never_touch, closing, communication, calls, escalation, scope, data, or 'all'.",
+    {"name": "check_policy", "description": "Read the agency operating policy. topic: one topic, several separated by commas, or 'all'. Topics: %s." % ", ".join(policy_topics(Config())),
      "parameters": _schema({"topic": _STR}, ["topic"])},
     {"name": "send_message", "description": "Stage a message to a party. Gates check the party exists in the case, chase timing, landlord approval before instructing a provider, appointment evidence for reminders, and that every phone number and amount in the body appears in the case. Returns staged or blocked with a reason.",
      "parameters": _schema({
@@ -335,10 +335,16 @@ class Toolbox:
 
     def _t_check_policy(self, args):
         topics = policy_topics(self.cfg)
-        topic = _s(args.get("topic"), 40).lower()
-        if topic in topics:
-            return {"status": "ok", "topic": topic, "policy": topics[topic]}
-        return {"status": "ok", "policy": topics}
+        asked = [t for t in re.split(r"[\s,]+", _s(args.get("topic"), 200).lower()) if t]
+        known = [t for t in asked if t in topics]
+        unknown = [t for t in asked if t not in topics and t != "all"]
+        if len(known) == 1 and not unknown:
+            return {"status": "ok", "topic": known[0], "policy": topics[known[0]]}
+        chosen = topics if not known or "all" in asked else {t: topics[t] for t in known}
+        result = {"status": "ok", "policy": chosen}
+        if unknown:
+            result["note"] = "unknown topic(s) %s; known topics: %s" % (", ".join(unknown), ", ".join(topics))
+        return result
 
     # ---------- action tools ----------
 
