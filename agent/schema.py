@@ -115,6 +115,7 @@ class Decision:
     trace: List[Dict[str, Any]] = field(default_factory=list)  # every tool call, in order
     consistency: Optional[Dict[str, Any]] = None  # agent.consistency report when the check is on
     answer: str = ""  # direct answer when the case asks an explicit question
+    red_flags: List[Dict[str, Any]] = field(default_factory=list)  # agent.redflags, also on fallback
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)

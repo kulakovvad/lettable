@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from agent import consistency, evidence, gates
+from agent import consistency, evidence, gates, handover, redflags
 from agent.chat import ChatBackend
 from agent.config import Config
 from agent.schema import Decision, Proposal
@@ -148,6 +148,11 @@ def _initial_message(case: Case, box: Toolbox, cfg: Config, wall: datetime,
     if case.explicit_question:
         lines.append("This case asks an explicit question. Put the direct answer in submit_decision's answer field, then choose the next action.")
         lines.append("")
+    lines += [
+        "CODE RED FLAGS (high-precision detectors; a forcing flag is escalated by the gates):",
+        redflags.describe(redflags.scan(case)),
+        "",
+    ]
     lines.append("Work the case with the tools, then call submit_decision.")
     return "\n".join(lines)
 
@@ -273,12 +278,20 @@ def finalize(case: Case, box: Toolbox, cfg: Config, as_of: datetime, trace, step
     decision = gates.apply(case, proposal, cfg, as_of, consistency_report)
 
     overridden = decision.action != proposal.action
+    holding_used = False
     for s in box.staged:
         # Escalations always go out. Safety advice goes out only to the tenant on a hazard found by code,
-        # so a model cannot relabel an arbitrary message to get it past the hold.
+        # so a model cannot relabel an arbitrary message to get it past the hold. One safe tenant update
+        # (acknowledge, set expectations, promise nothing) may go out with an escalation.
         always = s["kind"] == "escalation" or (
             s.get("purpose") == "safety_advice" and s.get("to") == "tenant" and box.urgent)
-        if always or matches_primary(decision.action, s):
+        holding = False
+        if (not holding_used and decision.action == "ESCALATE" and s.get("kind") == "message"
+                and s.get("to") == "tenant" and s.get("purpose") == "update"
+                and redflags.safe_holding(s.get("body") or "")):
+            holding = True
+            holding_used = True
+        if always or holding or matches_primary(decision.action, s):
             s["state"] = "committed"
             if s["kind"] == "call":
                 s["call_status"] = "pending"  # the runner places it after the final checks (agent.calls)
@@ -300,6 +313,17 @@ def finalize(case: Case, box: Toolbox, cfg: Config, as_of: datetime, trace, step
         box.staged[-1]["note"] = "Created automatically because the final decision is an escalation."
 
     decision.priority = "P1" if decision.hazard and d["priority"] in ("P2", "P3") else d["priority"]
+    for flag in decision.red_flags:
+        if flag.get("force") and flag.get("priority"):
+            decision.priority = handover.more_urgent(decision.priority, flag["priority"])
+    if decision.action == "ESCALATE":
+        for s in box.staged:
+            if s.get("kind") == "escalation":
+                handover.enrich(
+                    s, case, as_of, reason=decision.reason, unknowns=decision.unknowns, options=decision.options,
+                    gate_notes=decision.gate_notes, proposed=proposal.action, flags=decision.red_flags,
+                    consistency_report=consistency_report, hazard=decision.hazard,
+                )
     decision.title, decision.request = case.title, case.request
     decision.as_of = as_of.isoformat()
     decision.model, decision.steps, decision.tokens = model, steps, tokens

@@ -10,7 +10,7 @@ import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from agent import consistency, evidence
+from agent import consistency, evidence, redflags
 from agent.config import Config
 from agent.schema import (
     MAX_TEXT,
@@ -178,6 +178,11 @@ def apply(case: Case, proposal: Proposal, cfg: Config, now: datetime,
     if hazard and action != "ESCALATE":
         stricter("ESCALATE", "possible open hazard (%r); a person must decide" % hazard)
 
+    flags = redflags.scan(case)
+    for flag in flags:
+        if flag["force"] and action != "ESCALATE":
+            stricter("ESCALATE", "red flag %s at %s; %s" % (flag["category"], flag["ref"], flag["guidance"]))
+
     for c in consistency.escalations(consistency_report):
         if action != "ESCALATE":
             stricter("ESCALATE", "documents disagree on %s (%s); a person must confirm which is right"
@@ -254,4 +259,5 @@ def apply(case: Case, proposal: Proposal, cfg: Config, now: datetime,
         idempotency_key=idempotency_key(case.case_id, len(case.events), action, message),
         decided_at=now.isoformat(),
         warnings=case.warnings,
+        red_flags=flags,
     )

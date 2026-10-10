@@ -107,6 +107,7 @@ These are filled by every path: the tool loop, the single-call backends and the 
 | `decided_at` | string | Time the gates judged against. In the tool loop this is the decision time (`as_of`). On fallback it is the wall clock or `--now` |
 | `warnings` | string[] | Input problems, such as a missing `index.md` or unreadable event time |
 | `answer` | string | Direct answer when the case asks an explicit question. Empty on fallback, on the single-call backends, and when the case does not ask one. When non-empty, `ANSWER.md` starts with an `## Answer` section |
+| `red_flags` | object[] | High-precision detectors (`agent/redflags.py`). Empty when none matched. Also filled on fallback |
 
 ### Tool-loop fields
 
@@ -114,7 +115,7 @@ These are filled only by the `claude`, `anthropic`, `openai` and `auto` backends
 
 | Field | Type | Meaning |
 |---|---|---|
-| `priority` | `P0`–`P3` or null | Model priority. A hazard raises P2 or P3 to P1. Null outside the tool loop |
+| `priority` | `P0`–`P3` or null | Model priority. A hazard or a forcing red flag raises a lower priority. Fallback sets P1 on a hazard, otherwise P2, then applies the same floor |
 | `title` | string | Case title from `index.md` |
 | `request` | string | Initial request |
 | `as_of` | string | Decision time. `--as-of last_event` (default): the case's latest event; `now`: the wall clock or `--now` (an explicit `--now` implies this); `later`: whichever is later |
@@ -147,11 +148,11 @@ Present when `consistency_check` is on (tool loop only). Design: [design.md](des
 | `model` | string | Jev model |
 | `dropped` | integer | Extracted values not found in the source they cited |
 | `checks` | object[] | Only fields whose values still differ after normalising. Empty means nothing differed |
-| `checks[].field` | string | `tenant_name`, `landlord_name`, `property_address`, `tenant_phone`, `tenant_email`, `landlord_phone`, `landlord_email`, `reference_number` |
+| `checks[].field` | string | `tenant_name`, `landlord_name`, `property_address`, `tenant_phone`, `tenant_email`, `landlord_phone`, `landlord_email`, `reference_number`, `payee`, `bank_details` |
 | `checks[].values` / `refs` | string[] / string[][] | Distinct values as written, and where each appears, in the same order |
 | `checks[].score` | number | Jev similarity, 0 (different) to 1 (identical) |
 | `checks[].confidence` | number | Jev confidence |
-| `checks[].tier` | `pass` \| `flag` \| `escalate` | `escalate` adds a gate note and forces `ESCALATE` |
+| `checks[].tier` | `pass` \| `flag` \| `escalate` | `escalate` adds a gate note and forces `ESCALATE`. Name, phone, email and reference mismatches are capped at `flag`. Only a clearly different `property_address`, `payee` or `bank_details` can escalate |
 
 ### Cause
 
@@ -183,7 +184,7 @@ Common keys:
 | `state` | `committed` \| `held_for_review` \| `call_failed` | Items are `staged` during the run. Finished output has only these. `call_failed` is only for a `call` the dialer could not place |
 | `note` | string | Why it is in that state |
 
-Only the staged item that matches the final action is `committed` (for example the chase message for `CHASE_LANDLORD`, the follow-up for `WAIT`, the closure for `CLOSE`). Escalations always commit. A `safety_advice` message commits only when it goes to the tenant and code found an open hazard. Everything else is `held_for_review`, including every message when the loop ran out of budget or the final action is `ESCALATE`. If the final action is `ESCALATE` and the model staged no escalation, code adds one with note `Created automatically because the final decision is an escalation.`
+Only the staged item that matches the final action is `committed` (for example the chase message for `CHASE_LANDLORD`, the follow-up for `WAIT`, the closure for `CLOSE`). Escalations always commit. A `safety_advice` message commits only when it goes to the tenant and code found an open hazard. One tenant message with purpose `update` may also commit alongside `ESCALATE` when the body only acknowledges and sets expectations (no bank details, payment promise, liability or legal conclusion). Everything else is `held_for_review`, including every message when the loop ran out of budget. If the final action is `ESCALATE` and the model staged no escalation, code adds one with note `Created automatically because the final decision is an escalation.` Code then fills any missing handover fields.
 
 Per-kind keys:
 
@@ -193,7 +194,7 @@ Per-kind keys:
 | `call` | `to` (`tenant`, `landlord`, `provider`), `purpose` (`chase`, `request_info`, `instruct_provider`, `update`, `safety_advice`), `priority`, `number` (E.164, taken from the case, never from the model), `objective`, `facts` (short strings the caller may rely on), `body` (`Phone call: <objective>`), `evidence_refs`, and after placing: `call_status` (`pending` \| `dry_run` \| `started` \| `failed` \| `not_placed`), `conversation_id`, `call_detail`, and after `calls collect`: `call_result` (`status`, `success`, `summary`, `data`) |
 | `approval_request` | `to` (`landlord`), `amount_gbp` (`null` asks approval for a provider to attend or quote, with no cost approved), `scope`, `body`, `evidence_refs`, `above_limit` (amount over `approval_limit_gbp`, default 300) |
 | `followup` | `review_at`, `waiting_on` (`tenant`, `landlord`, `provider`, `internal`), `reason` |
-| `escalation` | `priority`, `route` (`on_call_emergency`, `property_manager`, `accounts`, `complaints`), `summary`, `known`, `unknowns`, `tried`, `options`, `evidence_refs` |
+| `escalation` | `priority`, `route` (`on_call_emergency`, `property_manager`, `accounts`, `complaints`), `respond_by` (ISO time), `summary`, `conflicts` (each `field` plus `values[].value` and `values[].refs`), `known`, `unknowns`, `tried`, `failed`, `options` (2 or 3 strings, one prefixed `Recommended:`), `recommended`, `evidence_refs`. A payment red flag sets the route to `accounts` unless the route is already `on_call_emergency` |
 | `closure` | `completion_refs` (events where a provider, tenant or landlord says the job is done), `invoice_status` (`sent_to_landlord`, `landlord_pays_directly`, `no_charge`), `invoice_refs`, `keys_status` (`returned`, `not_applicable`; `unknown` is recorded as `not_applicable` when no event says keys are held, and blocked while keys are held with no later return), `key_refs`, `reason` |
 
 ### Phone calls
@@ -392,9 +393,24 @@ These were produced by running PR 5's own code on public case 003 with the scrip
 }
 ```
 
+### Red flags
+
+`red_flags` items:
+
+| Field | Meaning |
+|---|---|
+| `category` | `payment`, `legal`, `vulnerability`, `abuse` or `failed_action` |
+| `force` | `true` makes the gates escalate. `failed_action` is `false`: the model is told how to recover and is not forced to escalate |
+| `route` / `priority` | Set on forcing flags. Payment is `accounts` / `P1`. Legal is `property_manager` / `P2`. Vulnerability and abuse are `property_manager` / `P1` |
+| `ref` | `event-NNN`, `request`, or an attachment name |
+| `excerpt` | The matched text |
+| `guidance` | What to do, also shown in the first model message and in `REASONING.md` |
+
+The same block is in the first model message under `CODE RED FLAGS`. Negated mentions are not flagged.
+
 ### Fallback
 
-`--backend tests.chaos_backend:ChaosBackend` on a folder named `raise-003`. The backend raises, so the runner writes the plain-code escalation. All tool-loop fields are empty.
+`--backend tests.chaos_backend:ChaosBackend` on a folder named `raise-003`. The backend raises, so the runner writes the plain-code escalation. A fallback now also sets `title`, `request`, `priority`, `red_flags` and one committed `escalation` action. That ticket includes `respond_by`, a short digest of recent events in `known`, and a recommended option. `model`, `steps`, `tokens`, `as_of` and `trace` stay empty. The example below is the previous shape; `title`, `request` and `actions` are no longer blank when the case loaded.
 
 ```json
 {

@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
+from agent import handover, redflags
 from agent.config import Config
 from agent.gates import find_hazard, wait_days
 from agent.schema import Decision, idempotency_key
@@ -50,13 +51,29 @@ def fallback_decision(
         reason += " Known: " + "; ".join(known) + "."
     if hazard:
         reason += " Possible hazard mentioned (%r): treat as urgent." % hazard
+    flags = redflags.scan(case) if case is not None else []
+    options = ("Take over the case and read the timeline", "Re-run the case once the cause is fixed",
+               "Contact the party we are waiting on using a number already in the case")
+    priority = "P1" if hazard else "P2"
+    for flag in flags:
+        if flag.get("force") and flag.get("priority"):
+            priority = handover.more_urgent(priority, flag["priority"])
+    ticket = handover.enrich(
+        {"priority": priority, "route": "on_call_emergency" if hazard else "property_manager",
+         "summary": reason, "known": list(known), "unknowns": list(unknowns),
+         "tried": ["Automatic fallback (%s); no model decision was recorded" % cause],
+         "options": list(options)},
+        case, now, reason=reason, unknowns=unknowns, options=options, flags=flags, hazard=bool(hazard), digest=True,
+    )
+    ticket.update(id="escalation-1", kind="escalation", state="committed",
+                  note="Created automatically because the run could not finish.")
     return Decision(
         case_id=case_id,
         action="ESCALATE",
         reason=reason,
         source="fallback",
         unknowns=tuple(unknowns),
-        options=("Take over the case and read the timeline", "Re-run the case once the cause is fixed"),
+        options=options,
         hazard=bool(hazard),
         waiting_on=waiting_on,
         waiting_days=waiting_days,
@@ -65,4 +82,9 @@ def fallback_decision(
         idempotency_key=idempotency_key(case_id, events_seen, "ESCALATE", cause),
         decided_at=now.isoformat(),
         warnings=tuple(warnings),
+        priority=priority,
+        title=case.title if case is not None else "",
+        request=case.request if case is not None else "",
+        actions=[ticket],
+        red_flags=flags,
     )
