@@ -10,6 +10,6 @@ Fill in the empty values at the end. After the 17:00 code freeze only this file,
 | 4 | Names of all team members | |
 | 5 | Commit hash at the 17:00 freeze | |
 | 6 | Reality Test results | `ANSWERS/` |
-| 7 | Path to the demo video inside the repo | |
+| 7 | Path to the demo video inside the repo | `demo/demo.mp4` |
 | 8 | LinkedIn post URL | |
 | 9 | X post URL | |
