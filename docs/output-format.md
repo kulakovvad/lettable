@@ -103,6 +103,32 @@ These are filled only by the `claude`, `anthropic`, `openai` and `auto` backends
 | `actions` | object[] | Everything staged, with its final state |
 | `blocked` | object[] | Tool calls a code gate refused, with the reason given to the model |
 | `trace` | object[] | Every model note and tool call, in order |
+| `consistency` | object or null | Document consistency report (see below). Null unless `consistency_check` is on |
+
+### Consistency report
+
+Present when `consistency_check` is on (tool loop only). Design: [design.md](design.md#document-consistency-check-opt-in). Shape, with values based on public case 028 (refs illustrative):
+
+```json
+{"status": "ok", "model": "jev-1.13.0", "dropped": 0,
+ "checks": [{"field": "property_address",
+             "values": ["Flat 7, 87 Alder Lane, Bellmere, ZZ3 8ZZ", "Flat 7, 177 Alder Lane, Northbridge, ZZ6 5ZZ"],
+             "refs": [["index", "event-001"], ["event-009"]],
+             "score": 0.023, "confidence": 0.94, "tier": "escalate"}]}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `status` | `ok` \| `unavailable` | `unavailable`: extraction or Jev failed, or `TYPESAFE_API_KEY` is not set. The case continues |
+| `error` | string | Only when `unavailable`, truncated to 300 characters |
+| `model` | string | Jev model |
+| `dropped` | integer | Extracted values not found in the source they cited |
+| `checks` | object[] | Only fields whose values still differ after normalising. Empty means nothing differed |
+| `checks[].field` | string | `tenant_name`, `landlord_name`, `property_address`, `tenant_phone`, `tenant_email`, `landlord_phone`, `landlord_email`, `reference_number` |
+| `checks[].values` / `refs` | string[] / string[][] | Distinct values as written, and where each appears, in the same order |
+| `checks[].score` | number | Jev similarity, 0 (different) to 1 (identical) |
+| `checks[].confidence` | number | Jev confidence |
+| `checks[].tier` | `pass` \| `flag` \| `escalate` | `escalate` adds a gate note and forces `ESCALATE` |
 
 ### Cause
 
@@ -169,6 +195,8 @@ Each item in `trace` is a model note or a tool call:
 {"step": 1, "thought": "model text, up to 1500 chars"}
 {"step": 2, "tool": "schedule_followup", "args": {"after_hours": 48}, "result": {"status": "staged", "id": "followup-1"}}
 ```
+
+With the consistency check on, the trace starts with step 0: `{"step": 0, "tool": "consistency_check", "result": {"status": "ok", "checks": ["property_address:escalate"], "dropped": 0, "error": null}}`.
 
 `result` is a summary. It keeps `status`, `code`, `why`, `hint`, `id`, `error` and `note`. Long lists and text become counts, such as `"events": "12 item(s)"`. Tool `status` values are `ok`, `staged`, `blocked`, `accepted`, `unavailable`, `error` and `skipped`.
 
