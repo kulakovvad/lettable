@@ -84,13 +84,37 @@ def _record_failure(decision: Dict[str, Any], action: Dict[str, Any]) -> None:
         action.get("to"), action.get("call_detail")))
 
 
+def _canonical_number(number: Any) -> str:
+    """'+' and digits, so '+44 7700 900555' and '447700900555' are the same number."""
+    digits = re.sub(r"\D", "", str(number or ""))
+    return "+" + digits if digits else ""
+
+
+def _on_list(number: Any, allowed: tuple) -> bool:
+    want = _canonical_number(number)
+    return bool(want) and want in {_canonical_number(n) for n in allowed}
+
+
 def _not_allowed(action: Dict[str, Any], cfg: Config) -> bool:
     """A live call to a number off the allow-list is held. The list is optional for ordinary calls (empty = no list),
     but an on-call briefing is only ever dialled to a number that is on it."""
     allowed = allowlist(cfg)
     if action.get("purpose") == ONCALL_PURPOSE:
-        return action.get("number") not in allowed
-    return bool(allowed) and action.get("number") not in allowed
+        return not _on_list(action.get("number"), allowed)
+    return bool(allowed) and not _on_list(action.get("number"), allowed)
+
+
+def _already_placed(previous: List[Dict[str, Any]], action: Dict[str, Any], cfg: Config) -> Optional[Dict[str, Any]]:
+    """An earlier run already placed this call. One on-call briefing per case, even if its old key included events_seen."""
+    for p in previous:
+        cid = p.get("conversation_id")
+        if not cid or (cfg.call_backend != "dry_run" and str(cid).startswith("dryrun-")):
+            continue
+        same_key = p.get("idempotency_key") == action.get("idempotency_key")
+        same_briefing = action.get("purpose") == ONCALL_PURPOSE and p.get("purpose") == ONCALL_PURPOSE
+        if same_key or same_briefing:
+            return p
+    return None
 
 
 def place_pending(decision: Dict[str, Any], get_dialer: Callable[[], Dialer], cfg: Config, budget: CallBudget,
@@ -99,8 +123,7 @@ def place_pending(decision: Dict[str, Any], get_dialer: Callable[[], Dialer], cf
     for a in decision.get("actions", []):
         if a.get("kind") != "call" or a.get("state") != "committed" or a.get("call_status") != "pending":
             continue
-        earlier = next((p for p in previous if p.get("idempotency_key") == a["idempotency_key"] and p.get("conversation_id")
-                        and (cfg.call_backend == "dry_run" or not str(p["conversation_id"]).startswith("dryrun-"))), None)
+        earlier = _already_placed(previous, a, cfg)
         if earlier:  # the same call was already placed by an earlier run: never dial twice
             for k in ("call_status", "conversation_id", "call_detail", "call_result"):
                 if k in earlier:

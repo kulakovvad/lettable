@@ -71,7 +71,8 @@ def _address(case: Optional[Case]) -> str:
 
 def build_action(decision: Dict[str, Any], case: Optional[Case], cfg: Config, to_number: str) -> Dict[str, Any]:
     case_id = str(decision["case_id"])
-    key = hashlib.sha256(("%s|oncall|%s" % (case_id, decision.get("events_seen", 0))).encode("utf-8")).hexdigest()[:12]
+    # One briefing per case. events_seen is not part of the key: a later event must not dial again.
+    key = hashlib.sha256(("%s|oncall" % case_id).encode("utf-8")).hexdigest()[:12]
     agency = evidence.agency_name(case) if case is not None else "the agency"
     facts = {"agency_name": agency, "job": "an urgent case", "case": _prompt_text(case_id, 40) or "unknown",
              "property": _address(case), "found": _found(decision, case, cfg), "done": _done(decision)}

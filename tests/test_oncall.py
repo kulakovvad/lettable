@@ -77,6 +77,17 @@ class TriggerTests(unittest.TestCase):
         self.assertEqual(len(d["actions"]), 1)
         self.assertEqual((d["actions"][0]["number"], d["actions"][0]["to"]), (ONCALL, STAFF_PARTY))
 
+    def test_the_briefing_key_is_the_case_id_and_ignores_events_seen(self):
+        cfg_on = Config(oncall_number=ONCALL)
+        early = {"case_id": "c1", "hazard": True, "actions": [], "events_seen": 3}
+        later = {"case_id": "c1", "hazard": True, "actions": [], "events_seen": 9}
+        oncall.add_briefing(early, Path("/nonexistent"), cfg_on)
+        oncall.add_briefing(later, Path("/nonexistent"), cfg_on)
+        self.assertEqual(early["actions"][0]["idempotency_key"], later["actions"][0]["idempotency_key"])
+        other = {"case_id": "c2", "hazard": True, "actions": [], "events_seen": 3}
+        oncall.add_briefing(other, Path("/nonexistent"), cfg_on)
+        self.assertNotEqual(other["actions"][0]["idempotency_key"], early["actions"][0]["idempotency_key"])
+
 
 class DryRunTests(Base):
     def test_a_hazard_case_records_a_briefing_and_dials_nothing(self):
@@ -107,6 +118,23 @@ class DryRunTests(Base):
         run_all(self.inp, out2, cfg(oncall_number=""), "fake", NOW)
         off = json.loads((out2 / "c2" / "decision.json").read_text())
         self.assertEqual([a for a in off["actions"] if a.get("purpose") == ONCALL_PURPOSE], [])
+
+    def test_a_rerun_after_a_new_event_reuses_the_briefing(self):
+        make_case(self.inp, "c1", GAS)
+        run_all(self.inp, self.out, cfg(), HAZARD_CHAT, NOW)
+        first = self.briefings()[0]
+        seen = self.decision()["events_seen"]
+        extra = ("\n<a id=\"event-099\"></a>\n## 2026-01-04 09:00:00 UTC — event 099\n\n"
+                 "- **Channel:** Email\n- **From:** Tenant\n- **To:** Agency / system\n\nAny update?\n")
+        hist = self.inp / "c1" / "history.md"
+        hist.write_text(hist.read_text() + extra)
+        run_all(self.inp, self.out, cfg(), HAZARD_CHAT, NOW)
+        again = self.briefings()
+        self.assertGreater(self.decision()["events_seen"], seen)
+        self.assertEqual(len(again), 1)
+        self.assertEqual((again[0]["conversation_id"], again[0]["idempotency_key"]),
+                         (first["conversation_id"], first["idempotency_key"]))
+        self.assertIn("Already placed", again[0]["note"])
 
     def test_a_rerun_does_not_make_a_second_briefing_or_a_new_conversation(self):
         make_case(self.inp, "c1", GAS)
@@ -187,6 +215,36 @@ class LiveTests(Base):
                 self.assertEqual(net.posts, [])
                 self.assertEqual(d["action"], "ESCALATE")
                 self.assertIn("call_held", [x["code"] for x in d["blocked"]])
+
+    def test_an_earlier_briefing_with_a_different_key_is_not_dialled_again(self):
+        fresh = {"case_id": "c1", "hazard": True, "actions": [], "events_seen": 4}
+        oncall.add_briefing(fresh, Path("/nonexistent"), Config(oncall_number=ONCALL))
+        action = fresh["actions"][0]
+        earlier = dict(action, idempotency_key="old-key-with-events", conversation_id="conv_old", call_status="started")
+        net = Network()
+        with mock.patch("urllib.request.urlopen", net):
+            calls.place_pending(fresh, lambda: make_dialer("elevenlabs", Config()),
+                                Config(call_backend="elevenlabs", call_allowlist=(ONCALL,), call_hours=(0, 24)),
+                                calls.CallBudget(5), [earlier], datetime(2026, 1, 9, 12, tzinfo=timezone.utc))
+        self.assertEqual(net.posts, [])
+        self.assertEqual(action["conversation_id"], "conv_old")
+        self.assertIn("Already placed", action["note"])
+
+    def test_the_allow_list_matches_spaces_and_a_missing_plus(self):
+        briefing = {"kind": "call", "state": "committed", "call_status": "pending", "purpose": ONCALL_PURPOSE,
+                    "number": ONCALL, "to": STAFF_PARTY, "objective": "x", "facts": {}, "idempotency_key": "k"}
+        ordinary = dict(briefing, purpose="chase", to="provider", number="+447700900001")
+        cases = ((briefing, "+44 7700 900555"), (briefing, "447700900555"),
+                 (ordinary, "+44 7700 900001"), (ordinary, "447700900001"))
+        for n, (base, entry) in enumerate(cases):
+            d = {"case_id": "c1", "actions": [dict(base, idempotency_key="k-norm-%d" % n)]}
+            net = Network()
+            with mock.patch("urllib.request.urlopen", net):
+                calls.place_pending(d, lambda: make_dialer("elevenlabs", Config()),
+                                    Config(call_backend="elevenlabs", call_allowlist=(entry,), call_hours=(0, 24)),
+                                    calls.CallBudget(5), [], datetime(2026, 1, 9, 12, tzinfo=timezone.utc))
+            self.assertEqual(d["actions"][0]["call_status"], "started", entry)
+            self.assertEqual(len(net.posts), 1, entry)
 
     def test_the_allow_list_also_holds_ordinary_calls_when_it_is_set_and_does_nothing_when_it_is_empty(self):
         action = {"kind": "call", "state": "committed", "call_status": "pending", "purpose": "chase", "number": "+447700900001",
