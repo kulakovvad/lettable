@@ -181,8 +181,10 @@ class UnreadableCase(Exception):
     pass
 
 
-_LIST_FIELDS = ("unknowns", "options", "evidence_refs", "unrelated_issues", "gate_notes", "warnings", "actions", "blocked", "trace")
-_TEXT_FIELDS = ("reason", "title", "request", "message", "model", "as_of", "decided_at")
+_LIST_FIELDS = ("unknowns", "options", "evidence_refs", "unrelated_issues", "gate_notes", "warnings", "actions", "blocked",
+                "trace", "red_flags")
+_TEXT_FIELDS = ("reason", "title", "request", "message", "model", "as_of", "decided_at", "answer")
+_PROPERTY_LINE = re.compile(r"^Property:\s*(.+?)\s*\(index\)\s*$")
 
 
 _CALL_TEXT = ("id", "party", "purpose", "priority", "number", "state", "call_status", "conversation_id", "placed_at", "objective", "detail")
@@ -231,12 +233,61 @@ def _load_decision(d: Path) -> dict:
         dec[k] = dec[k] if isinstance(dec.get(k), list) else []
     for k in ("unknowns", "options", "evidence_refs", "unrelated_issues", "gate_notes", "warnings"):
         dec[k] = [str(x) for x in dec[k]]
-    for k in ("actions", "blocked", "trace"):
+    for k in ("actions", "blocked", "trace", "red_flags"):
         dec[k] = [x for x in dec[k] if isinstance(x, dict)]
     for k in _TEXT_FIELDS:
         dec[k] = dec[k] if isinstance(dec.get(k), str) else ""
     dec["calls"] = _clean_calls(dec)
     return dec
+
+
+def _strings(value) -> list:
+    return [str(x) for x in value if str(x).strip()] if isinstance(value, list) else []
+
+
+def _text(value) -> str:
+    return value if isinstance(value, str) else ""
+
+
+def _conflicts(value) -> list:
+    out = []
+    for c in value if isinstance(value, list) else []:
+        if not isinstance(c, dict):
+            continue
+        values = [{"value": str(v.get("value", "")), "refs": _strings(v.get("refs"))}
+                  for v in c.get("values") or [] if isinstance(v, dict)]
+        out.append({"field": str(c.get("field") or ""), "values": values})
+    return out
+
+
+def _escalation_view(ticket: Optional[dict]) -> Optional[dict]:
+    """The handover ticket with every field forced to the type the page expects."""
+    if not ticket:
+        return None
+    return {
+        "priority": _text(ticket.get("priority")), "route": _text(ticket.get("route")), "state": _text(ticket.get("state")),
+        "respond_by": _text(ticket.get("respond_by")), "summary": _text(ticket.get("summary")),
+        "recommended": _text(ticket.get("recommended")), "known": _strings(ticket.get("known")),
+        "tried": _strings(ticket.get("tried")), "failed": _strings(ticket.get("failed")),
+        "conflicts": _conflicts(ticket.get("conflicts")),
+    }
+
+
+def _flags_view(flags: list) -> list:
+    keys = ("category", "ref", "excerpt", "guidance", "route", "priority")
+    return [{**{k: _text(f.get(k)) for k in keys}, "force": f.get("force") is True} for f in flags]
+
+
+def _property(dec: dict, ticket: Optional[dict]) -> str:
+    """details.property.address, or the 'Property: … (index)' line handover adds, for runs written before details existed."""
+    address = _dict(_dict(dec.get("details")).get("property")).get("address")
+    if isinstance(address, str) and address.strip():
+        return address
+    for line in _strings((ticket or {}).get("known")):
+        m = _PROPERTY_LINE.match(line)
+        if m:
+            return m.group(1)
+    return ""
 
 
 def case_view(out: Path, cid: str) -> Optional[dict]:
@@ -262,6 +313,9 @@ def case_view(out: Path, cid: str) -> Optional[dict]:
             "action_label": ACTION_LABELS.get(dec.get("action"), dec.get("action") or "—"),
             "amount": amount if isinstance(amount, (int, float)) else None,
             "route": {"route": escalation.get("route"), "state": escalation.get("state")} if escalation else None,
+            "escalation": _escalation_view(escalation),
+            "red_flags": _flags_view(dec["red_flags"]),
+            "property": _property(dec, escalation),
             "followup_missing": any(t.get("tool") == "schedule_followup" and _dict(t.get("result")).get("status") == "skipped"
                                     for t in trace),
             "reason_parts": split_refs(dec["reason"]),

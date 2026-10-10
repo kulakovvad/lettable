@@ -144,6 +144,7 @@ function renderInfo(v) {
     h("div", { class: "info-top" },
       h("h2", { class: "label" }, "Info"),
       h("p", { class: "case-heading" }, d.title || `Case ${d.case_id}`),
+      x.property && h("p", { class: "property" }, x.property),
       d.request && [
         h("p", { class: "field-label" }, "Initial request"),
         h("blockquote", { class: "request" }, `“${d.request}”`),
@@ -179,6 +180,47 @@ function stagedLine(a) {
   else if (a.kind === "escalation") what = `${a.priority} → ${a.route}`;
   else if (a.kind === "closure") what = `invoice ${a.invoice_status} · keys ${a.keys_status}`;
   return `${a.id} · ${what || a.kind} · ${words(a.state || "")}`;
+}
+
+function bulletList(label, items, cls) {
+  return items.length > 0 && [
+    h("p", { class: "kv-k sub-label" }, label),
+    h("ul", { class: `bullets ${cls || ""}` }, items.map((t) => h("li", {}, h("span", { class: "square", "aria-hidden": "true" }), h("span", {}, t)))),
+  ];
+}
+
+function flagsSection(flags) {
+  if (!flags.length) return null;
+  return h("div", { class: "section" },
+    h("div", { class: "row-between" },
+      h("h2", { class: "label flag-label" }, "Red flags"),
+      h("span", { class: "unknown-count" }, String(flags.length))),
+    h("ul", { class: "flags" }, flags.map((f) => h("li", { class: `flag${f.force ? " flag-force" : ""}` },
+      h("p", { class: "flag-head mono" },
+        [words(f.category || "flag"), f.force ? "forces escalation" : "advisory", f.ref].filter(Boolean).join(" · ")),
+      f.excerpt && h("p", { class: "flag-excerpt" }, `“${f.excerpt}”`),
+      f.guidance && h("p", { class: "flag-guidance" }, f.guidance)))));
+}
+
+function conflictLine(c) {
+  const vals = c.values.map((v) => `${v.value}${v.refs.length ? ` (${v.refs.join(", ")})` : ""}`);
+  return `${words(c.field || "value")}: ${vals.join(" vs ")}`;
+}
+
+function handoverSection(e) {
+  if (!e) return null;
+  return h("div", { class: "section" },
+    h("h2", { class: "label" }, "Handover"),
+    h("div", { class: "grid-2" },
+      h("div", {}, h("p", { class: "kv-k" }, "Route"),
+        h("p", { class: "kv-v" }, `${dash(e.priority)} → ${dash(e.route)}`, e.state && h("span", { class: "route-state" }, ` · ${words(e.state)}`))),
+      h("div", {}, h("p", { class: "kv-k" }, "Respond by"), h("p", { class: "kv-v" }, e.respond_by ? `${fmtDate(e.respond_by)} UTC` : "—"))),
+    e.recommended && [h("p", { class: "kv-k sub-label" }, "Recommended"), h("p", { class: "recommended" }, e.recommended.replace(/^recommended:\s*/i, ""))],
+    bulletList("Conflicts", e.conflicts.map(conflictLine), "bullets-red"),
+    bulletList("Known", e.known),
+    bulletList("Already tried", e.tried),
+    bulletList("Failed", e.failed, "bullets-red"),
+    e.summary && h("details", { class: "handover-summary" }, h("summary", {}, "Ticket text"), h("p", {}, e.summary)));
 }
 
 function callBlock(c) {
@@ -246,6 +288,11 @@ function renderDecision(v) {
       gateChanged && h("div", { class: "gates" },
         d.proposed_action ? `Gates changed the model's answer: it proposed ${d.proposed_action}.` : "Gate notes:",
         (d.gate_notes || []).length > 0 && h("ul", {}, d.gate_notes.map((n) => h("li", {}, n))))),
+    d.answer && h("div", { class: "section" },
+      h("h2", { class: "label primary" }, "Answer"),
+      h("p", { class: "answer" }, d.answer)),
+    flagsSection(x.red_flags || []),
+    handoverSection(x.escalation),
     h("div", { class: "section" },
       h("h2", { class: "label" }, "Wait"),
       h("div", { class: "grid-2" },

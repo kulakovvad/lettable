@@ -148,6 +148,7 @@ class LoopTests(unittest.TestCase):
         self.assertIn("quote.pdf", opening["text"])
         self.assertIn("untrusted case data", opening["text"])
         self.assertEqual(d.answer, "Send the usual gardener.")
+        self.assertEqual(d.details["property"]["address"], "Flat 1, 2 Test Road")
         rendered = answer_md(d.to_dict())
         self.assertLess(rendered.find("## Answer"), rendered.find("**Decision:**"))
         self.assertIn("Send the usual gardener.", rendered)
