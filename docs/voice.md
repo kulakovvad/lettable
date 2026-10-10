@@ -51,6 +51,20 @@ export ELEVENLABS_PHONE_NUMBER_ID=<printed id>
 
 Needs an ElevenLabs plan that includes phone calls and a Twilio number. Never commit keys; `.env` is ignored.
 
+## What a live call needs
+
+| Piece | Why | Variables |
+|---|---|---|
+| ElevenLabs account on a plan that includes phone calls | runs the voice agent (speech-to-text, the language model, text-to-speech, turn-taking) | `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID` |
+| A Twilio account and a Twilio phone number | the telephone line: ElevenLabs places the call through it | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` (used once, by `voice-setup --import-number`) |
+| The number imported into ElevenLabs | gives the agent a line to dial from | `ELEVENLABS_PHONE_NUMBER_ID` (printed by `voice-setup`) |
+
+Notes:
+- A Twilio **trial** account can only call numbers you have verified in Twilio, and plays a short trial message before the call connects. That is enough for a demo to your own phone.
+- ElevenLabs accepts a purchased Twilio number (inbound and outbound) or a verified caller ID (outbound only).
+- Prefer a Twilio API key (SID and secret) over the account token if you have one.
+- No Twilio? A SIP trunk from another carrier also works with ElevenLabs, but this repo's `voice-setup` only imports Twilio numbers.
+
 ## Demo call
 
 Use a phone you control and say so to whoever answers. Keep the number out of every committed file (`DEMO_CALL_NUMBER` in your own `.env` is a reminder, the code does not read it), build a case whose provider's phone number is that number, run with `--calls elevenlabs`, then `calls collect`. Synthetic case numbers (07700 900xxx) are unreachable test numbers.
