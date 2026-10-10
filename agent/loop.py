@@ -130,7 +130,8 @@ _PRIMARY_KIND = {
 def matches_primary(action: str, staged: Dict[str, Any]) -> bool:
     """Whether a staged action is the one the final primary action needs (ESCALATE needs only the ticket)."""
     kind, to, purpose = _PRIMARY_KIND.get(action, (None, None, None))
-    return (staged["kind"] == kind and (to is None or staged.get("to") == to)
+    same_kind = staged["kind"] == kind or (kind == "message" and staged["kind"] == "call")  # a call can stand in for a message
+    return (same_kind and (to is None or staged.get("to") == to)
             and (purpose is None or staged.get("purpose") == purpose))
 
 
@@ -218,7 +219,11 @@ def finalize(case: Case, box: Toolbox, cfg: Config, as_of: datetime, trace, step
             s.get("purpose") == "safety_advice" and s.get("to") == "tenant" and box.urgent)
         if always or matches_primary(decision.action, s):
             s["state"] = "committed"
-            s["note"] = "Recorded in the local outbox (no external delivery connected)."
+            if s["kind"] == "call":
+                s["call_status"] = "pending"  # the runner places it after the final checks (agent.calls)
+                s["note"] = "Call queued; it is placed after the final checks."
+            else:
+                s["note"] = "Recorded in the local outbox (no external delivery connected)."
         else:
             s["state"] = "held_for_review"
             s["note"] = ("Held: code gates changed the decision to %s." % decision.action if overridden else
