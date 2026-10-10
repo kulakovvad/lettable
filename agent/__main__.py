@@ -1,4 +1,4 @@
-"""python3 -m agent run|replay INPUT_DIR OUT_DIR [options]  |  calls collect OUT_DIR  |  export OUT_DIR  |  ui OUT_DIR  |  reality CHALLENGE_DIR --out ANSWERS  |  doctor"""
+"""python3 -m agent run|replay INPUT_DIR OUT_DIR [options]  |  calls collect OUT_DIR  |  export OUT_DIR  |  ui OUT_DIR  |  reality CHALLENGE_DIR --out ANSWERS  |  doctor  |  grade OUT_DIR EVAL_DIR [--judge claude]"""
 
 from __future__ import annotations
 
@@ -94,6 +94,20 @@ def _doctor(args) -> int:
     print(report(checks))
     return 1 if any(c.status == "fail" for c in checks) else 0
 
+def _grade(args) -> int:
+    from agent.grade import grade
+    from agent.llm import make_backend
+
+    for d in (args.out_dir, args.eval_dir):
+        if not Path(d).is_dir():
+            print("directory not found: %s" % d, file=sys.stderr)
+            return 2
+    judge = None
+    if args.judge:
+        judge = make_backend(args.judge, Config.load(Path(args.config) if args.config else None))
+    print(json.dumps(grade(Path(args.out_dir), Path(args.eval_dir), judge), indent=2))
+    return 0
+
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="agent")
@@ -128,6 +142,11 @@ def main(argv=None) -> int:
     rp.add_argument("--timeout", type=float)
     rp.add_argument("--concurrency", type=int)
     rp.add_argument("--config")
+    g = sub.add_parser("grade", help="grade a run's decisions against an eval set's <id>.expected.json rubrics")
+    g.add_argument("out_dir")
+    g.add_argument("eval_dir")
+    g.add_argument("--judge", help="also score the reasoning with a model: claude, openai, or module:Class")
+    g.add_argument("--config")
     ex = sub.add_parser("export", help="copy a run's results into ANSWERS/<n>/ for the submission")
     ex.add_argument("out_dir")
     ex.add_argument("--to", default="ANSWERS", help="destination folder (default: ANSWERS)")
@@ -187,6 +206,8 @@ def main(argv=None) -> int:
         return _reality(args)
     if args.cmd == "doctor":
         return _doctor(args)
+    if args.cmd == "grade":
+        return _grade(args)
 
     if args.cmd == "calls":
         from agent.calls import collect
