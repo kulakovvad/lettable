@@ -1,0 +1,21 @@
+[project]
+name = "lettable-agent"
+version = "0.1.0"
+description = "Bounded, resumable OpenAI Agents SDK runtime for Lettable"
+requires-python = ">=3.11"
+dependencies = ["openai-agents==0.23.1", "python-dotenv==1.2.4", "pypdf==6.1.1"]
+
+[project.optional-dependencies]
+dev = ["pytest==9.1.1", "pytest-asyncio==1.4.0"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["lettable*"]
