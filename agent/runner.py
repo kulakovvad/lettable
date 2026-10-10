@@ -141,6 +141,14 @@ def run_all(
                 dialer.append(make_dialer(cfg.call_backend, cfg))
             return dialer[0]
 
+    # Results of calls placed by an earlier run are fetched first, so this run's decisions can see what was said.
+    collected = {"collected": [], "pending": [], "errors": []}
+    if cfg.collect_calls and cfg.call_backend != "dry_run" and out_dir.is_dir():
+        try:
+            collected = calls.collect(out_dir, get_dialer)
+        except Exception as exc:  # never let the call results stop the cases
+            collected["errors"].append({"error": "%s: %s" % (type(exc).__name__, str(exc)[:200])})
+
     def trace(row: Dict[str, Any]) -> None:
         with lock:
             with open(trace_path, "a", encoding="utf-8") as fh:
@@ -207,6 +215,8 @@ def run_all(
         "write_errors": [r["case_id"] for r in done if r.get("write_error")],
         "seconds": round(time.monotonic() - started, 2),
     }
+    if cfg.call_backend != "dry_run":
+        summary["calls"] = {k: len(v) for k, v in collected.items()}
     summary["reconciled"] = summary["written"] + summary["skipped"] == summary["total"] and not summary["write_errors"]
     atomic_write(out_dir / "summary.json", json.dumps(summary, indent=2) + "\n")
     return summary

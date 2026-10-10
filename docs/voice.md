@@ -31,7 +31,7 @@ Safety rules in code:
 - Call records and transcripts are third-party speech: labelled untrusted, and amounts or numbers spoken in them do not count as facts of the case.
 - The phone agent has no authority: it cannot approve spend or promise prices, dates or compensation, and hands anything unusual to a colleague.
 
-Bring the result back, then re-run the case so the next decision sees what was said:
+Results come back by themselves: at the start of the next live run (`--calls elevenlabs`), calls placed earlier are fetched and their records added to the case (turn this off with `collect_calls: false`). You can also do it by hand:
 
 ```
 python3 -m agent calls collect out/ --backend elevenlabs
@@ -67,6 +67,10 @@ Create and update send the same configuration. `--create-agent` and `--update-ag
 - **Opening:** one short statement and then it waits, for example: "Hello, this is an automated assistant calling for Northbridge Lettings about the dishwasher repair. This call is recorded." It does not ask the person to confirm who they are. The job comes from the call's `job` fact (cut to 80 characters at a word), else "a maintenance job"; the objective is an instruction and is never read out as the topic. The agency name comes from the case (a sender's name or a sign-off such as "Kind regards, Northbridge Lettings"), else "the letting agency".
 - **During the call:** one or two short sentences per turn, one question at a time, it stops when interrupted, and it offers a colleague's callback if the person cannot talk. It writes plain words only (no bracketed tags such as `[sad]`).
 - **Voice:** a non-expressive English model (`eleven_flash_v2`, expressive mode off). The expressive models read stage directions aloud.
+- **Limits:** a call ends by itself after 3 minutes (the agent says "A colleague will follow up. Goodbye."), and the phone stops ringing after 30 seconds (`call_ring_timeout_s`).
+- **Voicemail:** if a machine answers, the standard message plays: only the agency name and the job, no objective, price or personal detail. The outcome is `no_answer`.
+- **Someone phones the number back:** every field has a spoken default ("the letting agency", "a maintenance job"), and the agent says this is an automated line that cannot take requests and asks them to contact the agency.
+- **Dates:** `confirmed_date` is what was said ("Tuesday morning"). `confirmed_date_iso` is filled only when an exact calendar date was given, and is empty otherwise: a relative day is never turned into a date.
 - **Outcome after the call** (one of): `confirmed`, `declined`, `no_answer` (nobody picked up or only voicemail), `callback_requested`, `needs_human`, `unclear` (a person answered but gave no usable answer). A call that a person answered is never `no_answer`.
 
 ## What a live call needs
@@ -93,4 +97,5 @@ Use a phone you control and say so to whoever answers. Keep the number out of ev
 - Text-to-speech replies and voicemail drops are not used.
 - The live path (real STT, real call) has only been tested against mocked HTTP.
 - Calling hours and the run cap are checked in the runner and again inside the dialer; dry runs skip the hours check, so they do not rehearse an out-of-hours hold.
+- Voicemail uses ElevenLabs' built-in detection only; Twilio's own machine detection is not turned on.
 - `calls collect` rewrites `decision.json` without a lock, so run it when no `run` is writing the same output folder.

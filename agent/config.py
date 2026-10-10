@@ -47,6 +47,8 @@ class Config:
     # Phone calls ("dry_run" records the call and dials nothing | "elevenlabs" places it)
     call_backend: str = "dry_run"
     call_hours: Tuple[int, int] = (8, 21)  # UK local hours in which a live call may be placed
+    call_ring_timeout_s: int = 30  # stop ringing after this long (the provider default is 60)
+    collect_calls: bool = True  # at the start of a live run, fetch the results of calls placed earlier
     max_calls_per_case: int = 1
     max_calls_per_run: int = 10
 

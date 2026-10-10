@@ -35,11 +35,29 @@ colleague will confirm.
 - Never share one party's phone number, email or personal details with another party.
 - If you are asked something outside the objective, the person is upset or seems vulnerable, mentions a danger to \
 safety (gas smell, fire, flooding, injury), or asks for a human, say that a colleague will call back, then end the call.
-- If there is no answer or you reach voicemail, leave a short message with the agency name and ask them to call back.
+- If you reach voicemail, the voicemail tool leaves the standard short message for you; add nothing, and never say \
+the objective, a price or any personal detail to a machine.
+- If someone phones you (you did not start the call), say this is an automated line that cannot take requests, ask \
+them to contact the agency directly, then end the call politely.
 - Never claim anything that is not in what you know."""
 
 # One short sentence of context, then the agent waits for the person. No question, so nobody is asked to confirm who they are.
 FIRST_MESSAGE = "Hello, this is an automated assistant calling for {{agency_name}} about {{job}}. This call is recorded."
+
+# Hard limits on a call, so a stuck or hostile call cannot run on (and cost) unbounded. The ringing limit is set per call
+# (Config.call_ring_timeout_s); the length limit is part of the agent.
+MAX_CALL_SECONDS = 180
+MAX_CALL_MESSAGE = "I need to end the call now. A colleague will follow up. Goodbye."
+
+# What a machine hears: only the agency and the topic (both already on the call), no objective, price or personal detail.
+VOICEMAIL_MESSAGE = ("Hello, this is an automated assistant calling for {{agency_name}} about {{job}}. "
+                     "We will follow up another way. Thank you.")
+
+# Spoken defaults for every variable, used when someone phones the number back and no call set the values.
+PLACEHOLDERS: Dict[str, str] = {
+    "agency_name": "the letting agency", "party": "the contact", "job": "a maintenance job",
+    "objective": "Find out where the job stands.", "known_facts": "nothing further", "case_id": "none",
+}
 
 # Plain, non-expressive voice: the expressive models read stage directions such as [sad] aloud.
 # The voice itself is left as the agent already has it.
@@ -61,6 +79,9 @@ DATA_COLLECTION: Dict[str, Dict[str, str]] = {
         "description": "Exactly one of: " + "; ".join("%s = %s" % kv for kv in OUTCOMES.items()) + ".",
     },
     "confirmed_date": {"type": "string", "description": "Any date or time slot the person confirmed, as spoken. Empty if none."},
+    "confirmed_date_iso": {"type": "string", "description": "YYYY-MM-DD, only if the person gave an exact calendar date "
+                           "(for example 'the 14th of October'). Empty for anything relative or vague such as 'Tuesday' or "
+                           "'next week': never work a date out."},
     "quoted_amount_gbp": {"type": "number", "description": "Any price the person quoted, in pounds. Leave empty if none."},
     "callback_number": {"type": "string", "description": "A number the person asked us to call back on. Empty if none."},
     "notes": {"type": "string", "description": "One or two sentences on what was said, including anything unexpected."},
