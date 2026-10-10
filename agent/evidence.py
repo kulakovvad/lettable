@@ -159,11 +159,69 @@ def _is_compliance_line(text: str, start: int, end: int) -> bool:
         r"\b(sounding|going off|beeping|triggered|activated|smell)\b", sentence, re.I)
 
 
+# How the agency introduces or signs itself in its own messages. Strict on purpose: the name found here is what the
+# agent signs and what the phone agent says aloud, so a wrong guess is worse than "the agency".
+_CAP = r"[A-ZÀ-ÖØ-Þ][^\W\d_]*(?:[&'.-][^\W\d_]+)*"  # one capitalised word, accents allowed
+_LAST_WORDS = ("Lettings", "Letting", "Estates", "Agents", "Properties", "Property", "Management", "Homes", "Residential")
+_GENERIC = {"Lettings", "Letting", "Estates", "Estate", "Agents", "Properties", "Property", "Management", "Homes",
+            "Residential", "Ltd", "Limited", "LLP", "Plc"}  # a name made only of these is a department or a job title
+_SUFFIX = r"(?: (?:Ltd|Limited|LLP|Plc)\.?)?"
+_AGENCY_NAME = r"((?:%s ){1,3}(?:%s)%s)" % (_CAP, "|".join(_LAST_WORDS), _SUFFIX)
+# "Hello, this is Northbridge Lettings!": only at the very start of the message, after an optional greeting, so an
+# introduction quoted or pasted further down (a contractor's) cannot win. Any capitalisation of "this is";
+# the name may end the line, the text, or be followed by punctuation.
+_INTRO = re.compile(r"\A\s*(?:(?i:hello|hi|hey|dear|good (?:morning|afternoon|evening))\b[^.!?\n]{0,30}?\s*)?(?i:this is) %s(?=\s*(?:[!.,\n]|\Z))"
+                    % _AGENCY_NAME)
+_SIGN_WORD = re.compile(r"\s*(?i:kind regards|best regards|warm regards|regards|many thanks|thanks|thank you|sincerely|"
+                        r"yours sincerely|best wishes|best|cheers)\s*,?\s*\Z")
+_NAME_LINE = re.compile(r"[ \t]*%s[ \t]*\Z" % _AGENCY_NAME)
+
+
+def _distinctive(name: str) -> bool:
+    return any(w.strip(".") not in _GENERIC for w in name.split())
+
+
+def _signed_name(body: str) -> Optional[str]:
+    """The agency named in a sign-off at the end of the message ("Kind regards," then the name, possibly after a
+    person's name). Only the last few lines count."""
+    lines = [l for l in body.strip().splitlines() if l.strip()][-5:]
+    for i, line in enumerate(lines):
+        if _SIGN_WORD.match(line):
+            for later in lines[i + 1:i + 3]:  # the name, or a person's name and then the firm
+                m = _NAME_LINE.match(later)
+                if m and _distinctive(m.group(1)):
+                    return m.group(1)
+            return None
+    return None
+
+
+def _named_in_own_messages(case: Case) -> Optional[str]:
+    """An agency-sounding name the agency uses for itself in its own messages (sender 'Agency / system' has none).
+    Two different names used equally often are not trusted: the case is ambiguous, so the caller falls back."""
+    counts: dict = {}
+    for e in case.events:
+        if role_of(e.sender) != "agency":
+            continue
+        m = _INTRO.match(e.body)
+        for name in (m.group(1) if m else None, _signed_name(e.body)):
+            if name and _distinctive(name):
+                counts[name] = counts.get(name, 0) + 1
+    if not counts:
+        return None
+    ranked = sorted(counts.items(), key=lambda kv: -kv[1])
+    if len(ranked) > 1 and ranked[0][1] == ranked[1][1]:
+        return None
+    return ranked[0][0]
+
+
 def agency_name(case: Case) -> str:
-    """The agency's own name as it signs in the history (e.g. 'Northbridge Lettings'), else 'the agency'."""
+    """The agency's own name (e.g. 'Northbridge Lettings'): a sender's name, else how it introduces or signs
+    itself in its own messages, else 'the agency'."""
     counts = {}
     for e in case.events:
         name = e.sender.strip()
         if role_of(name) == "agency" and "system" not in name.lower() and "agency" not in name.lower():
             counts[name] = counts.get(name, 0) + 1
-    return max(counts, key=counts.get) if counts else "the agency"
+    if counts:
+        return max(counts, key=counts.get)
+    return _named_in_own_messages(case) or "the agency"
