@@ -14,7 +14,8 @@ class Config:
     case_timeout_s: float = 240.0  # the tool loop makes up to loop_max_steps model calls
     run_deadline_s: Optional[float] = None
     call_timeout_s: float = 60.0
-    max_retries: int = 2
+    max_retries: int = 4  # 429 / 529 / 5xx and network errors, waiting retry-after when the server sends it
+    retry_after_cap_s: float = 30.0
     concurrency: int = 4
 
     # Decision thresholds. Starting values; tune on the public cases.
