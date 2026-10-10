@@ -229,6 +229,47 @@ class PlacePendingTests(Base):
         self.assertIn("Result: Visit on Friday.", answer_md(d))
 
 
+class CollectRobustnessTests(unittest.TestCase):
+    def folder(self, root, actions):
+        out = Path(root) / "out"
+        (out / "c1").mkdir(parents=True)
+        decision = {"case_id": "c1", "action": "CHASE_PROVIDER", "reason": "x", "source": "model", "events_seen": 1,
+                    "idempotency_key": "k", "warnings": [], "actions": actions}
+        (out / "c1" / "decision.json").write_text(json.dumps(decision))
+        return out
+
+    def test_one_failed_fetch_does_not_drop_the_other_calls_of_the_case(self):
+        class Flaky(CountingDialer):
+            def fetch(self, conversation_id):
+                if conversation_id == "conv_bad":
+                    raise RuntimeError("404")
+                return super().fetch(conversation_id)
+        call = lambda cid, key: {"id": key, "kind": "call", "to": "provider", "state": "committed", "call_status": "started",
+                                 "conversation_id": cid, "idempotency_key": key, "number": "+447000000001", "objective": "x"}
+        with tempfile.TemporaryDirectory() as tmp:
+            out = self.folder(tmp, [call("conv_bad", "a"), call("conv_ok", "b")])
+            result = calls.collect(out, lambda: Flaky())
+            self.assertEqual([c["conversation_id"] for c in result["collected"]], ["conv_ok"])
+            self.assertEqual(result["errors"][0]["conversation_id"], "conv_bad")
+            self.assertTrue((out / "c1" / "calls" / "conv_ok.json").is_file())
+
+    def test_rehearsal_calls_are_skipped_when_the_dialer_is_a_live_one(self):
+        dry = {"id": "x", "kind": "call", "to": "provider", "state": "committed", "call_status": "dry_run",
+               "conversation_id": "dryrun-abc", "idempotency_key": "k", "number": "+447000000001", "objective": "x"}
+        with tempfile.TemporaryDirectory() as tmp:
+            out = self.folder(tmp, [dry])
+            seen = []
+
+            class Spy(CountingDialer):
+                def fetch(self, conversation_id):
+                    seen.append(conversation_id)
+                    return super().fetch(conversation_id)
+            calls.collect(out, lambda: Spy(), skip_dry_run=True)
+            self.assertEqual(seen, [])
+            calls.collect(out, lambda: Spy())  # the default (a dry-run dialer) still collects them
+            self.assertEqual(seen, ["dryrun-abc"])
+
+
 class RunnerTests(unittest.TestCase):
     CALLS = "tests.call_backends:ProviderCallChat"
     NOW = "2026-01-09T12:00:00+00:00"

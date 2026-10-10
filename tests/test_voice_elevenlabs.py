@@ -75,7 +75,9 @@ class DialerTests(unittest.TestCase):
         self.assertEqual((body["agent_id"], body["agent_phone_number_id"], body["to_number"]), ("agent-1", "pn-1", "+447000000001"))
         self.assertTrue(body["call_recording_enabled"])
         dv = body["conversation_initiation_client_data"]["dynamic_variables"]
-        self.assertEqual((dv["party"], dv["objective"], dv["address"]), ("provider", "Ask for a visit date.", "Flat 1"))
+        self.assertEqual((dv["party"], dv["objective"]), ("provider", "Ask for a visit date."))
+        self.assertNotIn("address", dv)  # raw facts are not passed on under their own names
+        self.assertIn("address: Flat 1", dv["known_facts"])  # they reach the agent only cleaned, as known facts
 
     def test_same_key_never_dials_twice_even_from_a_new_instance(self):
         with mock.patch("urllib.request.urlopen", return_value=Resp(OK)) as uo:

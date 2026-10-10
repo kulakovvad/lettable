@@ -126,6 +126,7 @@ class ElevenLabsDialer:
                     "agent_phone_number_id": self._number,
                     "to_number": req.to_number,
                     "call_recording_enabled": True,
+                    "telephony_call_config": {"ringing_timeout_secs": self.cfg.call_ring_timeout_s},
                     "conversation_initiation_client_data": {"dynamic_variables": dynamic_variables(req)},
                 }, retry_5xx=False)
             except VoiceError as exc:

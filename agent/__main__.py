@@ -127,7 +127,7 @@ def main(argv=None) -> int:
             print("output directory not found: %s" % args.out_dir, file=sys.stderr)
             return 2
         ccfg = dataclasses.replace(Config(), call_backend=args.backend)
-        result = collect(Path(args.out_dir), lambda: make_dialer(args.backend, ccfg))
+        result = collect(Path(args.out_dir), lambda: make_dialer(args.backend, ccfg), skip_dry_run=args.backend != "dry_run")
         print(json.dumps(result, indent=2))
         return 1 if result["errors"] else 0
     if not Path(args.input_dir).is_dir():
