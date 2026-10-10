@@ -6,9 +6,10 @@ fetch() reads its transcript and extracted fields.
 Safety, all enforced here so no caller can skip it:
 - the same idempotency key never dials twice, even across processes (a file ledger under a lock);
 - only E.164 numbers, only inside cfg.call_hours (UK local time), at most cfg.max_calls_per_run per run;
-- a failed request is never recorded, so it can be tried again.
-Only transport problems on reads are retried. A POST is retried on 429 only: a 5xx or a timeout may
-mean the call was already placed, and dialling twice is worse than failing once.
+- a request the API clearly refused (4xx) is not recorded, so it can be tried again;
+- a request that may have gone through (timeout, dropped connection, 5xx) stays "pending" in the ledger
+  and is never retried automatically: a person checks ElevenLabs, then clears the entry.
+Only reads are retried on transport problems. A POST is retried on 429 only: dialling twice is worse than failing once.
 """
 
 from __future__ import annotations
@@ -36,7 +37,9 @@ E164 = re.compile(r"^\+\d{8,15}$")
 
 
 class VoiceError(RuntimeError):
-    pass
+    def __init__(self, message: str, ambiguous: bool = False) -> None:
+        super().__init__(message)
+        self.ambiguous = ambiguous  # the request may have been processed
 
 
 def request(method: str, path: str, api_key: str, cfg: Config, body: Optional[Dict[str, Any]] = None,
@@ -54,10 +57,10 @@ def request(method: str, path: str, api_key: str, cfg: Config, body: Optional[Di
             detail = exc.read().decode("utf-8", errors="replace")[:300]
             retryable = exc.code == 429 or (retry_5xx and exc.code >= 500)
             if not retryable or attempt >= cfg.max_retries:
-                raise VoiceError("HTTP %d from ElevenLabs: %s" % (exc.code, detail))
+                raise VoiceError("HTTP %d from ElevenLabs: %s" % (exc.code, detail), ambiguous=exc.code >= 500)
         except (urllib.error.URLError, socket.timeout, TimeoutError, ConnectionError) as exc:
             if not retry_5xx or attempt >= cfg.max_retries:
-                raise VoiceError("ElevenLabs unreachable: %s" % exc)
+                raise VoiceError("ElevenLabs unreachable: %s" % exc, ambiguous=True)
         time.sleep(min(2 ** attempt, 8))
         attempt += 1
 
@@ -68,7 +71,7 @@ def _uk_now() -> datetime:
 
         return datetime.now(ZoneInfo("Europe/London"))
     except Exception:  # no tz database on this machine: fall back to UTC
-        return datetime.utcnow()
+        return datetime.now()
 
 
 class ElevenLabsDialer:
@@ -79,7 +82,7 @@ class ElevenLabsDialer:
             raise RuntimeError("missing environment variable(s): %s" % ", ".join(missing))
         self.cfg, self._clock = cfg, clock
         self._key, self._agent, self._number = env["ELEVENLABS_API_KEY"], env["ELEVENLABS_AGENT_ID"], env["ELEVENLABS_PHONE_NUMBER_ID"]
-        self._ledger = Path(env.get("LETTABLE_CALL_LEDGER", ".cache/calls.json"))
+        self._ledger = Path(env.get("LETTABLE_CALL_LEDGER") or Path.home() / ".cache" / "lettable" / "calls.json")
         # The cap counts calls under one run id. The runner should set LETTABLE_RUN_ID per run; without it every
         # call in the ledger shares one id, so the cap becomes lifetime-of-ledger, which fails safe.
         self._run = env.get("LETTABLE_RUN_ID", "")
@@ -103,8 +106,11 @@ class ElevenLabsDialer:
     def place(self, req: CallRequest) -> CallResult:
         with self._locked() as ledger:
             done = ledger.get(req.idempotency_key)
-            if done:
+            if done and done.get("conversation_id"):
                 return CallResult("started", done["conversation_id"], "already placed (idempotent)")
+            if done:
+                return CallResult("failed", None, "an earlier attempt may have placed this call; check the ElevenLabs "
+                                  "conversations, then remove the pending entry from %s" % self._ledger)
             if not E164.match(req.to_number or ""):
                 return CallResult("failed", None, "number is not E.164 (+ and 8 to 15 digits)")
             start, end = self.cfg.call_hours
@@ -112,6 +118,8 @@ class ElevenLabsDialer:
                 return CallResult("failed", None, "outside calling hours %02d:00-%02d:00 UK time" % (start, end))
             if sum(1 for v in ledger.values() if v.get("run") == self._run) >= self.cfg.max_calls_per_run:
                 return CallResult("failed", None, "call cap of %d per run reached" % self.cfg.max_calls_per_run)
+            ledger[req.idempotency_key] = {"status": "pending", "run": self._run, "at": self._clock().isoformat()}
+            atomic_write(self._ledger, json.dumps(ledger, indent=1) + "\n")  # on disk before the request, in case we die mid-call
             try:
                 data = request("POST", "/v1/convai/twilio/outbound-call", self._key, self.cfg, {
                     "agent_id": self._agent,
@@ -121,9 +129,13 @@ class ElevenLabsDialer:
                     "conversation_initiation_client_data": {"dynamic_variables": dynamic_variables(req)},
                 }, retry_5xx=False)
             except VoiceError as exc:
+                if exc.ambiguous:
+                    return CallResult("failed", None, "%s; the call may have been placed, so it will not be retried automatically" % exc)
+                del ledger[req.idempotency_key]
                 return CallResult("failed", None, str(exc))
             cid = data.get("conversation_id")
             if not data.get("success") or not cid:
+                del ledger[req.idempotency_key]
                 return CallResult("failed", None, "ElevenLabs did not start the call: %s" % str(data.get("message"))[:200])
             ledger[req.idempotency_key] = {"conversation_id": cid, "run": self._run, "at": self._clock().isoformat()}
             return CallResult("started", cid, "call placed")

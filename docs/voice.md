@@ -20,11 +20,15 @@ Both directions are off or harmless by default, because they cost money and can 
 The model can only **stage** a call (`place_call`). It never supplies a number: code takes it from the case. The call goes through the same gates as a message (chase timing, already replied, landlord approval before instructing a provider). After the final decision passes the gates, the runner places it, once, and the case does not wait for the call.
 
 Safety rules in code:
-- At most `max_calls_per_case` per case and `max_calls_per_run` per run.
-- Live calls only between `call_hours` (default 08:00 to 21:00 UK time); otherwise held for a person.
+- At most `max_calls_per_case` calls in a case's whole history (earlier calls are counted from their call records) and `max_calls_per_run` per run.
+- Live calls only between `call_hours` (default 08:00 to 21:00 UK time); otherwise the call is held and a person is told.
 - A hazard case is not phoned except to give the tenant safety advice; it escalates.
-- The same call (idempotency key) never dials twice, across runs and processes (`.cache/calls.json`).
-- A failed call never loses the decision: the action is marked `call_failed` and a person is told.
+- The number comes from the case, never from the model. Quoted lines, lines pointing to someone else ("ring our accounts desk") and premium-rate or non-geographic numbers are skipped.
+- The phone agent speaks for the agency named in the case, not for a name the model supplies.
+- One call per case, party, purpose and number in each round: rewording the objective does not dial again. The ledger (`~/.cache/lettable/calls.json`, or `LETTABLE_CALL_LEDGER`) stops the same call being dialled twice, across runs and processes.
+- If a request may have gone through (timeout, dropped connection, 5xx) the call stays `pending` in the ledger and is never retried automatically. A person checks ElevenLabs, then removes the entry. A clear refusal (4xx) is not recorded and can be retried.
+- A call that cannot be placed (failed or held) never loses the decision: the action is marked `call_failed` or `held_for_review` and a person is told through an escalation ticket.
+- Call records and transcripts are third-party speech: labelled untrusted, and amounts or numbers spoken in them do not count as facts of the case.
 - The phone agent has no authority: it cannot approve spend or promise prices, dates or compensation, and hands anything unusual to a colleague.
 
 Bring the result back, then re-run the case so the next decision sees what was said:
@@ -49,10 +53,12 @@ Needs an ElevenLabs plan that includes phone calls and a Twilio number. Never co
 
 ## Demo call
 
-Use a phone you control and say so to whoever answers. Put the number in `DEMO_CALL_NUMBER` (never in a committed file), build a case whose provider's phone number is that number, run with `--calls elevenlabs`, then `calls collect`. Synthetic case numbers (07700 900xxx) are unreachable test numbers.
+Use a phone you control and say so to whoever answers. Keep the number out of every committed file (`DEMO_CALL_NUMBER` in your own `.env` is a reminder, the code does not read it), build a case whose provider's phone number is that number, run with `--calls elevenlabs`, then `calls collect`. Synthetic case numbers (07700 900xxx) are unreachable test numbers.
 
 ## Not done
 
 - Inbound calls (a tenant phoning the agency) are not handled.
 - Text-to-speech replies and voicemail drops are not used.
 - The live path (real STT, real call) has only been tested against mocked HTTP.
+- Calling hours and the run cap are checked in the runner and again inside the dialer; dry runs skip the hours check, so they do not rehearse an out-of-hours hold.
+- `calls collect` rewrites `decision.json` without a lock, so run it when no `run` is writing the same output folder.

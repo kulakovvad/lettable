@@ -108,9 +108,30 @@ class DialerTests(unittest.TestCase):
         with mock.patch("urllib.request.urlopen", side_effect=http_error(503)) as uo:
             self.assertEqual(self.dialer().place(REQ).status, "failed")
         self.assertEqual(uo.call_count, 1)
+        again = CallRequest("c1", "provider", "+447000000001", "Ask for a visit date.", {}, "k-429")
         with mock.patch("urllib.request.urlopen", side_effect=[http_error(429), Resp(OK)]) as uo:
-            self.assertEqual(self.dialer().place(REQ).status, "started")
+            self.assertEqual(self.dialer().place(again).status, "started")
         self.assertEqual(uo.call_count, 2)
+
+    def test_a_request_that_may_have_dialled_is_never_retried_automatically(self):
+        for failure in (http_error(503), TimeoutError("timed out"), urllib.error.URLError("reset")):
+            with self.subTest(failure=repr(failure)):
+                req = CallRequest("c1", "provider", "+447000000001", "x", {}, "k-%r" % (failure,))
+                with mock.patch("urllib.request.urlopen", side_effect=failure):
+                    first = self.dialer().place(req)
+                self.assertEqual(first.status, "failed")
+                self.assertIn("may have been placed", first.detail)
+                with mock.patch("urllib.request.urlopen") as uo:  # even from a new process: no second POST
+                    second = self.dialer().place(req)
+                self.assertEqual((second.status, uo.call_count), ("failed", 0))
+                self.assertIn("check the ElevenLabs", second.detail)
+
+    def test_a_clear_refusal_is_not_recorded_so_it_can_be_tried_again(self):
+        with mock.patch("urllib.request.urlopen", side_effect=http_error(400)):
+            self.assertEqual(self.dialer().place(REQ).status, "failed")
+        with mock.patch("urllib.request.urlopen", return_value=Resp(OK)) as uo:
+            self.assertEqual(self.dialer().place(REQ).status, "started")
+        self.assertEqual(uo.call_count, 1)
 
     def test_fetch_maps_the_conversation(self):
         body = {"status": "done",

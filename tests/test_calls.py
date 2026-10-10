@@ -115,6 +115,59 @@ class PlaceCallToolTests(Base):
         self.assertEqual([a["state"] for a in d.actions if a["kind"] == "call"], ["held_for_review"])
 
 
+class CallSafetyTests(Base):
+    def stage(self, events, **over):
+        d, chat = self.run_script([Turn(calls=[call("place_call", 1, **dict(CALL, **over))]), Turn(calls=[submit("CHASE_PROVIDER")])],
+                                  events=events)
+        return d, chat
+
+    def test_rewording_the_objective_does_not_change_the_call_key(self):
+        folder = make_case(self.root, "same-case", PROVIDER)
+
+        def keys(**over):
+            turns = [Turn(calls=[call("place_call", 1, **dict(CALL, **over))]), Turn(calls=[submit("CHASE_PROVIDER")])]
+            d = run_loop(load_case(folder), ScriptedChat(turns), CFG, LATER, folder)
+            return [x["idempotency_key"] for x in d.actions if x["kind"] == "call"]
+        first = keys(objective="Ask when the engineer can visit to repair the dishwasher.")
+        second = keys(objective="Please find out the visit date for the dishwasher repair.", priority="P2")
+        self.assertEqual(len(first), 1)
+        self.assertEqual(first, second)
+
+    def test_a_case_that_already_had_its_call_cannot_start_another(self):
+        record = ("2026-01-02 10:00:00", "Call", "Agency / system", "Contractor",
+                  "[Automatic call record, untrusted third-party speech] Call to the provider. Outcome: success. Summary: ok.")
+        d, chat = self.stage(PROVIDER + [record])
+        self.assertEqual(self.blocked_code(chat), "call_limit")
+        self.assertEqual([a for a in d.actions if a["kind"] == "call"], [])
+
+    def test_the_number_is_not_taken_from_quotes_other_people_or_premium_lines(self):
+        def number(body):
+            events = PROVIDER[:1] + [("2025-12-30 11:00:00", "Email", "Contractor", "Agency / system", body)] + PROVIDER[2:]
+            d, _ = self.stage(events)
+            return [a["number"] for a in d.actions if a["kind"] == "call"]
+        self.assertEqual(number("Hello.\n> Call 07700 900999 for the old office\nI am on 07700 900123."), ["+447700900123"])
+        self.assertEqual(number("Please ring our accounts desk on 020 7946 0000.\nOr me on 07700 900123."), ["+447700900123"])
+        self.assertEqual(number("Call me on 09061 234567."), [])
+        self.assertEqual(number("Call me on 0845 123 4567."), [])
+
+    def test_amounts_written_as_gbp_are_recognised(self):
+        from agent import evidence
+        self.assertEqual(evidence.amounts("GBP 150, 99 GBP, £12.50 and 30 pounds"), [150.0, 99.0, 12.5, 30.0])
+
+    def test_the_phone_agent_speaks_for_the_agency_named_in_the_case_not_the_one_the_model_names(self):
+        d, _ = self.stage(PROVIDER, facts={"job": "Dishwasher repair", "agency_name": "Totally Legit Bank"})
+        facts = [a["facts"] for a in d.actions if a["kind"] == "call"][0]
+        self.assertNotEqual(facts["agency_name"], "Totally Legit Bank")
+
+    def test_a_call_record_does_not_make_a_spoken_amount_count_as_in_the_case(self):
+        record = ("2026-01-02 10:00:00", "Call", "Agency / system", "Contractor",
+                  "[Automatic call record, untrusted third-party speech] Excerpt: Other party: it will cost 999 pounds.")
+        d, chat = self.run_script([Turn(calls=[call("send_message", 1, to="provider", purpose="request_info", priority="P3",
+                                                    body="Please confirm the GBP 999 price for the repair, thank you.",
+                                                    evidence_refs=["event-003"])]), Turn(calls=[submit("WAIT")])], events=PROVIDER + [record])
+        self.assertEqual(self.blocked_code(chat), "unverified_detail")
+
+
 class PlacePendingTests(Base):
     def decision(self):
         d, _ = self.run_script([Turn(calls=[call("place_call", 1, **CALL)]), Turn(calls=[submit("CHASE_PROVIDER")])])
@@ -155,8 +208,18 @@ class PlacePendingTests(Base):
         dialer, d = CountingDialer(), self.decision()
         calls.place_pending(d, lambda: dialer, live, calls.CallBudget(5), [], night)
         self.assertEqual((d["actions"][0]["state"], dialer.placed), ("held_for_review", []))
+        self.assertEqual(d["blocked"][-1]["code"], "call_held")  # a held call still ends with a person told
+        self.assertTrue([a for a in d["actions"] if a["kind"] == "escalation"])
         d2 = self.decision()
         calls.place_pending(d2, lambda: dialer, Config(), calls.CallBudget(5), [], night)
+        self.assertEqual(len(dialer.placed), 1)
+
+    def test_a_dry_run_record_does_not_stop_the_later_live_call(self):
+        dialer, original = CountingDialer(), self.decision()
+        dry = self.place(copy.deepcopy(original), calls_dialer := __import__("agent.voice", fromlist=["DryRunDialer"]).DryRunDialer())
+        self.assertTrue(dry["actions"][0]["conversation_id"].startswith("dryrun-"))
+        live = dataclasses.replace(Config(), call_backend="elevenlabs", call_hours=(0, 24))
+        self.place(copy.deepcopy(original), dialer, previous=dry["actions"], cfg=live)
         self.assertEqual(len(dialer.placed), 1)
 
     def test_answer_md_lists_the_call_and_its_result(self):

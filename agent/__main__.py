@@ -103,6 +103,8 @@ def main(argv=None) -> int:
         cap = args.max_calls if args.max_calls is not None else (None if args.backend == "fake" else 30)
         print(json.dumps(replay(Path(args.input_dir), Path(args.out_dir), rcfg, args.backend, args.points, cap), indent=2))
         return 0
+    if args.stt:
+        os.environ["LETTABLE_STT"] = args.stt  # an explicit flag (even 'off') beats the environment
     cfg = Config.load(Path(args.config) if args.config else None)
     as_of = args.as_of or ("now" if args.now else None)
     overrides = {k: v for k, v in (("case_timeout_s", args.timeout), ("run_deadline_s", args.deadline),

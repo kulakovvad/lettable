@@ -20,7 +20,7 @@ from typing import Any, Callable, Dict, List, Optional
 from agent.config import Config
 from agent.report import atomic_write, write_case
 from agent.timeline import Case, Event
-from agent.voice import CallRequest, CallResult, Dialer
+from agent.voice import CALL_RECORD_TAG, CallRequest, CallResult, Dialer
 
 _NAMES = {"provider": "Contractor", "landlord": "Landlord", "tenant": "Tenant"}
 _UNSAFE = re.compile(r"[^A-Za-z0-9_.-]")
@@ -46,15 +46,9 @@ def _in_hours(cfg: Config, now: datetime) -> bool:
     return cfg.call_hours[0] <= now.astimezone(ZoneInfo("Europe/London")).hour < cfg.call_hours[1]
 
 
-def _hold(action: Dict[str, Any], why: str) -> None:
-    action["state"], action["call_status"], action["note"] = "held_for_review", "not_placed", "Held: " + why
-
-
-def _record_failure(decision: Dict[str, Any], action: Dict[str, Any]) -> None:
-    """The decision stays valid; a person is told the call did not happen."""
-    action["state"] = "call_failed"
-    why = "The phone call to the %s could not be placed (%s)." % (action.get("to"), action.get("call_detail"))
-    decision.setdefault("blocked", []).append({"tool": "place_call", "status": "blocked", "code": "call_failed", "why": why,
+def _tell_a_person(decision: Dict[str, Any], action: Dict[str, Any], code: str, why: str) -> None:
+    """The decision stays valid, but a person is told the call did not happen (a case always ends with an output)."""
+    decision.setdefault("blocked", []).append({"tool": "place_call", "status": "blocked", "code": code, "why": why,
                                                "hint": "A person should make the call or send a message."})
     tickets = [a for a in decision.get("actions", []) if a.get("kind") == "escalation"]
     if tickets:
@@ -70,22 +64,34 @@ def _record_failure(decision: Dict[str, Any], action: Dict[str, Any]) -> None:
     })
 
 
+def _hold(decision: Dict[str, Any], action: Dict[str, Any], why: str) -> None:
+    action["state"], action["call_status"], action["note"] = "held_for_review", "not_placed", "Held: " + why
+    _tell_a_person(decision, action, "call_held", "The phone call to the %s was not placed: %s" % (action.get("to"), why))
+
+
+def _record_failure(decision: Dict[str, Any], action: Dict[str, Any]) -> None:
+    action["state"] = "call_failed"
+    _tell_a_person(decision, action, "call_failed", "The phone call to the %s could not be placed (%s)." % (
+        action.get("to"), action.get("call_detail")))
+
+
 def place_pending(decision: Dict[str, Any], get_dialer: Callable[[], Dialer], cfg: Config, budget: CallBudget,
                   previous: List[Dict[str, Any]], now: datetime) -> None:
     """Place each committed call that is still pending. Mutates the decision; never raises."""
     for a in decision.get("actions", []):
         if a.get("kind") != "call" or a.get("state") != "committed" or a.get("call_status") != "pending":
             continue
-        earlier = next((p for p in previous if p.get("idempotency_key") == a["idempotency_key"] and p.get("conversation_id")), None)
+        earlier = next((p for p in previous if p.get("idempotency_key") == a["idempotency_key"] and p.get("conversation_id")
+                        and (cfg.call_backend == "dry_run" or not str(p["conversation_id"]).startswith("dryrun-"))), None)
         if earlier:  # the same call was already placed by an earlier run: never dial twice
             for k in ("call_status", "conversation_id", "call_detail", "call_result"):
                 if k in earlier:
                     a[k] = earlier[k]
             a["note"] = "Already placed by an earlier run."
         elif cfg.call_backend != "dry_run" and not _in_hours(cfg, now):
-            _hold(a, "outside UK calling hours (%02d:00 to %02d:00)." % cfg.call_hours)
+            _hold(decision, a, "outside UK calling hours (%02d:00 to %02d:00)." % cfg.call_hours)
         elif not budget.take():
-            _hold(a, "the run's call limit (%d) is reached." % cfg.max_calls_per_run)
+            _hold(decision, a, "the run's call limit (%d) is reached." % cfg.max_calls_per_run)
         else:
             try:
                 result = get_dialer().place(CallRequest(decision["case_id"], a["to"], a["number"], a["objective"],
@@ -160,12 +166,13 @@ def with_call_events(case: Case, case_out: Path) -> Case:
             r = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        if r.get("dry_run") or r.get("status") != "done":
+        if r.get("dry_run") or r.get("status") not in ("done", "failed"):
             continue
         excerpt = " / ".join("%s: %s" % ("Agency" if t["role"] == "agent" else "Other party", t["message"]) for t in r.get("transcript", [])[:8])
         data = "; ".join("%s=%s" % kv for kv in (r.get("data") or {}).items())
-        body = "[Automatic call record] Call to the %s. Outcome: %s. Summary: %s%s Excerpt: %s" % (
-            r.get("party"), r.get("success") or "unknown", r.get("summary") or "(none)", " Extracted: %s." % data if data else "", excerpt)
+        body = CALL_RECORD_TAG + ", untrusted third-party speech] Call to the %s%s. Outcome: %s. Summary: %s%s Excerpt: %s" % (
+            r.get("party"), " (did not connect)" if r.get("status") == "failed" else "", r.get("success") or "unknown",
+            r.get("summary") or "(none)", " Extracted: %s." % data if data else "", excerpt)
         index += 1
         try:  # the call happened when it was placed, not when the case last changed
             ts = datetime.fromisoformat(r["placed_at"])

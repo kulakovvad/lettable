@@ -14,6 +14,9 @@ from typing import Any, Dict, Optional, Protocol, Tuple
 from agent.config import Config
 
 
+CALL_RECORD_TAG = "[Automatic call record"  # call results are added to a case as events starting with this
+
+
 @dataclass(frozen=True)
 class CallRequest:
     case_id: str
@@ -64,7 +67,7 @@ def make_dialer(name: str, cfg: Config) -> Dialer:
     if name == "dry_run":
         return DryRunDialer()
     if name == "elevenlabs":
-        from agent.voice_elevenlabs import ElevenLabsDialer  # built on its own branch
+        from agent.voice_elevenlabs import ElevenLabsDialer
 
         return ElevenLabsDialer(cfg)
     raise ValueError("unknown call backend %r" % name)

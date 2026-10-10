@@ -43,7 +43,7 @@ def _child(conn, path: str, cfg: Dict[str, Any], backend: str, now_iso: str, cut
            case_out: Optional[str] = None) -> None:
     try:
         config = Config.from_dict(cfg)
-        case = load_case(Path(path), config, make_transcriber(config))  # audio is transcribed here, inside the time limit
+        case = load_case(Path(path), config, None if cut is not None else make_transcriber(config))  # audio is transcribed here, inside the time limit; a replay cut discards it anyway
         if case_out:
             case = calls.with_call_events(case, Path(case_out))  # finished phone calls from an earlier run
         folder: Optional[Path] = Path(path)
