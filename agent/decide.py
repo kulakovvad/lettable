@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Union
 
-from agent import gates
+from agent import details, gates
 from agent.chat import ChatBackend
 from agent.config import Config
 from agent.llm import Backend
@@ -23,4 +23,6 @@ def decide(case: Case, backend: Union[Backend, ChatBackend], cfg: Config, now: d
         return run_loop(case, backend, cfg, now, folder)
     raw = backend.propose(case, now, cfg)
     proposal = Proposal.from_dict(raw)
-    return gates.apply(case, proposal, cfg, now)
+    decision = gates.apply(case, proposal, cfg, now)
+    details.attach(case, decision)  # the tool loop and the fallback do this themselves
+    return decision

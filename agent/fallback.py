@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from agent import details, handover, mismatches, redflags
+from agent import details, handover, redflags
 from agent.config import Config
 from agent.gates import find_hazard, wait_days
 from agent.schema import Decision, idempotency_key
@@ -89,9 +89,5 @@ def fallback_decision(
         red_flags=flags,
     )
     if case is not None:  # best effort: the escalation must be written even if this fails
-        try:
-            decision.details = details.build(case, decision)
-            decision.mismatches = mismatches.find(case, None)
-        except Exception:
-            pass
+        details.attach(case, decision)
     return decision

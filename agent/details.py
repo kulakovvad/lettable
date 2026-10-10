@@ -324,3 +324,18 @@ def build(case: Case, decision: Any) -> Dict[str, Any]:
         "warnings": [str(w) for w in (_get(decision, "warnings") or case.warnings or [])],
     }
     return card
+
+
+def attach(case: Any, decision: Any, consistency_report: Optional[Dict[str, Any]] = None) -> None:
+    """Record the case card and the mismatches on a decision. Every path that produces a decision calls this (the
+    tool loop, the single-call backends and the fallback), so decision.json always has them. It never raises and never
+    changes the decision itself: on a failure both stay empty and a warning says so."""
+    from agent import mismatches
+
+    try:
+        report = consistency_report if consistency_report is not None else getattr(decision, "consistency", None)
+        decision.details = build(case, decision)
+        decision.mismatches = mismatches.find(case, report)
+    except Exception as exc:  # noqa: BLE001 - extras must never lose the decision
+        decision.details, decision.mismatches = {}, []
+        decision.warnings = tuple(decision.warnings) + ("details and mismatches not recorded: %s" % type(exc).__name__,)

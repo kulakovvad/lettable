@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from agent import details, mismatches
+from agent.config import Config
 from agent.fallback import fallback_decision
 from agent.report import answer_md, write_case
 from agent.timeline import load_case
@@ -148,6 +149,56 @@ class FailureTests(unittest.TestCase):
         self.assertEqual((d["action"], d["details"], d["mismatches"]), ("ESCALATE", {}, []))
         self.assertIn("## Decision", answer_md(d))
         self.assertNotIn("## Details", answer_md(d))
+
+
+class EveryBackendRecordsTheCard(unittest.TestCase):
+    """The card and the mismatches must be in decision.json whichever backend produced the decision."""
+
+    def run_case(self, backend, events=None):
+        import json
+        import tempfile
+        from agent.runner import run_all
+        from tests.helpers import make_case
+        with tempfile.TemporaryDirectory() as tmp:
+            inp, out = Path(tmp) / "in", Path(tmp) / "out"
+            inp.mkdir()
+            make_case(inp, "c1", events or EVENTS)
+            run_all(inp, out, Config(case_timeout_s=30, as_of="now"), backend, NOW.isoformat())
+            return (json.loads((out / "c1" / "decision.json").read_text()), (out / "c1" / "ANSWER.md").read_text())
+
+    def check(self, decision, answer):
+        card = decision["details"]
+        self.assertEqual(card["schema"], "case-card/1")
+        for group in ("case", "property", "tenant", "landlord", "agency", "provider", "money", "appointments", "timeline",
+                      "attachments", "decision", "calls", "warnings"):
+            self.assertIn(group, card)
+        self.assertIsInstance(decision["mismatches"], list)
+        self.assertIn("## Details", answer)
+        self.assertIn("## Inconsistencies and mismatches", answer)
+        block = answer.split("```json")[-1].split("```")[0]
+        import json
+        self.assertEqual(json.loads(block), card)  # the machine-readable block is exactly decision.details
+
+    def test_single_call_backend_the_fake_one_used_offline(self):
+        self.check(*self.run_case("fake"))
+
+    def test_a_crash_ends_in_the_fallback_which_also_has_the_card(self):
+        d, a = self.run_case("tests.chaos_backend:ChaosBackend", EVENTS)  # not a crash case id: normal path
+        self.check(d, a)
+
+    def test_a_real_fallback_decision_has_the_card(self):
+        import json
+        import tempfile
+        from agent.runner import run_all
+        from tests.helpers import make_case
+        with tempfile.TemporaryDirectory() as tmp:
+            inp, out = Path(tmp) / "in", Path(tmp) / "out"
+            inp.mkdir()
+            make_case(inp, "raise1", EVENTS)  # ChaosBackend raises for ids starting with 'raise'
+            run_all(inp, out, Config(case_timeout_s=30, as_of="now"), "tests.chaos_backend:ChaosBackend", NOW.isoformat())
+            d = json.loads((out / "raise1" / "decision.json").read_text())
+            self.assertEqual(d["source"], "fallback")
+            self.check(d, (out / "raise1" / "ANSWER.md").read_text())
 
 
 if __name__ == "__main__":
