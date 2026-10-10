@@ -60,9 +60,17 @@ flowchart LR
 
 ## 4. How to run it
 
-**Prerequisites.** Python 3.9 or newer. The default setup has no dependencies and needs no keys (the `fake` backend is free and offline).
+**Prerequisites.** Python 3.9 or newer. The `fake` backend is free and offline and needs no API key. PDF attachments need `pypdf`.
 
-**Install.** `git clone https://github.com/kulakovvad/lettable && cd lettable`. Optional: `pip install pypdf` to read PDF attachments. The model clients use the standard library, so no SDK is needed.
+**Install.** Clone the repo, then install the pinned dependency with [uv](https://docs.astral.sh/uv/):
+
+```sh
+git clone https://github.com/kulakovvad/lettable && cd lettable
+uv venv .venv
+uv pip install --python .venv/bin/python -e '.[dev]'
+```
+
+That installs `pypdf` (PDF text for the code gates and the text preview) and, with the `dev` extra, `pytest`. The Claude and OpenAI clients use the Python standard library, so the `anthropic` extra is not required for `--backend claude`. With that backend, each PDF is also attached to the first message for Claude to read. A text preview can miss layout, stamps and scanned pages.
 
 **Configure.** `cp .env.example .env`, fill in what you need, and export it (`set -a; . ./.env; set +a`). `.env` is gitignored; never commit keys. Paid features are off unless asked for by name.
 
@@ -142,9 +150,9 @@ Files are copied byte for byte and never edited. Case folders named with digits 
 | Twilio | the telephone line the calls go through | off |
 | Jev, `api.typesafe.ai` (`jev-1.13.0`) | scoring whether names or addresses refer to the same entity | off (`consistency_check`) |
 
-Everything else is the Python standard library. Optional: `pypdf` for PDF text. The case text is sent to the services you switch on; the public cases are synthetic. Third-party services remain subject to their own terms.
+Everything else is the Python standard library, plus `pypdf` for PDF text. The case text, and with `--backend claude` the PDF files themselves, are sent to the services you switch on; the public cases are synthetic. Third-party services remain subject to their own terms.
 
-Case images are sent to Claude with the first message when `--backend claude` is on.
+Case images and PDF files are sent to Claude with the first message when `--backend claude` is on.
 
 ## 6. Important assumptions
 

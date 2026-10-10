@@ -446,3 +446,23 @@ def case_images(folder: Path, max_bytes: int = IMAGE_MAX_BYTES, limit: int = MAX
         if len(found) >= limit:
             break
     return found
+
+
+def case_pdfs(folder: Path, max_bytes: int = 2_000_000, limit: int = 8) -> List[Dict[str, str]]:
+    """PDF files as size-capped base64 blocks for Claude. Never raises."""
+    found: List[Dict[str, str]] = []
+    try:
+        paths = sorted(p for p in Path(folder).rglob("*") if p.is_file() and not p.is_symlink() and p.suffix.lower() == ".pdf")
+    except OSError:
+        return found
+    for path in paths:
+        try:
+            if path.stat().st_size <= 0 or path.stat().st_size > max_bytes:
+                continue
+            data = base64.standard_b64encode(path.read_bytes()).decode("ascii")
+        except OSError:
+            continue
+        found.append({"name": path.name, "media_type": "application/pdf", "data": data})
+        if len(found) >= limit:
+            break
+    return found
