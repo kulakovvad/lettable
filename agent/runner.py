@@ -131,7 +131,6 @@ def run_all(
     trace_path = out_dir / "trace.jsonl"
     out_dir.mkdir(parents=True, exist_ok=True)
     results: List[Dict[str, Any]] = []
-    spent = [0]  # model tokens used by finished cases, for the run-wide cap
     budget = calls.CallBudget(cfg.max_calls_per_run)
     dialer: List[Any] = []
 
@@ -164,12 +163,8 @@ def run_all(
         remaining = None
         if cfg.run_deadline_s is not None:
             remaining = cfg.run_deadline_s - (t0 - started)
-        with lock:
-            over_budget = cfg.run_token_budget is not None and spent[0] >= cfg.run_token_budget
         if remaining is not None and remaining <= 0:
             kind, payload = "deadline", "run deadline reached before this case started"
-        elif over_budget:
-            kind, payload = "spend_cap", "run token budget of %d reached before this case started" % cfg.run_token_budget
         else:
             limit = cfg.case_timeout_s if remaining is None else min(cfg.case_timeout_s, remaining)
             try:
@@ -179,8 +174,6 @@ def run_all(
         before = _previous_actions(out_dir, case_id)  # read before write_case overwrites it
         if kind == "ok":
             decision = payload
-            with lock:
-                spent[0] += int(decision.get("tokens") or 0)
             calls.place_pending(decision, get_dialer, cfg, budget, before, datetime.now(timezone.utc))
         else:
             try:

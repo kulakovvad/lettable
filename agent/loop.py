@@ -4,7 +4,7 @@
       -> agent.gates.apply (may only make it stricter)
       -> commit staged actions, or hold them for a person if the gates changed the decision
 
-The loop is bounded by model turns, a token budget and repeated-call detection.
+The loop is bounded by model turns and repeated-call detection. Token use is recorded and does not stop the case.
 If the model never submits, the case ends as an escalation that keeps the full
 investigation trace, so a person can pick it up without redoing the work.
 """
@@ -298,9 +298,6 @@ def run_loop(case: Case, chat: ChatBackend, cfg: Config, now: datetime, folder: 
             trace.append({"step": step, "tool": call.name, "args": call.arguments, "result": _brief(result)})
         transcript.append({"role": "tool", "results": results})
         if box.decision is not None:
-            break
-        if tokens > cfg.loop_token_budget:
-            stop_reason = "token budget of %d exceeded" % cfg.loop_token_budget
             break
     else:
         stop_reason = "no decision within %d turns" % cfg.loop_max_steps

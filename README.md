@@ -6,7 +6,7 @@ Licence: Apache 2.0 ([LICENSE](LICENSE)). Submission details: [SUBMISSION.md](SU
 
 ## 1. What we built
 
-A command-line agent, `python3 -m agent`, that reads a folder of cases (`index.md`, `history.md`, optional `attachments/` and audio) and writes, for every case, a decision with its reasoning:
+A command-line agent, `uv run python -m agent`, that reads a folder of cases (`index.md`, `history.md`, optional `attachments/` and audio) and writes, for every case, a decision with its reasoning:
 
 - the **next action**: wait, chase the landlord or provider, ask the tenant or provider, route a quote for approval, instruct the provider, send a reminder, close, or escalate to a person;
 - the **messages and phone calls** that action needs (staged and gated, see below);
@@ -35,7 +35,7 @@ flowchart LR
     D -->|"passes: commit matching actions"| E["Outbox + phone calls<br/>messages recorded, calls placed once"]
   end
   E --> F["decision.json, ANSWER.md, REASONING.md"]
-  W -. "crash, timeout, model failure, spend cap" .-> G["Fallback escalation (no model call)"]
+  W -. "crash, timeout, or model failure" .-> G["Fallback escalation (no model call)"]
   G --> F
   F -->|"calls collect"| H["Call result back into the case"]
   F -->|"export"| I["ANSWERS/n/"]
@@ -60,19 +60,36 @@ flowchart LR
 
 ## 4. How to run it
 
-**Prerequisites.** Python 3.9 or newer. The `fake` backend is free and offline and needs no API key. PDF attachments need `pypdf`.
+**Prerequisites.** Python 3.9 or newer, and [uv](https://docs.astral.sh/uv/). The `fake` backend is free and offline and needs no API key.
 
-**Install.** Clone the repo, then install the pinned dependency with [uv](https://docs.astral.sh/uv/):
+**Install.** Clone the repo and sync the lockfile. The same two commands work on macOS, Linux and Windows:
 
 ```sh
 git clone https://github.com/kulakovvad/lettable && cd lettable
-uv venv .venv
-uv pip install --python .venv/bin/python -e '.[dev]'
+uv sync
 ```
 
-That installs `pypdf` (PDF text for the code gates and the text preview) and, with the `dev` extra, `pytest`. The Claude and OpenAI clients use the Python standard library, so the `anthropic` extra is not required for `--backend claude`. With that backend, each PDF is also attached to the first message for Claude to read. A text preview can miss layout, stamps and scanned pages.
+`uv sync` creates `.venv`, installs this project, and installs the versions recorded in `uv.lock`. Run the agent with `uv run` so the per-case worker uses that same environment.
 
-**Configure.** `cp .env.example .env`, fill in what you need, and export it (`set -a; . ./.env; set +a`). `.env` is gitignored; never commit keys. Paid features are off unless asked for by name.
+| Package | Required | Used for |
+|---|---|---|
+| `pypdf` | yes, `>=5` | PDF text for the code gates and the text preview. The exact version uv installs is in `uv.lock` |
+| `tzdata` | yes | UK local time for live-call hours. Windows has no system timezone database; macOS and Linux use this copy if theirs is missing |
+| `anthropic` | no | only `--backend anthropic-single`, the older one-call path. Install with `uv sync --extra anthropic` |
+
+The Claude and OpenAI tool loops (`--backend claude`, `openai`, `auto`) use the Python standard library, so they do not need the `anthropic` extra. Tests use `unittest` from the standard library. With `--backend claude`, each PDF is also attached to the first message for Claude to read. A text preview can miss layout, stamps and scanned pages.
+
+**Configure.** Copy `.env.example` to `.env` and fill in what you need. `.env` is gitignored; never commit keys. Paid features are off unless asked for by name. Export the file before `uv run`.
+
+```sh
+set -a; . ./.env; set +a
+```
+
+```powershell
+Get-Content .env | ForEach-Object {
+  if ($_ -match '^\s*([A-Za-z_][A-Za-z0-9_]*)=(.*)$') { Set-Item -Path "env:$($Matches[1])" -Value $Matches[2] }
+}
+```
 
 | Variable | Needed for | What it does |
 |---|---|---|
@@ -95,19 +112,19 @@ That installs `pypdf` (PDF text for the code gates and the text preview) and, wi
 **Run.**
 
 ```
-python3 -m agent run "<cases folder>" out/                      # fake backend: free, offline
-python3 -m agent run "<cases folder>" out/ --backend claude     # the tool loop with Claude
+uv run python -m agent run "<cases folder>" out/                      # fake backend: free, offline
+uv run python -m agent run "<cases folder>" out/ --backend claude     # the tool loop with Claude
 ```
 
 Each case folder holds `index.md`, `history.md` and optional `attachments/`. Useful options: `--timeout` (seconds per case), `--deadline` (whole run), `--concurrency`, `--resume`, `--now <ISO time>` (judge waits as of that time), `--config file.json` (override any value in `agent/config.py`). Output format: [docs/output-format.md](docs/output-format.md).
 
-**Tests.** `python3 -m unittest discover -s tests -t .` (offline; failure injection for crashes, hangs and bad input included).
+**Tests.** `uv run python -m unittest discover -s tests -t .` (offline; failure injection for crashes, hangs and bad input included). GitHub Actions runs that on Ubuntu and Windows, on Python 3.9 and 3.12, after `uv sync --frozen`.
 
 **Replay (testing without an answer key).**
 
 ```
-python3 -m agent replay "<cases folder>" out-replay/ --points 4
-python3 -m agent replay "<cases folder>" out-replay/ --points 2 --backend claude   # paid, capped at 30 points
+uv run python -m agent replay "<cases folder>" out-replay/ --points 4
+uv run python -m agent replay "<cases folder>" out-replay/ --points 2 --backend claude   # paid, capped at 30 points
 ```
 
 Cuts each finished case at a few points, shows the agent only the events up to that point and compares its proposed action with what the agency actually did next. The "what happened next" label is a rough rule, so read the numbers as agreement, not accuracy.
@@ -115,11 +132,11 @@ Cuts each finished case at a few points, shows the agent only the events up to t
 **Voice.** Details and safety rules: [docs/voice.md](docs/voice.md). The model asks for a call, but code decides whether the phone is the right channel (two unanswered messages, a bounce, or an urgent hazard).
 
 ```
-python3 -m agent run cases/ out/ --stt elevenlabs --calls dry_run   # transcribe audio; record calls, dial nothing
-python3 -m agent voice-setup --create-agent --yes                    # one-off: create the phone agent
-python3 -m agent voice-setup --import-number +1... --yes             # one-off: import a Twilio number
-python3 -m agent run cases/ out/ --backend claude --calls elevenlabs # places a real call when the agent decides to
-python3 -m agent calls collect out/ --backend elevenlabs             # bring finished calls back; re-run to use them
+uv run python -m agent run cases/ out/ --stt elevenlabs --calls dry_run   # transcribe audio; record calls, dial nothing
+uv run python -m agent voice-setup --create-agent --yes                    # one-off: create the phone agent
+uv run python -m agent voice-setup --import-number +1... --yes             # one-off: import a Twilio number
+uv run python -m agent run cases/ out/ --backend claude --calls elevenlabs # places a real call when the agent decides to
+uv run python -m agent calls collect out/ --backend elevenlabs             # bring finished calls back; re-run to use them
 ```
 
 **Document consistency check (opt-in).** `echo '{"consistency_check": true}' > jev.json` then add `--config jev.json` and set `TYPESAFE_API_KEY`. See [docs/design.md](docs/design.md#document-consistency-check-opt-in).
@@ -127,7 +144,7 @@ python3 -m agent calls collect out/ --backend elevenlabs             # bring fin
 **UI (case workspace).**
 
 ```
-python3 -m agent ui out/ --open      # http://127.0.0.1:8765/  (--port to change)
+uv run python -m agent ui out/ --open      # http://127.0.0.1:8765/  (--port to change)
 ```
 
 A local page over a finished run: the case list, the case info and what is not known, the decision with its reasoning and evidence refs, and the model's tool calls. It reads `decision.json`, `summary.json` and `trace.jsonl` and never changes them. "Go with option N", "Take over case" and "Open as new case" record a person's choice in `<case>/review.json` ([docs/output-format.md](docs/output-format.md#review)); nothing is sent anywhere. The server listens on 127.0.0.1 only, ignores symlinked case folders and needs no dependencies. A case whose `decision.json` cannot be read is listed as `UNREADABLE` rather than hidden.
@@ -135,7 +152,7 @@ A local page over a finished run: the case list, the case info and what is not k
 **Export the results for submission.**
 
 ```
-python3 -m agent export out/ --to ANSWERS    # ANSWERS/<n>/ANSWER.md, REASONING.md, decision.json, ANSWERS/index.json, ANSWERS/_run/
+uv run python -m agent export out/ --to ANSWERS    # ANSWERS/<n>/ANSWER.md, REASONING.md, decision.json, ANSWERS/index.json, ANSWERS/_run/
 #   --force: overwrite folders from another run   --skip-incomplete: export the rest if one case lacks a file
 ```
 
@@ -152,7 +169,7 @@ Files are copied byte for byte and never edited. Case folders named with digits 
 | Twilio | the telephone line the calls go through | off |
 | Jev, `api.typesafe.ai` (`jev-1.13.0`) | scoring whether names or addresses refer to the same entity | off (`consistency_check`) |
 
-Everything else is the Python standard library, plus `pypdf` for PDF text. The case text, and with `--backend claude` the PDF files themselves, are sent to the services you switch on; the public cases are synthetic. Third-party services remain subject to their own terms.
+Everything else is the Python standard library. `pypdf` reads PDF text and `tzdata` supplies UK local time where the operating system has no timezone database. The case text, and with `--backend claude` the PDF files themselves, are sent to the services you switch on; the public cases are synthetic. Third-party services remain subject to their own terms.
 
 Case images and PDF files are sent to Claude with the first message when `--backend claude` is on.
 

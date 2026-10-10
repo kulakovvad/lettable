@@ -14,7 +14,6 @@ Only reads are retried on transport problems. A POST is retried on 429 only: dia
 
 from __future__ import annotations
 
-import fcntl
 import json
 import os
 import re
@@ -34,6 +33,31 @@ from agent.voice_prompt import dynamic_variables
 
 API = "https://api.elevenlabs.io"
 E164 = re.compile(r"^\+\d{8,15}$")
+
+
+def _acquire_lock(lock) -> None:
+    """Exclusive lock. flock on macOS and Linux; a byte lock on Windows, which has no fcntl."""
+    if os.name == "nt":
+        import msvcrt
+        lock.seek(0, os.SEEK_END)
+        if lock.tell() == 0:
+            lock.write(b"\0")
+            lock.flush()
+        lock.seek(0)
+        msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)
+        return
+    import fcntl
+    fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+
+
+def _release_lock(lock) -> None:
+    if os.name == "nt":
+        import msvcrt
+        lock.seek(0)
+        msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
+        return
+    import fcntl
+    fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
 
 class VoiceError(RuntimeError):
@@ -92,14 +116,17 @@ class ElevenLabsDialer:
     @contextmanager
     def _locked(self) -> Iterator[Dict[str, Any]]:
         self._ledger.parent.mkdir(parents=True, exist_ok=True)
-        with open(str(self._ledger) + ".lock", "w") as lock:
-            fcntl.flock(lock, fcntl.LOCK_EX)
+        with open(str(self._ledger) + ".lock", "a+b") as lock:
+            _acquire_lock(lock)
             try:
-                ledger = json.loads(self._ledger.read_text(encoding="utf-8")) if self._ledger.exists() else {}
-            except ValueError:
-                ledger = {}
-            yield ledger
-            atomic_write(self._ledger, json.dumps(ledger, indent=1) + "\n")
+                try:
+                    ledger = json.loads(self._ledger.read_text(encoding="utf-8")) if self._ledger.exists() else {}
+                except ValueError:
+                    ledger = {}
+                yield ledger
+                atomic_write(self._ledger, json.dumps(ledger, indent=1) + "\n")
+            finally:
+                _release_lock(lock)
 
     # ---- Dialer ----
 

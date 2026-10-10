@@ -10,20 +10,21 @@ Every case is a timeline of emails, calls, texts and holds. The agent reads it u
 
 ```mermaid
 flowchart LR
-  subgraph W["Per-case wrapper: own timeout, own errors, nothing shared with other cases"]
-    A["Case folder<br/>index.md, history.md, PDFs"] -->|files| B["Timeline (code)<br/>ordered events, who we wait on"]
-    B -.->|"opt-in"| K["Consistency check<br/>extraction (model) + Jev scores"]
-    K -.->|"flags"| C
-    B -->|timeline| C["Propose (model, one call)<br/>next action, why, what is unknown"]
-    C -->|proposal| D["Gates (code)<br/>authority, spend, wait time, hazard"]
-    D -->|approved| E["Act (tools)<br/>send, chase, book, read state back"]
+  subgraph W["Per-case process: own timeout, own errors, nothing shared with other cases"]
+    A["Case folder<br/>index.md, history.md, PDFs, audio"] -->|"audio to text, opt-in"| B["Timeline (code)<br/>ordered events, who we wait on"]
+    B -.->|"opt-in"| K["Consistency check<br/>extraction + Jev"]
+    K -.->|flags| C
+    B --> C["Tool loop (model)<br/>read tools, stage actions, submit_decision"]
+    C --> D["Gates (code)<br/>authority, spend, wait time, hazard, completion"]
+    D -->|"passes: commit matching actions"| E["Local outbox<br/>calls placed only if switched on"]
   end
-  E -->|result| F["Record<br/>packet + trace, ANSWERS/n/"]
-  W -. "crash, timeout, model failure, or a gate says no" .-> G["Escalate to a person (no model call)<br/>summary, known, missing, tried, 2-3 options, trace id"]
-  G -->|same output shape| F
+  E --> F["decision.json, ANSWER.md, REASONING.md"]
+  W -. "crash, timeout, or model failure" .-> G["Fallback escalation (no model call)"]
+  G --> F
+  F -->|"export"| I["ANSWERS/n/"]
 ```
 
-The model only proposes. The gates and the wrapper are plain code, so a bad proposal, a hung call or a crash all end in the same place: an escalation packet a person can pick up without redoing the work.
+This is the loop in `agent/`. `--backend claude`, `openai` and `auto` run the tool loop. `--backend fake` is the offline rules backend. `--backend anthropic-single` is the older one-call path and needs the optional `anthropic` package. The model proposes; gates and the wrapper are plain code. A bad proposal, a hung call or a crash ends as a fallback escalation, so a person can pick the case up without redoing the work. Staged messages stay in the local outbox. A phone call is the only action that can leave the machine, and only when calls are set to ElevenLabs.
 
 ## What the proposal can be
 
@@ -43,8 +44,8 @@ The public cases are mostly repairs that sit in waiting states: for the landlord
 
 - One case is one unit of work with a catch-all around it. No state is shared between cases.
 - Each case has its own time budget. When it runs out, or anything crashes, the fallback escalation packet is written.
-- Results are written atomically as each case finishes.
-- Retries only for timeouts, rate limits and 5xx errors. Actions use an idempotency key and read the state back before any retry.
+- Results are written atomically as each case finishes. `decision.json` is written last.
+- Model requests retry timeouts, HTTP 408, 429 and 5xx, up to `max_retries`. A live phone call is not retried after a timeout or 5xx: the call ledger keeps it pending so it is not dialled twice. Staged messages are local records, not deliveries.
 
 ## Testing without an answer key
 
@@ -57,7 +58,7 @@ Crash tests: inject a hang, a corrupt file and a model error into one case of te
 Keep:
 - The rule that the model proposes and code decides
 - Per-case isolation and the escalation fallback
-- Tracing, retries, spend caps, idempotent actions
+- Tracing, retries, idempotent actions
 - Escalation and spend-authority rules
 
 Rewrite or drop:
@@ -65,15 +66,15 @@ Rewrite or drop:
 - The one-shot nine-outcome packet and the grader upload
 - The fraud, identity and PII gates, which suit the old task more than routine repairs
 
-## Amendment (proposed): bounded tool loop instead of one call
+## Bounded tool loop
 
-Status: proposed in the `vikkash/agent-loop` PR, needs team agreement.
+Status: shipped in `agent/loop.py`. This is what `--backend claude`, `openai` and `auto` run.
 
-"Propose" becomes a bounded loop: the model may call read tools (events, search, attachments, case files, policy) and *stage* actions through gated tools before one `submit_decision`. The principle is unchanged: the model only proposes, code decides.
+The model may call read tools (events, search, attachments, case files, policy) and *stage* actions through gated tools before one `submit_decision`. The principle is unchanged: the model only proposes, code decides.
 
 - Nothing leaves the case during the loop. Action tools only stage; each is checked by code first and a refusal is returned to the model with a reason and a hint, so it can pick a different action.
 - After `submit_decision`, the existing `gates.apply` runs as before. If it changes the decision, every staged action except escalations and safety advice is held for a person instead of committed.
-- Bounded by turns (`loop_max_steps`), a token budget and repeated-call detection. If the model never submits, the case escalates with its trace; no extra model call.
+- Bounded by turns (`loop_max_steps`) and repeated-call detection. Token use is recorded on the decision and does not stop the case or skip later cases. If the model never submits, the case escalates with its trace; no extra model call.
 - Waits are judged as of the latest event (`as_of = last_event`), because synthetic case dates do not relate to the wall clock.
 - Adds one action, `INSTRUCT_PROVIDER` (landlord approved, provider not yet told to go ahead), gated on a landlord approval dated after the latest quote.
 - The Claude client uses `tool_choice: auto`. The configured model rejects forced tool use (`any`) with HTTP 400, which turned every case into a fallback escalation. A turn without a tool call gets a nudge from the loop instead.
@@ -87,7 +88,7 @@ The Reality Test promises conflicting information. The public cases already cont
 1. **Extract (model, one call).** The model reports every mention of the tenant and landlord names, phones and emails, the property address and reference numbers, verbatim, each with the `event-NNN`, `index` or attachment it came from. A name counts for a role only when the text makes the role explicit; agency staff and contractors are out of scope.
 2. **Verify (code).** A value that does not appear in the source it cites is dropped. Values equal after normalising (case, spacing, punctuation, `+44` phone prefix) pass without any call.
 3. **Score (Jev).** The fields that still differ go to Jev (`api.typesafe.ai`, model pinned to `jev-1.13.0`) in one request, one `score` question per field: "Do all `values` refer to the same ...?" on a four-level rubric. Jev returns a score on the 0 to 3 level scale; code divides it by 3.
-4. **Tier (code, `Config`).** At or above `jev_pass` (0.85): pass. Below `jev_escalate` (0.4) with confidence at least `jev_min_confidence` (0.6): escalate. Anything else: flag.
+4. **Tier (code, `Config`).** At or above `jev_pass` (0.85): pass. Below `jev_escalate` (0.4) with confidence at least `jev_min_confidence` (0.6): escalate. Anything else: flag. Names, phones, emails and reference numbers are capped at flag. Only a clearly different property address, or a payee or bank-details change, can escalate.
 
 Effects:
 
@@ -116,6 +117,6 @@ Open findings, not fixed here:
 - **First landlord approval cannot go out.** At the start of a repair the model drafts the request asking the landlord to approve sending a provider and submits `WAIT`. `route_for_approval` needs an amount already in the case, `chase` needs an earlier unanswered request, and under `WAIT` only the follow-up commits, so the request is held for review. This affected 6 of 30 points.
 - **Completed jobs escalate.** In 8 of 10 points where the agency closed next, the model escalated, mostly because the invoice position was unknown or completion was only in agency notes. Some are defensible; in 027 the `close_case` gate rejected the tenant's own "drain is now clear" three times.
 
-## Open questions
+## Still open
 
-The output format and any tools or CRM for the real challenge cases are not known yet. The packet and the "Act" step stay provisional until we see them.
+The output files are specified in [output-format.md](output-format.md). Messages, approval requests and closures are local records; no email, CRM or ticketing system is connected. The GBP 300 approval limit in `agent/config.py` is still a placeholder. Chase timing is a fixed 3 days, not the hold's own "(N days)".

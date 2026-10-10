@@ -8,14 +8,13 @@ version = "0.1.0"
 description = "Decide the next step on property-management cases: the model proposes, code decides."
 requires-python = ">=3.9"
 license = {text = "Apache-2.0"}
-dependencies = ["pypdf>=5.0"]
+dependencies = [
+    "pypdf>=5.0",
+    "tzdata>=2024.1", # Europe/London for call hours; Windows has no system timezone database
+]
 
 [project.optional-dependencies]
-anthropic = ["anthropic>=0.40"]
-dev = ["pytest>=8.0"]
+anthropic = ["anthropic>=0.40"] # only --backend anthropic-single; the tool loop uses the standard library
 
 [tool.setuptools]
 packages = ["agent"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]

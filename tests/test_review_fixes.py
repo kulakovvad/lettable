@@ -195,13 +195,14 @@ class ShouldFix(Base):
         self.assertTrue(facts["urgent_by_code"])
         self.assertEqual(facts["open_hazard_hits"][0]["match"], gates.find_hazard(load_case(make_case(self.root, "h", events)), Config()))
 
-    def test_run_wide_token_cap_stops_model_calls(self):
+    def test_token_use_does_not_skip_later_cases(self):
         with tempfile.TemporaryDirectory() as tmp:
             for cid in ("001", "002", "003"):
                 make_case(Path(tmp) / "in", cid, WAITING_LANDLORD)
-            cfg = Config(case_timeout_s=30, concurrency=1, run_token_budget=1)
+            cfg = Config(case_timeout_s=30, concurrency=1)
             summary = run_all(Path(tmp) / "in", Path(tmp) / "out", cfg, backend="tests.loop_backends:TokenWaitChat")
-            self.assertEqual(summary["fallbacks"], {"spend_cap": 2})
+            self.assertEqual(summary["fallbacks"], {})
+            self.assertEqual(summary["by_action"], {"WAIT": 3})
 
 
 if __name__ == "__main__":
