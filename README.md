@@ -10,7 +10,7 @@ A command-line agent, `python3 -m agent`, that reads a folder of cases (`index.m
 
 - the **next action**: wait, chase the landlord or provider, ask the tenant or provider, route a quote for approval, instruct the provider, send a reminder, close, or escalate to a person;
 - the **messages and phone calls** that action needs (staged and gated, see below);
-- a plain-language `ANSWER.md`, a `REASONING.md` with the checks applied, and a machine-readable `decision.json`.
+- a plain-language `ANSWER.md` (decision, a structured case card, and any inconsistencies found in the case), a `REASONING.md` with the checks applied, and a machine-readable `decision.json`.
 
 Around the core loop: a replay harness to test without an answer key, speech-to-text for audio files, phone calls through ElevenLabs and Twilio, an opt-in document consistency check, and an exporter that lays results out as `ANSWERS/<n>/`.
 

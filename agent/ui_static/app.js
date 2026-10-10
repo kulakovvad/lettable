@@ -181,6 +181,33 @@ function stagedLine(a) {
   return `${a.id} · ${what || a.kind} · ${words(a.state || "")}`;
 }
 
+function callBlock(c) {
+  const r = c.result, dec = (r && r.decisions) || {};
+  const status = c.dry_run ? "not dialled (dry run)" : words(c.call_status || c.state || "");
+  const facts = [
+    ["Outcome", r && r.outcome], ["Visit date", dec.confirmed_date], ["Exact date", dec.confirmed_date_iso],
+    ["Amount quoted", dec.quoted_amount_gbp == null ? null : `GBP ${Number(dec.quoted_amount_gbp).toFixed(2)}`],
+    ["Call back on", dec.callback_number], ["Duration", r && r.duration_s != null ? `${Math.round(r.duration_s)} s` : null],
+  ].filter(([, value]) => value);
+  const turns = (r && r.transcript) || [];
+  return h("div", { class: "call" },
+    h("div", { class: "row-between" },
+      h("p", { class: "kv-v" }, `Call to ${dash(c.party)} · ${words(c.purpose || "")}`),
+      h("span", { class: `call-badge${c.dry_run ? " call-dry" : ""}` }, status)),
+    c.objective && h("p", { class: "call-objective" }, c.objective),
+    r
+      ? [
+        facts.length > 0 && h("dl", { class: "facts call-facts" },
+          facts.map(([k, value]) => h("div", {}, h("dt", {}, k), h("dd", {}, String(value))))),
+        r.summary && h("p", { class: "call-summary" }, r.summary),
+        turns.length > 0 && h("div", { class: "transcript", tabindex: "0", role: "log", "aria-label": "Call transcript (automatic, untrusted)" },
+          turns.map((t) => h("p", { class: `turn turn-${t.role === "agent" ? "agent" : "other"}` },
+            h("span", { class: "who" }, t.role === "agent" ? "Agent" : "Other party"), t.message)),
+          r.truncated && h("p", { class: "muted small" }, `… ${r.transcript_turns - turns.length} more turns in ${dash(r.record)}`)),
+      ]
+      : h("p", { class: "none" }, c.dry_run ? "Nothing to collect: no call was made." : "Waiting for the call result."));
+}
+
 function renderDecision(v) {
   const d = v.decision, x = v.derived;
   const blocked = d.blocked || [];
@@ -227,6 +254,9 @@ function renderDecision(v) {
           h("p", { class: "kv-v" }, d.waiting_days == null ? "—" : `${Number(d.waiting_days).toFixed(1).replace(/\.0$/, "")} days`))),
       x.followup_missing && h("p", { class: "alert" },
         "Follow-up was not scheduled: schedule_followup was skipped after the decision was submitted.")),
+    (d.calls || []).length > 0 && h("div", { class: "section" },
+      h("h2", { class: "label" }, "Calls"),
+      d.calls.map((c) => callBlock(c))),
     h("div", { class: "action-block" },
       options.length
         ? [

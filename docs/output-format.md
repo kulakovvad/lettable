@@ -78,6 +78,54 @@ The reality `summary.json` records `total`, `written`, `missing` (numbers with n
 {"case_id": "003", "seconds": 0.47, "source": "model", "action": "WAIT", "cause": null, "gate_notes": [], "write_error": null}
 ```
 
+
+## Case card (`details`) and mismatches
+
+`decision.details` is everything the case tells us, as data. It is built by plain code (`agent/details.py`, no model call), versioned with `"schema": "case-card/1"`, and **every key is always present** (`null` or an empty list when unknown). Each extracted value carries `refs`: `event-NNN`, an attachment file name, or `index` (the case details), so a reader can check it. Names are never guessed: `name` is set only when the case names one person (or only shorter forms of one name); other cases list every spelling under `names` and leave `name` null. Lists keep at most 10 entries. `ANSWER.md` shows the same card as readable groups and ends the section with it as a JSON block (`### Case card (machine-readable)`), so a dashboard can parse either file.
+
+| Key | Content |
+|---|---|
+| `case` | `id`, `title`, `source_role`, `status` (always null for now), `request` (first 300 characters) |
+| `property` | `address` (from the case details), `address_variants` (`[{value, refs}]`, every distinct `Address:` line, including `index`), `references` (`[{kind, value, refs}]`, e.g. a Job Id) |
+| `tenant`, `landlord` | `name`, `names` (`[{value, refs}]`), `phones`, `emails` (`[{value, refs}]`, only from that party's own messages or an explicit label such as "tenant's number") |
+| `agency` | `name` (null when unknown), `phones`, `emails` (only "call us on ..." style lines), `staff` (people who signed the agency's messages) |
+| `provider` | `name`, `assigned_ref` (the "provider assigned" event), `phones`, `emails` |
+| `money` | `quotes` `[{amount_gbp, vat: incl\|excl\|unknown, from, ref}]`, `invoices` `[{amount_gbp, from, ref}]`, `approval` `{amount_gbp, ref, covers: visit\|amount\|unknown}`, `payments` `[{kind: payment\|direct_debit\|bank_details\|paid_directly\|no_charge, text, ref}]`, `deposit` `[{text, amount_gbp, ref}]` |
+| `appointments` | `[{when_text, ref}]`: sentences with an appointment word and a date or time |
+| `timeline` | `events`, `first`, `last` (ISO), `waiting_on` `{party, since, days}` or null, `channels` (count per channel) |
+| `attachments` | `[{name, available, kind: pdf\|image\|audio\|text\|other}]` |
+| `decision` | `action`, `priority`, `confidence`, `decided_by` (`model` or `fallback`), `cause`, `as_of`, `evidence_refs` |
+| `calls` | `[{party, status, conversation_id, result_summary}]` |
+| `warnings` | Input warnings (a missing `index.md`, an unreadable file, ...) |
+
+Example (shortened, from public case 044):
+
+```json
+{"schema": "case-card/1",
+ "case": {"id": "044", "title": "Window Handle Repair Request", "source_role": "Tenant", "status": null, "request": "..."},
+ "property": {"address": "Flat 21, 129 Juniper Mews, Northbridge, ZZ9 4ZZ", "address_variants": [{"value": "Flat 21, 129 Juniper Mews, Northbridge, ZZ9 4ZZ", "refs": ["index", "event-005"]}], "references": []},
+ "tenant": {"name": null, "names": [{"value": "Harriet", "refs": ["event-005"]}, {"value": "Nora Quinn", "refs": ["event-014"]}], "phones": [], "emails": []},
+ "landlord": {"name": null, "names": [], "phones": [], "emails": []},
+ "agency": {"name": "Northbridge Lettings", "phones": [], "emails": [], "staff": [{"value": "Grace", "refs": ["event-009"]}]},
+ "provider": {"name": "Cedar Homes", "assigned_ref": "event-014", "phones": [], "emails": []},
+ "money": {"quotes": [], "invoices": [], "approval": {"amount_gbp": null, "ref": "event-012", "covers": "visit"}, "payments": [], "deposit": []},
+ "appointments": [], "timeline": {"events": 27, "first": "2025-01-13T07:04:33+00:00", "last": "2025-02-14T09:39:55+00:00", "waiting_on": null, "channels": {"Email": 10, "Update": 10}},
+ "attachments": [], "decision": {"action": "WAIT", "priority": "P3", "confidence": 0.8, "decided_by": "model", "cause": null, "as_of": "2025-02-14T09:39:55+00:00", "evidence_refs": ["event-014"]},
+ "calls": [], "warnings": []}
+```
+
+### Mismatches (`mismatches`)
+
+Each item is `{kind, severity: flag|info, summary, refs}`, found by plain code (`agent/mismatches.py`) and listed in `ANSWER.md` under "Inconsistencies and mismatches", flags first, at most 20. The checks are deliberately conservative (a wrong item is worse than a missed one):
+
+- `address`: an `Address:` or `Property address:` line (in a message or an attachment) that clearly names another place than the case details; a longer or shorter form of the same address is fine.
+- `amount`: an invoice that matches no quote (VAT-aware), an invoice above what the landlord approved, or two different quotes (a note).
+- `completion`: someone reports the job done and the tenant later reports the fault again.
+- `contact`: one party gives two different phone numbers or emails (a note).
+- `document consistency`: the checks of the optional document consistency check (`consistency`) with tier `flag` or `escalate`.
+
+When nothing is found, `ANSWER.md` says "None found." and lists what was checked, including whether the document consistency check was on.
+
 ## Decision
 
 All keys are always present. Timestamps are ISO-8601 strings with an offset.
@@ -128,6 +176,8 @@ These are filled only by the `claude`, `anthropic`, `openai` and `auto` backends
 | `blocked` | object[] | Tool calls a code gate refused, with the reason given to the model |
 | `trace` | object[] | Every model note and tool call, in order |
 | `consistency` | object or null | Document consistency report (see below). Null unless `consistency_check` is on |
+| `details` | object | The case card, schema `case-card/1` (see the "Case card" section above). Every key is always present. Empty object only if building it failed (then `warnings` says so) |
+| `mismatches` | list | Things in the case that do not match each other (see "Mismatches" below). Empty list means none were found by the checks listed in `ANSWER.md` |
 
 ### Consistency report
 

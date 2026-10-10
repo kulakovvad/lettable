@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from agent import consistency, evidence, gates, handover, redflags
+from agent import consistency, details, evidence, gates, handover, redflags
 from agent.chat import ChatBackend
 from agent.config import Config
 from agent.schema import Decision, Proposal
@@ -374,6 +374,7 @@ def finalize(case: Case, box: Toolbox, cfg: Config, as_of: datetime, trace, step
     decision.trace = trace
     decision.consistency = consistency_report
     decision.answer = str(d.get("answer") or "")[:2000]
+    details.attach(case, decision, consistency_report)  # ANSWER.md extras: never allowed to change or lose the decision
     if stop_reason:
         decision.cause = "loop_" + stop_reason.split()[0]
     return decision

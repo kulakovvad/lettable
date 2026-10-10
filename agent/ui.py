@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import unquote, urlparse
 
+from agent import call_results
 from agent.files import atomic_write
 
 STATIC_DIR = Path(__file__).parent / "ui_static"
@@ -184,6 +185,42 @@ _LIST_FIELDS = ("unknowns", "options", "evidence_refs", "unrelated_issues", "gat
 _TEXT_FIELDS = ("reason", "title", "request", "message", "model", "as_of", "decided_at")
 
 
+_CALL_TEXT = ("id", "party", "purpose", "priority", "number", "state", "call_status", "conversation_id", "placed_at", "objective", "detail")
+
+
+def _scalar(value, limit: int = 500):
+    return value if value is None or isinstance(value, (int, float)) and not isinstance(value, bool) else str(value)[:limit]
+
+
+def _clean_call_result(r) -> Optional[dict]:
+    if not isinstance(r, dict):
+        return None
+    out = {"status": _scalar(r.get("status")), "success": _scalar(r.get("success")), "summary": _scalar(r.get("summary"), 1500),
+           "outcome": _scalar(r.get("outcome")), "decisions": call_results.decisions_from(r.get("decisions")),
+           "duration_s": r.get("duration_s") if isinstance(r.get("duration_s"), (int, float)) and not isinstance(r.get("duration_s"), bool) else None,
+           "record": _scalar(r.get("record"))}
+    out.update(call_results.transcript_from(r.get("transcript")))
+    return out
+
+
+def _clean_calls(dec: dict) -> list:
+    """decision["calls"] with every field forced to a known type (it is shown by the page), derived from the actions
+    when an older decision.json has none."""
+    raw = dec.get("calls")
+    entries = raw if isinstance(raw, list) and raw else call_results.call_entries(dec.get("actions"))
+    out = []
+    for e in entries:
+        if not isinstance(e, dict):
+            continue
+        clean = {k: _scalar(e.get(k)) for k in _CALL_TEXT}
+        clean["dry_run"] = bool(e.get("dry_run"))
+        clean["result"] = _clean_call_result(e.get("result"))
+        out.append(clean)
+        if len(out) == 10:
+            break
+    return out
+
+
 def _load_decision(d: Path) -> dict:
     """decision.json with list and text fields forced to the right type, so a hand-edited file cannot break the page."""
     dec = _read_json(d / "decision.json")
@@ -198,6 +235,7 @@ def _load_decision(d: Path) -> dict:
         dec[k] = [x for x in dec[k] if isinstance(x, dict)]
     for k in _TEXT_FIELDS:
         dec[k] = dec[k] if isinstance(dec.get(k), str) else ""
+    dec["calls"] = _clean_calls(dec)
     return dec
 
 
