@@ -1,7 +1,6 @@
 {
   "concurrency": 8,
   "case_timeout_s": 300,
-  "run_token_budget": 20000000,
   "max_retries": 4,
   "consistency_check": false,
   "reality_resume_passes": 1,

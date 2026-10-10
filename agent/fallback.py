@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from agent import handover, redflags
+from agent import details, handover, redflags
 from agent.config import Config
 from agent.gates import find_hazard, wait_days
 from agent.schema import Decision, idempotency_key
@@ -67,7 +67,7 @@ def fallback_decision(
     )
     ticket.update(id="escalation-1", kind="escalation", state="committed",
                   note="Created automatically because the run could not finish.")
-    return Decision(
+    decision = Decision(
         case_id=case_id,
         action="ESCALATE",
         reason=reason,
@@ -85,7 +85,9 @@ def fallback_decision(
         priority=priority,
         title=case.title if case is not None else "",
         request=case.request if case is not None else "",
-        property=case.property if case is not None else "",
         actions=[ticket],
         red_flags=flags,
     )
+    if case is not None:  # best effort: the escalation must be written even if this fails
+        details.attach(case, decision)
+    return decision

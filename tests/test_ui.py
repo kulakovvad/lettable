@@ -90,9 +90,10 @@ class AdapterTests(unittest.TestCase):
         self.assertTrue(x["red_flags"][0]["force"])
         self.assertEqual(view["decision"]["answer"], "Do not pay.")
 
-    def test_property_field_wins_over_ticket_line(self):
+    def test_case_card_address_wins_over_ticket_line(self):
         ticket = {"kind": "escalation", "known": ["Property: Old address (index)"]}
-        out = make_run(self.root, [decision("015", property="Flat 9, 3 New Street", actions=[ticket])])
+        details = {"property": {"address": "Flat 9, 3 New Street", "address_variants": [], "references": []}}
+        out = make_run(self.root, [decision("015", details=details, actions=[ticket])])
         self.assertEqual(case_view(out, "015")["derived"]["property"], "Flat 9, 3 New Street")
 
     def test_skipped_followup_is_flagged(self):
@@ -295,6 +296,78 @@ class ServerTests(unittest.TestCase):
 
     def test_foreign_host_is_refused(self):
         self.assertEqual(self.request("GET", "/api/run", headers={"Host": "evil.example"})[0], 403)
+
+
+class CallsPanelTests(unittest.TestCase):
+    """The page shows what a call said and what was agreed; the transcript is untrusted speech."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.addCleanup(self.tmp.cleanup)
+
+    def view(self, **over):
+        return case_view(make_run(self.root, [decision("015", **over)]), "015")["decision"]
+
+    def call(self, **over):
+        c = {"id": "call-1", "kind": "call", "to": "provider", "purpose": "chase", "state": "committed", "call_status": "started",
+             "conversation_id": "conv_1", "objective": "Ask for a date."}
+        c.update(over)
+        return c
+
+    def test_the_payload_has_the_calls_with_what_was_agreed(self):
+        result = {"status": "done", "summary": "They agreed.", "outcome": "confirmed", "duration_s": 24,
+                  "decisions": {"confirmed_date": "Friday", "confirmed_date_iso": "2026-10-17", "quoted_amount_gbp": 0},
+                  "transcript": [{"role": "agent", "message": "Hello"}, {"role": "other_party", "message": "Friday"}],
+                  "transcript_turns": 2, "truncated": False, "record": "calls/conv_1.json"}
+        calls = self.view(calls=[{"id": "call-1", "party": "provider", "purpose": "chase", "call_status": "started",
+                                  "conversation_id": "conv_1", "dry_run": False, "result": result}])["calls"]
+        self.assertEqual(calls[0]["result"]["decisions"]["confirmed_date_iso"], "2026-10-17")
+        self.assertEqual([t["role"] for t in calls[0]["result"]["transcript"]], ["agent", "other_party"])
+        self.assertEqual(calls[0]["result"]["duration_s"], 24)
+
+    def test_an_older_decision_without_calls_gets_them_from_its_actions(self):
+        action = self.call(call_result={"status": "done", "summary": "old style", "data": {"outcome": "declined"}})
+        calls = self.view(actions=[action])["calls"]
+        self.assertEqual((calls[0]["party"], calls[0]["conversation_id"]), ("provider", "conv_1"))
+        self.assertEqual(calls[0]["result"]["summary"], "old style")
+        empty = case_view(make_run(self.root, [decision("016", actions=[])]), "016")["decision"]["calls"]
+        self.assertEqual(empty, [])
+
+    def test_a_dry_run_call_has_no_result_and_a_started_one_without_a_result_is_waiting(self):
+        calls = self.view(actions=[self.call(call_status="dry_run", conversation_id="dryrun-ab"), self.call(id="call-2")])["calls"]
+        self.assertEqual([(c["dry_run"], c["result"]) for c in calls], [(True, None), (False, None)])
+
+    def test_hostile_or_wrong_typed_call_fields_are_forced_to_safe_types(self):
+        hostile = {"id": {"x": 1}, "party": ["a"], "result": {"summary": "<img src=x onerror=alert(1)>", "duration_s": "long",
+                   "transcript": [{"role": "user", "message": "<script>alert(1)</script>" + "x" * 900}] + [{"role": "agent", "message": "m"}] * 80,
+                   "decisions": {"confirmed_date_iso": "not a date", "quoted_amount_gbp": "lots"}}}
+        c = self.view(calls=[hostile, "junk", None, 5] + [hostile] * 20)["calls"]
+        self.assertEqual(len(c), 10)  # capped
+        self.assertIsInstance(c[0]["id"], str)
+        r = c[0]["result"]
+        self.assertIsNone(r["duration_s"])
+        self.assertIsNone(r["decisions"]["confirmed_date_iso"])
+        self.assertIsNone(r["decisions"]["quoted_amount_gbp"])
+        self.assertEqual(len(r["transcript"]), 60)
+        self.assertTrue(r["truncated"])
+        self.assertLessEqual(len(r["transcript"][0]["message"]), 501)
+        json.dumps(c)  # still plain JSON
+
+    def test_the_page_only_ever_puts_call_text_in_as_text(self):
+        js = (Path(__file__).resolve().parent.parent / "agent" / "ui_static" / "app.js").read_text()
+        for banned in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "eval(", "new Function"):
+            self.assertNotIn(banned, js)
+        block = js[js.index("function callBlock"):js.index("function renderDecision")]
+        self.assertEqual(block.count("("), block.count(")"))
+        self.assertEqual(block.count("{"), block.count("}"))
+        self.assertEqual(block.count("["), block.count("]"))
+        self.assertIn("t.message", block)  # reaches the page as a child of h(), which creates text nodes
+        self.assertIn("Waiting for the call result", block)
+        self.assertIn("Nothing to collect", block)
+        self.assertIn("(d.calls || []).length > 0", js)
+        css = (Path(__file__).resolve().parent.parent / "agent" / "ui_static" / "styles.css").read_text()
+        self.assertNotRegex(css[css.index("/* calls:"):], r"https?://")  # no new external hosts
 
 
 if __name__ == "__main__":

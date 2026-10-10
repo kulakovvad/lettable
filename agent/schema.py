@@ -104,7 +104,6 @@ class Decision:
     priority: Optional[str] = None
     title: str = ""
     request: str = ""
-    property: str = ""
     as_of: str = ""
     model: str = ""
     steps: int = 0
@@ -117,6 +116,9 @@ class Decision:
     consistency: Optional[Dict[str, Any]] = None  # agent.consistency report when the check is on
     answer: str = ""  # direct answer when the case asks an explicit question
     red_flags: List[Dict[str, Any]] = field(default_factory=list)  # agent.redflags, also on fallback
+    details: Dict[str, Any] = field(default_factory=dict)  # agent.details: the factual block of ANSWER.md
+    mismatches: List[Dict[str, Any]] = field(default_factory=list)  # agent.mismatches: things that do not match
+    calls: List[Dict[str, Any]] = field(default_factory=list)  # agent.call_results: one entry per phone call, with what was agreed
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)

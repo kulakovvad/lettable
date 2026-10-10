@@ -212,3 +212,15 @@ button:disabled, input:disabled { cursor: not-allowed; }
   display: flex; align-items: center; justify-content: center;
 }
 .ask :disabled { opacity: 0.6; }
+
+/* calls: what was said and what was agreed (transcript text is untrusted: the page only ever sets it as text) */
+.call { padding: 8px 0 12px; }
+.call + .call { border-top: 1px solid var(--line-soft); }
+.call-badge { font-family: var(--mono); font-size: 11px; padding: 2px 8px; border: 1px solid var(--line-soft); border-radius: 10px; color: var(--ink-3); }
+.call-dry { border-style: dashed; }
+.call-objective, .call-summary { margin: 6px 0; font-size: 13px; }
+.call-facts { margin: 8px 0; }
+.transcript { max-height: 220px; overflow-y: auto; margin-top: 8px; padding: 8px 10px; border: 1px solid var(--line-soft); border-radius: 6px; background: #FAFBFD; }
+.turn { margin: 0 0 6px; font-size: 12.5px; line-height: 1.45; overflow-wrap: anywhere; }
+.turn .who { display: inline-block; min-width: 86px; margin-right: 6px; font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+.turn-agent .who { color: #1D4ED8; }

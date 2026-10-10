@@ -109,6 +109,30 @@ def _grade(args) -> int:
     return 0
 
 
+def _voice_test(args) -> int:
+    from agent import voice_simulate as vs
+
+    chosen = [s for s in vs.SCENARIOS if args.only in (None, s.name)]
+    if not chosen:
+        print("unknown scenario %r; choose from: %s" % (args.only, ", ".join(s.name for s in vs.SCENARIOS)), file=sys.stderr)
+        return 2
+    if not args.live:
+        for s in chosen:
+            print("%-17s %s" % (s.name, s.description))
+            print("    would send: %s" % json.dumps(s.body(), ensure_ascii=False)[:300])
+        print("Not run. Add --live to run these against ELEVENLABS_AGENT_ID (uses ElevenLabs credits, never dials).")
+        return 0
+    key, agent_id = os.environ.get("ELEVENLABS_API_KEY"), os.environ.get("ELEVENLABS_AGENT_ID")
+    if not (key and agent_id):
+        print("ELEVENLABS_API_KEY and ELEVENLABS_AGENT_ID are required for --live", file=sys.stderr)
+        return 2
+    results = [vs.run_scenario(s, agent_id, key, attempts=args.attempts) for s in chosen]
+    print(vs.table(results))
+    vs.save(results, Path(args.out))
+    print("transcripts saved in %s/" % args.out)
+    return 0 if all(r.passed for r in results) else 1
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="agent")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -157,6 +181,11 @@ def main(argv=None) -> int:
     vs.add_argument("--update-agent", action="store_true", help="apply the current configuration to ELEVENLABS_AGENT_ID")
     vs.add_argument("--import-number", metavar="E164", help="Twilio number to import (uses TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN)")
     vs.add_argument("--yes", action="store_true", help="actually call the API; without it only describe")
+    vt = sub.add_parser("voice-test", help="test the phone agent with simulated callers (no phone; --live uses ElevenLabs credits)")
+    vt.add_argument("--only", metavar="NAME", help="run one scenario")
+    vt.add_argument("--live", action="store_true", help="run against ELEVENLABS_AGENT_ID; without it only list the scenarios")
+    vt.add_argument("--attempts", type=int, default=1, help="tries per scenario (the simulated caller is an LLM)")
+    vt.add_argument("--out", default="out-voice-test", help="where to save the transcripts")
     ui = sub.add_parser("ui", help="open a local page over a run's results (read-only, except a person's choice in review.json)")
     ui.add_argument("out_dir")
     ui.add_argument("--port", type=int, default=8765)
@@ -185,6 +214,8 @@ def main(argv=None) -> int:
     args = p.parse_args(argv)
     if args.cmd == "voice-setup":
         return _voice_setup(args)
+    if args.cmd == "voice-test":
+        return _voice_test(args)
     if args.cmd == "ui":
         from agent.ui import serve
 

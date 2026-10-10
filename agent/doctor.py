@@ -56,7 +56,7 @@ def check_pypdf() -> Check:
     try:
         import pypdf
     except Exception as exc:
-        return Check("fail", "pypdf", "not importable (%s); PDF attachments would be unreadable. pip install pypdf" % type(exc).__name__)
+        return Check("fail", "pypdf", "not importable (%s); PDF attachments would be unreadable. From the repository root: uv sync" % type(exc).__name__)
     return Check("ok", "pypdf", "version %s" % getattr(pypdf, "__version__", "?"))
 
 

@@ -4,7 +4,7 @@
       -> agent.gates.apply (may only make it stricter)
       -> commit staged actions, or hold them for a person if the gates changed the decision
 
-The loop is bounded by model turns, a token budget and repeated-call detection.
+The loop is bounded by model turns and repeated-call detection. Token use is recorded and does not stop the case.
 If the model never submits, the case ends as an escalation that keeps the full
 investigation trace, so a person can pick it up without redoing the work.
 """
@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from agent import consistency, evidence, gates, handover, redflags
+from agent import consistency, details, evidence, gates, handover, redflags
 from agent.chat import ChatBackend
 from agent.config import Config
 from agent.schema import Decision, Proposal
@@ -299,9 +299,6 @@ def run_loop(case: Case, chat: ChatBackend, cfg: Config, now: datetime, folder: 
         transcript.append({"role": "tool", "results": results})
         if box.decision is not None:
             break
-        if tokens > cfg.loop_token_budget:
-            stop_reason = "token budget of %d exceeded" % cfg.loop_token_budget
-            break
     else:
         stop_reason = "no decision within %d turns" % cfg.loop_max_steps
 
@@ -364,7 +361,7 @@ def finalize(case: Case, box: Toolbox, cfg: Config, as_of: datetime, trace, step
                     gate_notes=decision.gate_notes, proposed=proposal.action, flags=decision.red_flags,
                     consistency_report=consistency_report, hazard=decision.hazard,
                 )
-    decision.title, decision.request, decision.property = case.title, case.request, case.property
+    decision.title, decision.request = case.title, case.request
     decision.as_of = as_of.isoformat()
     decision.model, decision.steps, decision.tokens = model, steps, tokens
     decision.evidence_refs = d["evidence_refs"]
@@ -374,6 +371,7 @@ def finalize(case: Case, box: Toolbox, cfg: Config, as_of: datetime, trace, step
     decision.trace = trace
     decision.consistency = consistency_report
     decision.answer = str(d.get("answer") or "")[:2000]
+    details.attach(case, decision, consistency_report)  # ANSWER.md extras: never allowed to change or lose the decision
     if stop_reason:
         decision.cause = "loop_" + stop_reason.split()[0]
     return decision
