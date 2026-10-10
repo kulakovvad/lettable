@@ -86,7 +86,7 @@ TOOL_SPECS: List[Dict[str, Any]] = [
      "parameters": _schema({}, [])},
     {"name": "read_case_file", "description": "Read a text file in the case folder by relative path (capped). Summary/outcome sections are removed.",
      "parameters": _schema({"path": _STR}, ["path"])},
-    {"name": "check_policy", "description": "Read the agency operating policy. Topics: authority, chasing, safety, damp_mould, compliance, never_touch, closing, communication, escalation, scope, data, or 'all'.",
+    {"name": "check_policy", "description": "Read the agency operating policy. Topics: authority, chasing, safety, damp_mould, compliance, never_touch, closing, communication, calls, escalation, scope, data, or 'all'.",
      "parameters": _schema({"topic": _STR}, ["topic"])},
     {"name": "send_message", "description": "Stage a message to a party. Gates check the party exists in the case, chase timing, landlord approval before instructing a provider, appointment evidence for reminders, and that every phone number and amount in the body appears in the case. Returns staged or blocked with a reason.",
      "parameters": _schema({

@@ -44,6 +44,13 @@ def _action_line(a: Dict[str, Any]) -> str:
     kind = a.get("kind")
     if kind == "message":
         head = "Message to %s (%s, %s)" % (a.get("to"), a.get("purpose"), a.get("priority"))
+    elif kind == "call":
+        head = "Phone call to %s (%s, %s), %s: %s" % (a.get("to"), a.get("purpose"), a.get("priority"),
+                                                      a.get("call_status", "?"), a.get("objective"))
+        if a.get("conversation_id"):
+            head += " [conversation %s]" % a["conversation_id"]
+        if a.get("call_result"):
+            head += ". Result: %s" % (a["call_result"].get("summary") or a["call_result"].get("status"))
     elif kind == "approval_request":
         head = "Approval request to landlord for GBP %.2f (%s)" % (a.get("amount_gbp") or 0, a.get("scope", ""))
     elif kind == "escalation":
@@ -72,7 +79,7 @@ def answer_md(d: Dict[str, Any]) -> str:
     if d.get("actions"):
         out += ["## Actions taken", ""] + [_action_line(a) for a in d["actions"]] + [""]
         for a in d["actions"]:
-            if a.get("body"):
+            if a.get("body") and a.get("kind") != "call":
                 out += ["### %s `%s`" % ("Message to %s" % a.get("to"), a["id"]), "", a["body"], ""]
     elif d.get("message"):
         out += ["## Message to send", "", d["message"], ""]
