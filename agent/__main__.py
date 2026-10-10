@@ -76,6 +76,7 @@ def main(argv=None) -> int:
     ex.add_argument("out_dir")
     ex.add_argument("--to", default="ANSWERS", help="destination folder (default: ANSWERS)")
     ex.add_argument("--force", action="store_true", help="overwrite ANSWERS/<n> folders that came from another run")
+    ex.add_argument("--skip-incomplete", action="store_true", help="export the finished cases and list those missing ANSWER.md or REASONING.md")
     vs = sub.add_parser("voice-setup", help="create the ElevenLabs phone agent and/or import a Twilio number")
     vs.add_argument("--create-agent", action="store_true")
     vs.add_argument("--import-number", metavar="E164", help="Twilio number to import (uses TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN)")
@@ -87,7 +88,7 @@ def main(argv=None) -> int:
         from agent.export import ExportError, export
 
         try:
-            print(json.dumps(export(Path(args.out_dir), Path(args.to), args.force), indent=2))
+            print(json.dumps(export(Path(args.out_dir), Path(args.to), args.force, args.skip_incomplete), indent=2))
         except ExportError as exc:
             print("export refused: %s" % exc, file=sys.stderr)
             return 2

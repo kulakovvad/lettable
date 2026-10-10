@@ -100,9 +100,46 @@ class ExportTests(unittest.TestCase):
     def test_a_finished_case_missing_a_file_is_refused(self):
         out = make_run(self.root, ["001", "002"])
         (out / "002" / "REASONING.md").unlink()
-        with self.assertRaisesRegex(ExportError, "002/REASONING.md"):
+        with self.assertRaisesRegex(ExportError, "002 lacks REASONING.md.*--skip-incomplete"):
             export(out, self.dest)
         self.assertFalse(self.dest.exists())
+
+    def test_skip_incomplete_exports_the_rest_and_lists_the_bad_case(self):
+        out = make_run(self.root, ["001", "002", "003"])
+        (out / "002" / "REASONING.md").unlink()
+        result = export(out, self.dest, skip_incomplete=True)
+        self.assertEqual((result["exported"], result["skipped_incomplete"]), (2, ["002"]))
+        self.assertFalse((self.dest / "2").exists())
+        self.assertEqual(sorted(json.loads((self.dest / "index.json").read_text())), ["1", "3"])
+        (out / "003" / "ANSWER.md").unlink()
+        (out / "003" / "ANSWER.md").symlink_to(out / "001" / "ANSWER.md")
+        self.assertEqual(export(out, self.dest, force=True, skip_incomplete=True)["skipped_incomplete"], ["002", "003"])
+
+    def test_a_second_export_from_the_same_place_removes_folders_the_new_run_does_not_have(self):
+        export(make_run(self.root, ["010", "011", "003"]), self.dest)
+        other = self.root / "other"
+        other.mkdir()
+        result = export(make_run(other, ["003"]), self.dest, force=True)
+        self.assertEqual(sorted(p.name for p in self.dest.iterdir() if p.name.isdecimal()), ["3"])
+        self.assertEqual(result["stale_folders_not_from_this_export"], [])
+
+    def test_folders_that_this_exporter_did_not_write_are_reported_not_deleted(self):
+        (self.dest / "7").mkdir(parents=True)
+        (self.dest / "7" / "ANSWER.md").write_text("hand-made")
+        result = export(make_run(self.root, ["001"]), self.dest)
+        self.assertTrue((self.dest / "7" / "ANSWER.md").is_file())
+        self.assertEqual(result["stale_folders_not_from_this_export"], ["7"])
+
+    def test_odd_inputs_are_refused_cleanly(self):
+        out = make_run(self.root, ["001"])
+        (self.root / "afile").write_text("x")
+        with self.assertRaisesRegex(ExportError, "not a folder"):
+            export(out, self.root / "afile")
+        out2 = self.root / "out2"
+        (out2 / "\u00b2").mkdir(parents=True)
+        for name in ("ANSWER.md", "REASONING.md", "decision.json"):
+            (out2 / "\u00b2" / name).write_text("x")
+        self.assertEqual(export(out2, self.root / "ANS2")["index"], {"1": "\u00b2"})  # not a number, so numbered in order
 
     def test_existing_folders_from_another_run_need_force(self):
         first = make_run(self.root, ["001"])

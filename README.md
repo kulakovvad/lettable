@@ -117,6 +117,7 @@ python3 -m agent calls collect out/ --backend elevenlabs             # bring fin
 
 ```
 python3 -m agent export out/ --to ANSWERS    # ANSWERS/<n>/ANSWER.md, REASONING.md, decision.json, ANSWERS/index.json, ANSWERS/_run/
+#   --force: overwrite folders from another run   --skip-incomplete: export the rest if one case lacks a file
 ```
 
 Files are copied byte for byte and never edited. Case folders named with digits keep their number (`003` becomes `3`). The command refuses, and writes nothing, if the run has no finished case, two cases would share a number, or `ANSWERS/` holds another run's results (override with `--force`).
