@@ -275,20 +275,13 @@ def finalize(case: Case, box: Toolbox, cfg: Config, as_of: datetime, trace, step
     decision = gates.apply(case, proposal, cfg, as_of, consistency_report)
 
     overridden = decision.action != proposal.action
-    holding_used = False
     for s in box.staged:
         # Escalations always go out. Safety advice goes out only to the tenant on a hazard found by code,
-        # so a model cannot relabel an arbitrary message to get it past the hold. One safe tenant update
-        # (acknowledge, set expectations, promise nothing) may go out with an escalation.
+        # so a model cannot relabel an arbitrary message to get it past the hold. A model-written tenant
+        # update does not commit with an escalation; only that code-found safety advice does.
         always = s["kind"] == "escalation" or (
             s.get("purpose") == "safety_advice" and s.get("to") == "tenant" and box.urgent)
-        holding = False
-        if (not holding_used and decision.action == "ESCALATE" and s.get("kind") == "message"
-                and s.get("to") == "tenant" and s.get("purpose") == "update"
-                and redflags.safe_holding(s.get("body") or "")):
-            holding = True
-            holding_used = True
-        if always or holding or matches_primary(decision.action, s):
+        if always or matches_primary(decision.action, s):
             s["state"] = "committed"
             if s["kind"] == "call":
                 s["call_status"] = "pending"  # the runner places it after the final checks (agent.calls)

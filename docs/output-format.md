@@ -184,7 +184,7 @@ Common keys:
 | `state` | `committed` \| `held_for_review` \| `call_failed` | Items are `staged` during the run. Finished output has only these. `call_failed` is only for a `call` the dialer could not place |
 | `note` | string | Why it is in that state |
 
-Only the staged item that matches the final action is `committed` (for example the chase message for `CHASE_LANDLORD`, the follow-up for `WAIT`, the closure for `CLOSE`). Escalations always commit. A `safety_advice` message commits only when it goes to the tenant and code found an open hazard. One tenant message with purpose `update` may also commit alongside `ESCALATE` when the body only acknowledges and sets expectations (no bank details, payment promise, liability or legal conclusion). Everything else is `held_for_review`, including every message when the loop ran out of budget. If the final action is `ESCALATE` and the model staged no escalation, code adds one with note `Created automatically because the final decision is an escalation.` Code then fills any missing handover fields.
+Only the staged item that matches the final action is `committed` (for example the chase message for `CHASE_LANDLORD`, the follow-up for `WAIT`, the closure for `CLOSE`). Escalations always commit. A `safety_advice` message commits only when it goes to the tenant and code found an open hazard. Everything else is `held_for_review`, including every message when the loop ran out of budget. If the final action is `ESCALATE` and the model staged no escalation, code adds one with note `Created automatically because the final decision is an escalation.` Code then fills any missing handover fields.
 
 Per-kind keys:
 

@@ -76,21 +76,6 @@ _NOSHOW = re.compile(
 )
 _VOICEMAIL = re.compile(r"\bvoicemail\b", re.I)
 
-_UNSAFE_HOLDING = re.compile(
-    r"\b(?:sort code|account number|direct debit|"
-    r"you (?:are|will be) (?:liable|responsible)|"
-    r"(?:will|can) (?:pay|offer) compensation|"
-    r"section\s*21|"
-    r"we have approved|"
-    r"deduct(?:ed|ion) from (?:your|the) deposit|"
-    r"new account)\b",
-    re.I,
-)
-_HOLDING_TONE = re.compile(
-    r"\b(?:thank|sorry|colleague|update you|in touch|looking into|acknowledge|shortly|will come back)\b",
-    re.I,
-)
-
 _GUIDANCE = {
     "payment": "Suspected payment redirection. Do not reply to the requester, do not change bank details, and do not pay. Escalate P1 to accounts.",
     "legal": "Deposit, notice or legal claim. Do not advise, promise or decide it. Escalate to the property manager; a message may only acknowledge.",
@@ -223,9 +208,3 @@ def describe(flags: Sequence[Dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def safe_holding(body: str) -> bool:
-    """A tenant update that only acknowledges and sets expectations, with no promise."""
-    text = (body or "").strip()
-    if len(text) < 15 or _UNSAFE_HOLDING.search(text):
-        return False
-    return bool(_HOLDING_TONE.search(text))

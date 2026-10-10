@@ -195,7 +195,7 @@ class GateAndLoopTests(unittest.TestCase):
         self.assertEqual(ticket["route"], "on_call_emergency")
         self.assertEqual([a["state"] for a in d.actions if a["kind"] == "message"], ["held_for_review"])
 
-    def test_one_safe_holding_message_commits_with_the_escalation(self):
+    def test_model_written_tenant_update_stays_held_on_escalation(self):
         events = WAITING_LANDLORD + [(
             "2026-01-02 10:00:00", "Email", "Tenant", "Agency",
             "If this is not sorted I'm coming down to your office and you'll regret it.",
@@ -216,7 +216,7 @@ class GateAndLoopTests(unittest.TestCase):
             Turn(calls=[submit("ESCALATE", priority="P1")]),
         ])
         d = run_loop(load_case(folder), chat, CFG, NOW, folder)
-        self.assertEqual([a["state"] for a in d.actions if a["kind"] == "message"], ["committed"])
+        self.assertEqual([a["state"] for a in d.actions if a["kind"] == "message"], ["held_for_review"])
         self.assertEqual([a["state"] for a in d.actions if a["kind"] == "escalation"], ["committed"])
 
         folder2 = make_case(self.root, "hold-bad", events)
