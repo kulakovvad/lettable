@@ -33,10 +33,12 @@ def parse_now(value: Optional[str]) -> datetime:
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
-def _child(conn, path: str, cfg: Dict[str, Any], backend: str, now_iso: str) -> None:
+def _child(conn, path: str, cfg: Dict[str, Any], backend: str, now_iso: str, cut: Optional[int] = None) -> None:
     try:
         config = Config.from_dict(cfg)
         case = load_case(Path(path), config)
+        if cut is not None:
+            case = case.cut(cut)  # replay: later events do not exist for this run
         result = decide(case, make_backend(backend, config), config, parse_now(now_iso))
         conn.send(("ok", result.to_dict()))
     except BaseException as exc:  # a child must always report, whatever went wrong
@@ -49,12 +51,12 @@ def _child(conn, path: str, cfg: Dict[str, Any], backend: str, now_iso: str) -> 
 
 
 def run_isolated(
-    path: Path, cfg: Config, backend: str, now_iso: str, timeout: float
+    path: Path, cfg: Config, backend: str, now_iso: str, timeout: float, cut: Optional[int] = None
 ) -> Tuple[str, Any]:
     """Return ("ok", decision_dict) or (cause, detail)."""
     ctx = mp.get_context("spawn")
     parent, child = ctx.Pipe(duplex=False)
-    proc = ctx.Process(target=_child, args=(child, str(path), cfg.to_dict(), backend, now_iso), daemon=True)
+    proc = ctx.Process(target=_child, args=(child, str(path), cfg.to_dict(), backend, now_iso, cut), daemon=True)
     proc.start()
     child.close()
     try:
