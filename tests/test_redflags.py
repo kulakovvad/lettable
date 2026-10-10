@@ -105,6 +105,20 @@ class DetectorTests(unittest.TestCase):
         self.assertEqual(flags[0]["category"], "payment")
         self.assertTrue(flags[0]["force"])
         self.assertEqual(flags[0]["route"], "accounts")
+        mixed = load_case(make_case(self.root, "dd-mixed", [
+            assigned,
+            ("2026-01-19 10:00:00", "Email", "BrightServe Appliance Cover", "Agency",
+             "Keystone Works finished the visit. Please set up a Direct Debit mandate with BrightServe Ltd."),
+        ]))
+        self.assertEqual(redflags.scan(mixed)[0]["category"], "payment")
+        short = ("2025-09-10 08:41:12", "Email", "Northbridge Lettings", "Tenant",
+                 "Our maintenance provider **Key** will be attending your property.")
+        keystone = load_case(make_case(self.root, "dd-keystone", [
+            short,
+            ("2026-01-19 11:00:00", "Email", "Keystone Cover", "Agency",
+             "Please set up a Direct Debit mandate with Keystone Cover."),
+        ]))
+        self.assertEqual(redflags.scan(keystone)[0]["category"], "payment")
 
     def test_legal_deposit_and_section_21(self):
         flags = redflags.scan(self.case(
@@ -137,6 +151,14 @@ class DetectorTests(unittest.TestCase):
         self.assertEqual(self.cats("There is no heating, please book a boiler service."), [])
         self.assertEqual(self.cats("The tenant is not vulnerable and there is no heating problem."), [])
         self.assertNotIn("vulnerability", self.cats("Just to be clear there's no smell of gas, the oven just doesn't get hot."))
+        split = load_case(make_case(
+            self.root, "vuln-split",
+            [("2026-01-02 10:00:00", "Email", "Tenant", "Agency", "The boiler has stopped and there is no heating.")],
+            request="I am pregnant."))
+        flags = [f for f in redflags.scan(split) if f["category"] == "vulnerability"]
+        self.assertEqual(len(flags), 1)
+        self.assertIn("request", flags[0]["ref"])
+        self.assertIn("event-001", flags[0]["ref"])
 
     def test_abuse_and_its_negation(self):
         flags = redflags.scan(self.case(

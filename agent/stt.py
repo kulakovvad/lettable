@@ -93,6 +93,28 @@ def format_words(words: Iterable[Dict[str, Any]]) -> str:
     return "\n".join("Speaker %d: %s" % (n, " ".join(t.split())) for n, t in lines if t.strip())
 
 
+class OpenAITranscriber(Transcriber):
+    """OpenAI transcriptions API. Used when ElevenLabs is not configured."""
+
+    def __init__(self, cfg: Config) -> None:
+        self.cfg = cfg
+
+    def transcribe(self, path: Path, keyterms: List[str]) -> Optional[str]:
+        key = os.environ.get("OPENAI_API_KEY")
+        if not key:
+            return None
+        model = self.cfg.stt_model if self.cfg.stt_model and self.cfg.stt_model != "scribe_v2" else "gpt-4o-transcribe"
+        fields = [("model", model), ("response_format", "json"), ("language", "en")]
+        prompt = ", ".join(k for k in keyterms if k)[:200]
+        if prompt:
+            fields.append(("prompt", prompt))
+        body, content_type = _multipart(fields, Path(path).name, Path(path).read_bytes())
+        url = (os.environ.get("OPENAI_BASE_URL") or "https://api.openai.com/v1").rstrip("/") + "/audio/transcriptions"
+        result = _post(url, {"authorization": "Bearer %s" % key}, body, content_type, self.cfg)
+        text = str(result.get("text") or "").strip()
+        return text or None
+
+
 class ElevenLabsTranscriber(Transcriber):
     def __init__(self, cfg: Config) -> None:
         self.cfg = cfg
@@ -119,6 +141,8 @@ def make_transcriber(cfg: Config) -> Optional[Transcriber]:
         return FakeTranscriber()
     if name == "elevenlabs":
         return ElevenLabsTranscriber(cfg)
+    if name == "openai":
+        return OpenAITranscriber(cfg)
     raise ValueError("unknown stt backend %r" % name)
 
 

@@ -29,7 +29,7 @@ from typing import Any, Callable, Dict, Iterator, Optional
 
 from agent.config import Config
 from agent.files import atomic_write
-from agent.voice import CallRequest, CallResult, Conversation
+from agent.voice import STAFF_PARTY, CallRequest, CallResult, Conversation
 from agent.voice_prompt import dynamic_variables
 
 API = "https://api.elevenlabs.io"
@@ -114,7 +114,7 @@ class ElevenLabsDialer:
             if not E164.match(req.to_number or ""):
                 return CallResult("failed", None, "number is not E.164 (+ and 8 to 15 digits)")
             start, end = self.cfg.call_hours
-            if not start <= self._clock().hour < end:
+            if req.party != STAFF_PARTY and not start <= self._clock().hour < end:  # an on-call briefing may be night-time
                 return CallResult("failed", None, "outside calling hours %02d:00-%02d:00 UK time" % (start, end))
             if sum(1 for v in ledger.values() if v.get("run") == self._run) >= self.cfg.max_calls_per_run:
                 return CallResult("failed", None, "call cap of %d per run reached" % self.cfg.max_calls_per_run)

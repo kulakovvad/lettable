@@ -48,6 +48,11 @@ class AnthropicCacheTests(unittest.TestCase):
         msgs = AnthropicChat._messages([{"role": "user", "text": "see this", "images": [image]}])
         self.assertEqual(msgs[0]["content"][0]["text"], "see this")
         self.assertEqual(msgs[0]["content"][1]["source"]["data"], "QQ==")
+        document = {"name": "quote.pdf", "media_type": "application/pdf", "data": "UQ=="}
+        docs = AnthropicChat._messages([{"role": "user", "text": "read this", "documents": [document]}])
+        self.assertEqual(docs[0]["content"][1]["type"], "document")
+        self.assertEqual(docs[0]["content"][1]["title"], "quote.pdf")
+        self.assertEqual(docs[0]["content"][1]["source"]["media_type"], "application/pdf")
         with mock.patch.dict(os.environ, {"OPENAI_API_KEY": "x"}):
             client = OpenAIChat(Config())
         openai = client._messages("sys", [{"role": "user", "text": "see this", "images": [image]}])

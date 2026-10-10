@@ -60,9 +60,17 @@ flowchart LR
 
 ## 4. How to run it
 
-**Prerequisites.** Python 3.9 or newer. The default setup has no dependencies and needs no keys (the `fake` backend is free and offline).
+**Prerequisites.** Python 3.9 or newer. The `fake` backend is free and offline and needs no API key. PDF attachments need `pypdf`.
 
-**Install.** `git clone https://github.com/kulakovvad/lettable && cd lettable`. Optional: `pip install pypdf` to read PDF attachments. The model clients use the standard library, so no SDK is needed.
+**Install.** Clone the repo, then install the pinned dependency with [uv](https://docs.astral.sh/uv/):
+
+```sh
+git clone https://github.com/kulakovvad/lettable && cd lettable
+uv venv .venv
+uv pip install --python .venv/bin/python -e '.[dev]'
+```
+
+That installs `pypdf` (PDF text for the code gates and the text preview) and, with the `dev` extra, `pytest`. The Claude and OpenAI clients use the Python standard library, so the `anthropic` extra is not required for `--backend claude`. With that backend, each PDF is also attached to the first message for Claude to read. A text preview can miss layout, stamps and scanned pages.
 
 **Configure.** `cp .env.example .env`, fill in what you need, and export it (`set -a; . ./.env; set +a`). `.env` is gitignored; never commit keys. Paid features are off unless asked for by name.
 
@@ -81,6 +89,8 @@ flowchart LR
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | `voice-setup --import-number` | read once when importing a Twilio number into ElevenLabs |
 | `TYPESAFE_API_KEY` | consistency check | Jev document-similarity service |
 | `TYPESAFE_MODEL`, `TYPESAFE_BASE_URL` | optional | override Jev model name and URL |
+| `LETTABLE_ONCALL_NUMBER` | on-call briefing | number the code phones when a case ends with a code-found hazard or priority P0; empty means off. Never taken from a case or the model |
+| `LETTABLE_CALL_ALLOWLIST` | live calls | comma-separated E.164 numbers a live call may dial. A live on-call briefing is dialled only if its number is on this list; when the list is set, other live calls off the list are held too. Empty leaves ordinary calls unchanged. Dry runs ignore it |
 
 **Run.**
 
@@ -102,7 +112,7 @@ python3 -m agent replay "<cases folder>" out-replay/ --points 2 --backend claude
 
 Cuts each finished case at a few points, shows the agent only the events up to that point and compares its proposed action with what the agency actually did next. The "what happened next" label is a rough rule, so read the numbers as agreement, not accuracy.
 
-**Voice.** Details and safety rules: [docs/voice.md](docs/voice.md).
+**Voice.** Details and safety rules: [docs/voice.md](docs/voice.md). The model asks for a call, but code decides whether the phone is the right channel (two unanswered messages, a bounce, or an urgent hazard).
 
 ```
 python3 -m agent run cases/ out/ --stt elevenlabs --calls dry_run   # transcribe audio; record calls, dial nothing
@@ -142,9 +152,9 @@ Files are copied byte for byte and never edited. Case folders named with digits 
 | Twilio | the telephone line the calls go through | off |
 | Jev, `api.typesafe.ai` (`jev-1.13.0`) | scoring whether names or addresses refer to the same entity | off (`consistency_check`) |
 
-Everything else is the Python standard library. Optional: `pypdf` for PDF text. The case text is sent to the services you switch on; the public cases are synthetic. Third-party services remain subject to their own terms.
+Everything else is the Python standard library, plus `pypdf` for PDF text. The case text, and with `--backend claude` the PDF files themselves, are sent to the services you switch on; the public cases are synthetic. Third-party services remain subject to their own terms.
 
-Case images are sent to Claude with the first message when `--backend claude` is on.
+Case images and PDF files are sent to Claude with the first message when `--backend claude` is on.
 
 ## 6. Important assumptions
 
