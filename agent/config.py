@@ -84,7 +84,14 @@ class Config:
         r"\bco alarm\b",
         r"\bflood(?:ing|ed)\b(?! with)|\bflood (?:in|through|from|everywhere)\b|water (?:is )?(?:pouring|gushing|streaming)",
         r"burst pipe",
-        r"exposed wir",
+        r"exposed (?:live )?wir",
+        r"\belectric(?:al)? shock\b",
+        r"\bsmoke (?:is )?(?:pouring|billowing) (?:out of|from) (?:the |a )?(?:socket|plug)\b",
+        r"\bgas fumes?\b",
+        r"\bwater\b.{0,50}\bceiling\b.{0,40}\belectrics?\b",
+        r"\b(?:cannot|can't|can not|unable to) lock the front door\b",
+        r"\b(?:mould|mold)\b.{0,80}\b(?:baby|infant)\b.{0,40}\bcough\b"
+        r"|\b(?:baby|infant)\b.{0,40}\bcough\b.{0,80}\b(?:mould|mold)\b",
         r"\bsparking\b|\bsparks (?:from|coming)",
         r"\bon fire\b|\bcaught fire\b|\b(?:a|the) fire (?:in|at|broke|started|has)\b|\bfire (?:brigade|service)\b|"
         r"\bburning smell\b|\bsmell of burning\b|\b(?:fire|smoke) alarm (?:is |keeps )?(?:going off|sounding)",

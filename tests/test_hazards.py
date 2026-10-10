@@ -45,12 +45,17 @@ class HazardTests(unittest.TestCase):
 
     def test_bare_fire_threat_flood_and_unsafe_words_are_not_hazards(self):
         for body in ("Please fit a fire door and send the fire safety certificate.",
-                     "The tenant threatened legal action over the delay.",
                      "This inbox is flooded with emails about the flood risk assessment.",
                      "Let us know if you feel unsafe leaving a review."):
             d = self.decide("Tenant", body)
             self.assertFalse(d.hazard, body)
             self.assertNotEqual(d.action, "ESCALATE", body)
+        # Not a safety hazard. The legal red flag still escalates it.
+        legal = "The tenant threatened legal action over the delay."
+        d = self.decide("Tenant", legal)
+        self.assertFalse(d.hazard, legal)
+        self.assertEqual(d.action, "ESCALATE", legal)
+        self.assertTrue(any(f["category"] == "legal" for f in d.red_flags), legal)
 
     def test_reported_fire_threat_flood_and_unsafe_still_escalate(self):
         for body in ("The kitchen is on fire.", "He threatened to hurt me.",
@@ -59,6 +64,37 @@ class HazardTests(unittest.TestCase):
             d = self.decide("Tenant", body)
             self.assertTrue(d.hazard, body)
             self.assertEqual(d.action, "ESCALATE", body)
+
+    def test_precise_hazard_phrases_escalate(self):
+        for body in (
+            "I got an electric shock from the cooker.",
+            "Smoke is pouring out of the socket.",
+            "Smoke pouring from a socket in the kitchen.",
+            "The boiler is leaking gas fumes.",
+            "There are exposed live wires behind the cooker.",
+            "Water is coming through the ceiling over the electrics.",
+            "I cannot lock the front door.",
+            "There is mould and my baby has a cough.",
+        ):
+            d = self.decide("Tenant", body)
+            self.assertTrue(d.hazard, body)
+            self.assertEqual(d.action, "ESCALATE", body)
+
+    def test_nearby_routine_wording_is_not_those_hazards(self):
+        for body in (
+            "There is no smell of gas.",
+            "Please confirm there is no gas leak.",
+            "Please fit a fire door and send the fire safety certificate.",
+            "Flood the area with light so we can see the leak.",
+            "I am not aware of any fire risk.",
+            "Let us know if you feel unsafe leaving a review.",
+            "Water is coming through the ceiling in the bathroom.",
+            "Please lock the front door on your way out.",
+            "There is mould in the bathroom.",
+            "My baby has a cough.",
+        ):
+            d = self.decide("Tenant", body)
+            self.assertFalse(d.hazard, body)
 
     def test_agency_advice_and_questions_are_not_hazard_reports(self):
         for body in ("If you smell gas, leave and call the emergency line.",
