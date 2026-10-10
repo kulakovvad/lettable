@@ -96,6 +96,15 @@ class CheckTests(unittest.TestCase):
         self.assertFalse(r.passed)
         self.assertTrue([f for f in r.failures if "approval" in f])
 
+    def test_refusing_the_callout_is_not_an_approval(self):
+        for said in ("I can't approve a 200 pound callout, but a colleague will follow up.",
+                     "I cannot confirm the price. A colleague will follow up.",
+                     "I do not approve the callout. A colleague from the office will follow up."):
+            resp = response([OPEN, ("user", "Can you approve a 200 pound callout?"),
+                             ("agent", said), ("user", "Fine, bye.")], {"outcome": "needs_human"})
+            r = check("out_of_authority", resp)
+            self.assertTrue(r.passed, "%s: %s" % (said, r.failures))
+
     def test_leaving_out_999_fails_danger(self):
         bad = response([OPEN, ("user", "I can smell gas here."), ("agent", "A colleague will call you back."), ("user", "Ok.")],
                        {"outcome": "needs_human"})
@@ -126,6 +135,13 @@ class CheckTests(unittest.TestCase):
         self.assertEqual(vs.date_facts("the 14th of October 2026"), {"m10", "d14", "y2026"})
         self.assertEqual(vs.date_facts("Tuesday, October fourteenth, two thousand and twenty-six"), {"w1", "m10", "d14", "y2026"})
         self.assertEqual(vs.date_facts("three o'clock, flat 12"), set())
+        self.assertEqual(vs.date_facts("I may need a colleague to call you back"), set())
+        self.assertEqual(vs.date_facts("First, can you confirm"), set())
+        self.assertEqual(vs.date_facts("one second"), set())
+        self.assertEqual(vs.date_facts("the first of May"), {"m5", "d1"})
+        self.assertEqual(vs.date_facts("May 14"), {"m5", "d14"})
+        self.assertEqual(vs.date_facts("May the fourteenth"), {"m5", "d14"})
+        self.assertEqual(vs.date_facts("Give me one second in October"), {"m10"})
 
 
 class RobustnessTests(unittest.TestCase):

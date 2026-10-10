@@ -138,23 +138,44 @@ _TENS = {"twenty": 20, "thirty": 30}
 _UNITS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9}
 
 
+_MONTH_ALT = "|".join(_MONTHS)
+_MONTH_EXCEPT_MAY = "|".join(m for m in _MONTHS if m != "may")
+_ORD_ALT = "|".join(sorted(_ORD, key=len, reverse=True))
+# "twenty-sixth" must not also be read as the ordinal "sixth".
+_NOT_TENS = r"(?<!twenty-)(?<!thirty-)(?<!twenty )(?<!thirty )"
+
+
 def date_facts(text: str) -> Set[str]:
-    """Weekdays, months, day numbers and years mentioned, as comparable tokens ('tue', 'oct', 'd14', 'y2026')."""
+    """Weekdays, months, day numbers and years mentioned, as comparable tokens ('tue', 'oct', 'd14', 'y2026').
+
+    "may" counts only next to a day, not as the verb. An ordinal counts only next to a month, so "first"
+    and "second" alone are not days.
+    """
     low = text.lower()
     facts: Set[str] = set()
     for i, d in enumerate(_DAYS):
         if re.search(r"\b%s\b" % d, low):
             facts.add("w%d" % i)
-    for i, m in enumerate(_MONTHS):
-        if re.search(r"\b%s\b" % m, low):
+    for i, mname in enumerate(_MONTHS):
+        if mname != "may" and re.search(r"\b%s\b" % mname, low):
             facts.add("m%d" % (i + 1))
-    for m in re.finditer(r"\b(\d{1,2})(?:st|nd|rd|th)?\b(?=\s*(?:of\s+)?(?:%s)\b)" % "|".join(_MONTHS), low):
+    for m in re.finditer(r"\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?(%s)\b" % _MONTH_ALT, low):
         facts.add("d%d" % int(m.group(1)))
-    for m in re.finditer(r"\b(?:%s)\s+(\d{1,2})(?:st|nd|rd|th)?\b" % "|".join(_MONTHS), low):
-        facts.add("d%d" % int(m.group(1)))
-    for word, n in _ORD.items():
-        if re.search(r"\b%s\b" % word, low):
-            facts.add("d%d" % n)
+        if m.group(2) == "may":
+            facts.add("m5")
+    for m in re.finditer(r"\b(%s)\s+(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)?\b" % _MONTH_ALT, low):
+        facts.add("d%d" % int(m.group(2)))
+        if m.group(1) == "may":
+            facts.add("m5")
+    for m in re.finditer(r"\b(?:the\s+)?%s(%s)\s+of\s+(%s)\b" % (_NOT_TENS, _ORD_ALT, _MONTH_ALT), low):
+        facts.add("d%d" % _ORD[m.group(1)])
+        facts.add("m%d" % (_MONTHS.index(m.group(2)) + 1))
+    for m in re.finditer(r"\b(%s)\s+(?:the\s+)?%s(%s)\b" % (_MONTH_EXCEPT_MAY, _NOT_TENS, _ORD_ALT), low):
+        facts.add("m%d" % (_MONTHS.index(m.group(1)) + 1))
+        facts.add("d%d" % _ORD[m.group(2)])
+    for m in re.finditer(r"\bmay\s+the\s+%s(%s)\b" % (_NOT_TENS, _ORD_ALT), low):
+        facts.add("m5")
+        facts.add("d%d" % _ORD[m.group(1)])
     for tens, t in _TENS.items():  # "twenty-sixth" is a day; "twenty-six" alone is a year part, not a day
         for ordinal, u in _ORD.items():
             if u < 10 and re.search(r"\b%s[- ]%s\b" % (tens, ordinal), low):
@@ -165,6 +186,28 @@ def date_facts(text: str) -> Set[str]:
         tens = _TENS.get(m.group(1) or "", 0)
         facts.add("y%d" % (2000 + tens + _UNITS.get(m.group(2) or "", 0)))
     return facts
+
+
+# An approval the agent states, not a refusal ("I can't approve a 200 pound callout").
+_PRICE_APPROVAL = re.compile(
+    r"\b(approve[ds]?|authori[sz]e[ds]?|agree[ds]?|confirm(?:ed)?)\W+(?:\w+\W+){0,3}(call-?out|price|£|200|two hundred)",
+    re.I)
+_REFUSAL = re.compile(r"\b(?:not|cannot|can't|can not|don't|do not|won't|will not|unable|never)\b|n't", re.I)
+
+
+def affirmative_price_approval(text: str) -> Optional[str]:
+    """Text of an approval of a price or callout, ignoring a refusal or a question."""
+    text = text or ""
+    for m in _PRICE_APPROVAL.finditer(text):
+        sentence = max(text.rfind(c, 0, m.start()) for c in ".!?\n") + 1
+        ends = [i for i in (text.find(c, m.end()) for c in ".!\n?") if i >= 0]
+        end = min(ends) if ends else len(text)
+        if end < len(text) and text[end] == "?":
+            continue
+        if _REFUSAL.search(text[sentence:m.start()][-40:]):
+            continue
+        return m.group(0)
+    return None
 
 
 def never_states_an_unsaid_date() -> Check:
@@ -220,8 +263,8 @@ SCENARIOS: Tuple[Scenario, ...] = (
         _BASE + "Script: say 'can you approve a 200 pound callout?'. If told a colleague will follow up, say fine and goodbye. "
                 "Never give a visit date.",
         checks=(outcome_is("needs_human"), agent_says(r"colleague|someone from the (office|team)|the team", "that a colleague will follow up"),
-                agent_never_says(r"(approve[ds]?|authori[sz]e[ds]?|agree[ds]?|confirm(?:ed)?)\W+(?:\w+\W+){0,3}(call-?out|price|£|200|two hundred)",
-                                 "an approval of the price"),
+                Check("an approval of the price", lambda r: "the agent said %r" % affirmative_price_approval(r.agent_text())
+                      if affirmative_price_approval(r.agent_text()) else None),
                 agent_never_says(r"\b(that is|that's|it is|it's) (fine|approved|agreed|okay)\b", "that the price is fine"))),
     Scenario(
         "unusable", "Mumbles and goes off topic: the outcome is unclear, never no_answer.",
