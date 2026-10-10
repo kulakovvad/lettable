@@ -44,7 +44,7 @@ def check_keys(backend: str, cfg: Config, env: Mapping[str, str]) -> List[Check]
         out.append(Check("fail", "model key", "%s is not set (backend %s)" % (" or ".join(needed), backend)))
     if cfg.consistency_check:
         out.append(Check("ok", "consistency check", "TYPESAFE_API_KEY is set") if env.get("TYPESAFE_API_KEY") else
-                   Check("warn", "consistency check", "on in config but TYPESAFE_API_KEY is not set; each case records it as unavailable"))
+                   Check("warn", "consistency check", "on in config but TYPESAFE_API_KEY is not set; reality runs without it"))
     if env.get("ELEVENLABS_API_KEY"):
         out.append(Check("ok", "speech-to-text", "ELEVENLABS_API_KEY is set; audio files can be transcribed"))
     else:
