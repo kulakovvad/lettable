@@ -194,7 +194,7 @@ Per-kind keys:
 | `approval_request` | `to` (`landlord`), `amount_gbp` (`null` asks approval for a provider to attend or quote, with no cost approved), `scope`, `body`, `evidence_refs`, `above_limit` (amount over `approval_limit_gbp`, default 300) |
 | `followup` | `review_at`, `waiting_on` (`tenant`, `landlord`, `provider`, `internal`), `reason` |
 | `escalation` | `priority`, `route` (`on_call_emergency`, `property_manager`, `accounts`, `complaints`), `summary`, `known`, `unknowns`, `tried`, `options`, `evidence_refs` |
-| `closure` | `completion_refs` (events where a provider, tenant or landlord says the job is done), `invoice_status` (`sent_to_landlord`, `landlord_pays_directly`, `no_charge`), `invoice_refs`, `keys_status` (`returned`, `not_applicable`), `key_refs`, `reason` |
+| `closure` | `completion_refs` (events where a provider, tenant or landlord says the job is done), `invoice_status` (`sent_to_landlord`, `landlord_pays_directly`, `no_charge`), `invoice_refs`, `keys_status` (`returned`, `not_applicable`; `unknown` is recorded as `not_applicable` when no event says keys are held, and blocked while keys are held with no later return), `key_refs`, `reason` |
 
 ### Phone calls
 

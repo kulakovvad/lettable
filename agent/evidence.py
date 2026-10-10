@@ -20,8 +20,17 @@ NEGATION_RE = re.compile(
     r"\b(not|never|no|yet to|still|incomplete|unfinished|hold off|cannot|won't|wouldn't|unable)\b|n't", re.I)
 DONE_RE = re.compile(
     r"\b(completed|all done|job (?:is )?(?:done|complete)|works? (?:is |are )?complete|finished the (?:work|job)|"
-    r"(?:have|has|had) (?:now )?(?:been )?(?:fixed|repaired|replaced|resolved)|is (?:now )?fixed|fixed (?:it|the)\b)",
+    r"(?:have|has|had) (?:now )?(?:been )?(?:fixed|repaired|replaced|resolved|sorted|cleared|unblocked)|"
+    r"(?:has|have) (?:now )?been (?:done|carried out)|is (?:now )?fixed|fixed (?:it|the)\b|"
+    r"(?:this|that|the) (?:one|job|work|repair) is (?:now )?(?:done|sorted|finished)|all (?:sorted|fixed|working)|"
+    r"(?:work|works|job|clean(?:ing)?|repairs?) (?:that )?(?:was|were) done|"
+    r"(?:is|are|it's|its) (?:now )?(?:clear|unblocked)\b(?! (?:that|whether|how|what|why|to)\b)|now (?:clear|unblocked)\b|"
+    r"draining (?:fine|properly|normally|well)|"
+    r"(?:is|are|it's|its) (?:now )?working (?:again|now|fine|properly)|working again|"
+    r"(?:that|this|it|plunger|fix|advice) (?:has )?worked\b)",
     re.I)
+# A completion word after one of these in its sentence is reported or asked about, not affirmed.
+UNCERTAIN_RE = re.compile(r"\b(whether|if|inquir\w*|enquir\w*|hope|hopefully|expected|should be|once)\b", re.I)
 APPROVAL_RE = re.compile(
     r"\b(go ahead|approved?|proceed|yes,? please|happy (?:for|to)|ok(?:ay)? to|fine to|authori[sz]e)\b", re.I)
 AGENCY_APPROVAL_RE = re.compile(
@@ -58,13 +67,16 @@ def amounts(text: str) -> List[float]:
     return out
 
 
-def affirmed(pattern: "re.Pattern[str]", text: str) -> Optional["re.Match[str]"]:
-    """First match that is not negated in its sentence and not part of a question."""
+def affirmed(pattern: "re.Pattern[str]", text: str,
+             hedges: Optional["re.Pattern[str]"] = None) -> Optional["re.Match[str]"]:
+    """First match that is not negated (or hedged) in its sentence and not part of a question."""
     for m in pattern.finditer(text or ""):
         start = max(text.rfind(c, 0, m.start()) for c in ".!?\n") + 1
         ends = [i for i in (text.find(c, m.end()) for c in ".!\n?") if i >= 0]
         end = min(ends) if ends else len(text)
         if NEGATION_RE.search(text[start:m.start()][-40:]):
+            continue
+        if hedges is not None and hedges.search(text[start:m.start()][-60:]):
             continue
         if end < len(text) and text[end] == "?":
             continue
@@ -74,7 +86,7 @@ def affirmed(pattern: "re.Pattern[str]", text: str) -> Optional["re.Match[str]"]
 
 def reports_completion(e: Event) -> bool:
     """A provider, tenant or landlord says the job is done. Agency/system notes do not count."""
-    return role_of(e.sender) in PARTIES and affirmed(DONE_RE, e.body) is not None
+    return role_of(e.sender) in PARTIES and affirmed(DONE_RE, e.body, UNCERTAIN_RE) is not None
 
 
 def is_approval(e: Event) -> bool:

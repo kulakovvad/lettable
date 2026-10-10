@@ -37,6 +37,10 @@ _UNCALLABLE_RE = re.compile(r"^0(9|84|87|118|70|76|55|56)")
 _PHONE_RE = re.compile(r"(?:\+44\s?\(?0?\)?|\b0)\d(?:[\s-]?\d){8,10}\b")
 _APPOINTMENT_RE = re.compile(r"\b(appointment|booked|attend(?:ing|ance)?|visit|scheduled|between \d{1,2}(?::\d\d)? ?(?:am|pm)?(?: and| -| to) \d)", re.I)
 _KEY_HELD_RE = re.compile(r"\b(collect(?:ed)? (?:the )?keys?|keys? (?:collected|held|from the office)|key collection|return (?:the )?keys?)\b", re.I)
+_KEY_BACK_RE = re.compile(
+    r"\bkeys? (?:(?:have|has|were|was|are) (?:now |all )?(?:been )?)?(?:returned|dropped (?:off|back)|handed (?:back|in)|"
+    r"brought back|posted back|back (?:at|in|to) (?:the |our )?office)\b|"
+    r"\b(?:returned|dropped (?:off|back)|handed back|brought back) (?:the |all |both )?keys?\b", re.I)
 
 role_of = evidence.role_of
 _amounts = evidence.amounts
@@ -569,6 +573,14 @@ class Toolbox:
     def _event_refs(self, refs: List[str]) -> List[Event]:
         return [self._by_index[int(re.search(r"\d+", r).group())] for r in refs if r.startswith("event-")]
 
+    def _keys_out(self) -> Optional[Event]:
+        """The latest event saying keys are held, if no later event says they came back."""
+        held = [e for e in self.case.events if _KEY_HELD_RE.search(e.body)]
+        if not held:
+            return None
+        back = [e for e in self.case.events if evidence.affirmed(_KEY_BACK_RE, e.body)]
+        return None if back and back[-1].index > held[-1].index else held[-1]
+
     def _t_close_case(self, args):
         """Completion uses the same definition as the final gate (gates.confirmed_completion)."""
         refs, bad = self._resolve_refs(args.get("completion_refs"))
@@ -577,27 +589,36 @@ class Toolbox:
             return self._blocked("no_confirmation",
                                  "none of the cited events is a provider, tenant or landlord saying the job is done "
                                  "(agency notes, quotes, questions and negated mentions do not count)",
-                                 "Cite the confirming event, or ask the provider or tenant to confirm completion.")
+                                 "Cite the confirming event, or ask the provider (ASK_PROVIDER) or tenant (ASK_TENANT) "
+                                 "to confirm completion.")
         done = gates.confirmed_completion(self.case)
         if done is None or self.case.events[done].index < max(e.index for e in confirmers):
-            return self._blocked("possibly_reopened", "a later tenant message is not a clear all-clear, so the job may be reopened",
-                                 "Check with the tenant before closing.")
+            return self._blocked("possibly_reopened",
+                                 "a later tenant message reports a fault or asks about this job, so it may be reopened",
+                                 "ASK_TENANT whether the fix worked. A message about something else does not block a "
+                                 "close: list it in unrelated_issues.")
         invoice = _s(args.get("invoice_status"), 30)
         invoice_refs, _ = self._resolve_refs(args.get("invoice_refs"))
+        routine = " This is a routine question, not a reason to escalate."
         if invoice not in INVOICE_STATES or invoice == "unknown":
             return self._blocked("invoice_unknown", "the invoice position is not known",
-                                 "Ask the provider for the invoice or confirm with the landlord how it is paid.")
+                                 "Ask the provider for the invoice (ASK_PROVIDER) or the landlord how it is paid "
+                                 "(ASK_LANDLORD)." + routine)
         if not any(evidence.INVOICE_RE.search(e.body) for e in self._event_refs(invoice_refs)):
             return self._blocked("invoice_unverified", "no cited event shows the invoice position (%s)" % invoice,
-                                 "Cite the event that shows the invoice was sent, paid directly or not charged.")
+                                 "Cite the event that shows the invoice was sent, paid directly or not charged; an "
+                                 "unreadable invoice file still counts as sent if an event says it was sent. If none "
+                                 "exists, ASK_PROVIDER for it." + routine)
         keys = _s(args.get("keys_status"), 20)
         key_refs, _ = self._resolve_refs(args.get("key_refs"))
-        held = [e for e in self.case.events if _KEY_HELD_RE.search(e.body)]
-        if keys == "unknown" or (keys == "not_applicable" and held):
-            return self._blocked("keys_unknown", "key return is not confirmed%s" % (" (keys are mentioned at %s)" % ref(held[0]) if held else ""),
-                                 "Confirm the keys were returned before closing.")
+        out = self._keys_out()
+        if keys in ("unknown", "not_applicable") and out is not None:
+            return self._blocked("keys_unknown", "keys are mentioned as held at %s and no later event shows them returned" % ref(out),
+                                 "Ask the provider (ASK_PROVIDER) or tenant (ASK_TENANT) whether the keys came back." + routine)
         if keys == "returned" and not any(evidence.KEYS_RE.search(e.body) for e in self._event_refs(key_refs)):
             return self._blocked("keys_unverified", "no cited event shows the keys were returned", "Cite the event that confirms key return.")
+        if keys == "unknown":
+            keys = "not_applicable"  # no key was ever held
         result = self._stage("closure", {"completion_refs": [ref(e) for e in confirmers], "invoice_status": invoice,
                                          "invoice_refs": invoice_refs, "keys_status": keys, "key_refs": key_refs,
                                          "reason": _s(args.get("reason"), 800)})
