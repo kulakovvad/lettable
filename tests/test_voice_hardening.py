@@ -39,13 +39,15 @@ class AgentConfigTests(unittest.TestCase):
         self.assertEqual(end["params"]["system_tool_type"], "end_call")
         self.assertIn("voicemail_detection", cc["agent"]["prompt"]["built_in_tools"])  # added, not replaced
         self.assertEqual(cc["turn"]["silence_end_call_timeout"], SILENCE_END_SECONDS)
-        self.assertTrue(0 < SILENCE_END_SECONDS <= 30)  # -1 (the platform default) would never hang up
+        self.assertTrue(30 <= SILENCE_END_SECONDS <= 90)  # -1 (the platform default) never hangs up; too short cuts off a diary check
         self.assertIn("end_call tool", PROMPT)
         self.assertIn("do not reply again", PROMPT)  # no second goodbye after the person says thanks
 
     def test_a_relative_day_is_turned_into_a_calendar_date_by_asking(self):
-        self.assertIn("which calendar date", PROMPT)
-        self.assertIn("read the date back", PROMPT)
+        self.assertIn("ask which date that is, with the day, month and year", PROMPT)
+        self.assertIn("read back exactly what they say", PROMPT)
+        self.assertIn("Never state a date they did not say", PROMPT)
+        self.assertNotRegex(PROMPT, r"\d+(?:st|nd|rd|th) of (?:January|February|March|April|May|June|July|August|September|October|November|December)")  # no example date for the agent to copy
 
     def test_a_callback_hears_sensible_words_because_every_variable_has_a_default(self):
         placeholders = agent_config()["conversation_config"]["agent"]["dynamic_variables"]["dynamic_variable_placeholders"]
@@ -55,8 +57,8 @@ class AgentConfigTests(unittest.TestCase):
         for k, v in placeholders.items():
             said = said.replace("{{%s}}" % k, v)
         self.assertNotIn("{{", said)
-        self.assertEqual(said, "Hello, this is an automated assistant calling for the letting agency about a maintenance job. "
-                               "This call is recorded.")
+        self.assertEqual(said, "Hello, this is an automated assistant for the letting agency, about a maintenance job. "
+                               "This call is recorded.")  # true for a callback too: it says "for", not "calling for"
         self.assertIn("phones you", PROMPT)  # the prompt covers an inbound call
 
     def test_voicemail_detection_is_on_and_a_machine_hears_no_objective_or_personal_detail(self):
@@ -86,6 +88,43 @@ class AgentConfigTests(unittest.TestCase):
         only_junk = CallRequest("c1", "provider", "+447000000001", "x", {"job": "\u00a3450 07700 900123", "agency_name": "07700 900123"}, "k")
         self.assertEqual((dynamic_variables(only_junk)["job"], dynamic_variables(only_junk)["agency_name"]),
                          ("a maintenance job", "the letting agency"))
+
+    def test_every_way_of_ending_a_call_names_the_end_call_tool_and_a_danger_always_gets_999(self):
+        endings = [l for l in PROMPT.splitlines() if re.search(r"\bend the call\b|\bthen use the end_call tool\b|goodbye", l)]
+        for line in endings:
+            self.assertIn("end_call", line, line)  # "end the call" alone is what failed on the live call
+        danger = [l for l in PROMPT.splitlines() if "reports a danger" in l][0]
+        self.assertIn("999", danger)
+        self.assertIn("0800 111 999", danger)
+        self.assertIn("end_call", danger)
+        self.assertIn("danger rule above still comes first", PROMPT)
+
+    def test_facts_and_the_objective_reach_the_agent_cleaned(self):
+        req = CallRequest("c1", "provider", "+447000000001", "Confirm the visit; email me@example.com or ring 07700 900123, see https://x.example",
+                          {"job": "Boiler", "address": "Flat 1, 2 Test Road", "note": "Mrs Smith, 07700 900123, me@example.com, www.evil.example",
+                           "x" * 40: "too long a key", "agency_name": "Northbridge Lettings"}, "k")
+        v = dynamic_variables(req)
+        self.assertEqual(set(v), set(VARIABLES))  # only the declared variables, never raw fact names
+        for key in ("known_facts", "objective"):
+            self.assertNotRegex(v[key], r"@|http|www|07700|evil")
+        self.assertIn("address: Flat 1, 2 Test Road", v["known_facts"])
+        self.assertIn("note: Mrs Smith", v["known_facts"])
+        self.assertNotIn("too long a key", v["known_facts"])
+        self.assertNotIn("agency_name", v["known_facts"])  # already said, not repeated
+        many = CallRequest("c1", "provider", "+447000000001", "x", {"f%d" % i: "word " * 30 for i in range(40)}, "k")
+        self.assertLessEqual(len(dynamic_variables(many)["known_facts"]), 500)
+        self.assertEqual(dynamic_variables(CallRequest("c1", "provider", "+447000000001", "x", {}, "k"))["known_facts"], "nothing further")
+
+    def test_a_normal_agency_name_with_punctuation_is_kept_and_bare_numbers_are_not_spoken(self):
+        for raw in ("Northbridge Lettings.", "Northbridge Lettings,", "  Northbridge   Lettings ; "):
+            self.assertEqual(dynamic_variables(CallRequest("c1", "provider", "+447000000001", "x", {"agency_name": raw}, "k"))["agency_name"],
+                             "Northbridge Lettings", raw)
+        for raw in ("Northbridge Lettings 24", "Lettings 0800", "Northbridge Lettings pay £5"):
+            self.assertEqual(dynamic_variables(CallRequest("c1", "provider", "+447000000001", "x", {"agency_name": raw}, "k"))["agency_name"],
+                             "the letting agency", raw)  # a digit in a name means it is not a plain name
+        job = lambda text: dynamic_variables(CallRequest("c1", "provider", "+447000000001", "x", {"job": text}, "k"))["job"]
+        self.assertEqual(job("Boiler repair 450"), "Boiler repair")
+        self.assertEqual(job("Flat 12 boiler"), "Flat 12 boiler")  # a short number is part of a normal description
 
     def test_an_inbound_caller_reporting_a_danger_is_sent_to_the_emergency_services(self):
         self.assertIn("999", PROMPT)

@@ -31,7 +31,7 @@ class WhatTheAgentSaysTests(unittest.TestCase):
         said = FIRST_MESSAGE
         for k, v in dynamic_variables(REQ).items():
             said = said.replace("{{%s}}" % k, v)
-        self.assertEqual(said, "Hello, this is an automated assistant calling for Northbridge Lettings about the dishwasher repair. "
+        self.assertEqual(said, "Hello, this is an automated assistant for Northbridge Lettings, about the dishwasher repair. "
                                "This call is recorded.")
 
     def test_unknown_job_and_agency_fall_back_to_neutral_words_not_to_the_instruction(self):
@@ -42,7 +42,7 @@ class WhatTheAgentSaysTests(unittest.TestCase):
         said = FIRST_MESSAGE
         for k, val in v.items():
             said = said.replace("{{%s}}" % k, val)
-        self.assertEqual(said, "Hello, this is an automated assistant calling for the letting agency about a maintenance job. This call is recorded.")
+        self.assertEqual(said, "Hello, this is an automated assistant for the letting agency, about a maintenance job. This call is recorded.")
 
     def test_the_case_reading_placeholder_is_not_spoken_and_a_real_name_is(self):
         named = CallRequest("c1", "tenant", "+447000000001", "x", {"agency_name": "Northbridge Lettings"}, "k")
@@ -62,7 +62,7 @@ class WhatTheAgentSaysTests(unittest.TestCase):
     def test_prompt_keeps_every_safety_rule_and_the_new_manners(self):
         text = PROMPT.lower()
         for must in ("no authority to approve spend", "never share one party", "colleague will", "recorded",
-                     "never claim anything that is not in what you know", "voicemail", "safety"):
+                     "never claim anything that is not in what you know", "voicemail", "danger", "999"):
             self.assertIn(must, text)
         self.assertIn("never write bracketed tags", text)
         self.assertIn("one or two short sentences", text)

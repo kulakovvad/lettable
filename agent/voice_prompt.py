@@ -29,33 +29,38 @@ finish before you speak; if they interrupt, stop and answer what they asked.
 - Never read out a long explanation and never repeat your whole introduction. If they did not follow, say it again \
 in one short sentence.
 - If they ask who you are, answer in one sentence. If they cannot talk now, say a colleague will call back at a \
-better time, then end the call politely.
+better time, then use the end_call tool.
 - Ask only for what the objective needs. Confirm any date, time or amount back to the person before you finish.
-- If they give a weekday or a relative day ("Tuesday", "next Friday", "next week"), ask which calendar date that is, \
-and read the date back (for example "Tuesday the 14th of October").
+- If they give a weekday or a relative day ("Tuesday", "next Friday", "next week"), ask which date that is, with \
+the day, month and year, and read back exactly what they say. Never state a date they did not say.
 - When the objective is done, say one short goodbye and then use the end_call tool. If the person says thanks or \
 goodbye after that, do not reply again: end the call.
 - Say words only. Never write bracketed tags or stage directions such as [sad], [slow] or [laughs].
 - You have NO authority to approve spend, accept or promise a price, a date or compensation. If asked, say a \
 colleague will confirm.
 - Never share one party's phone number, email or personal details with another party.
-- If you are asked something outside the objective, the person is upset or seems vulnerable, mentions a danger to \
-safety (gas smell, fire, flooding, injury), or asks for a human, say that a colleague will call back, then end the call.
+- If the person reports a danger (gas smell, fire, flooding, injury), tell them to call the emergency services on 999 \
+now (for gas also the National Gas Emergency line on 0800 111 999), say that a colleague will call back, then use the \
+end_call tool.
+- If you are asked something outside the objective, the person is upset or seems vulnerable, or asks for a human, say \
+that a colleague will call back, then use the end_call tool.
 - If you reach voicemail, the voicemail tool leaves the standard short message for you; add nothing, and never say \
 the objective, a price or any personal detail to a machine.
 - If someone phones you (you did not start the call), say this is an automated line that cannot take requests, ask \
-them to contact the agency directly, then end the call politely. If they report a danger (gas smell, fire, flooding, \
-injury), tell them to call the emergency services on 999 now and then contact the agency.
+them to contact the agency directly, then use the end_call tool. The danger rule above still comes first.
 - Never claim anything that is not in what you know."""
 
-# One short sentence of context, then the agent waits for the person. No question, so nobody is asked to confirm who they are.
-FIRST_MESSAGE = "Hello, this is an automated assistant calling for {{agency_name}} about {{job}}. This call is recorded."
+# One short sentence of context, then the agent waits for the person. No question, so nobody is asked to confirm who they
+# are. The platform speaks this before the model runs, so it must also be true when someone phones the number back:
+# it says "for", not "calling for".
+FIRST_MESSAGE = "Hello, this is an automated assistant for {{agency_name}}, about {{job}}. This call is recorded."
 
 # Hard limits on a call, so a stuck or hostile call cannot run on (and cost) unbounded. The ringing limit is set per call
 # (Config.call_ring_timeout_s); the length limit is part of the agent.
 MAX_CALL_SECONDS = 180
 MAX_CALL_MESSAGE = "I need to end the call now. A colleague will follow up. Goodbye."
-SILENCE_END_SECONDS = 20  # hang up after this long without the person speaking (the platform default never hangs up)
+SILENCE_END_SECONDS = 60  # hang up after this long without the person speaking; the platform default never hangs up,
+# and a person checking a diary goes quiet for a while (the agent re-prompts every few seconds in between)
 
 # What a machine hears. A voicemail is a durable recording, so it carries no case-derived text except the agency name
 # (cleaned and capped, see _speakable): no job, objective, price, name or number.
@@ -107,17 +112,31 @@ _EMAIL = re.compile(r"\S+@\S+")
 _URL = re.compile(r"(?i)\b(?:https?://|www\.)\S+")
 _MONEY = re.compile(r"(?i)(?:£|GBP\s?)\s?\d[\d,]*(?:\.\d+)?|\d[\d,]*(?:\.\d+)?\s?(?:GBP|pounds)\b")
 _LONG_NUMBER = re.compile(r"\+?\d[\d\s().-]{4,}\d")  # phone numbers, references, account numbers
+_BARE_NUMBER = re.compile(r"\b\d{3,}\b")
+_EDGE = " ,.;:-"
+
+
+def _cut(text: str, limit: int, edge: str = _EDGE) -> str:
+    text = " ".join(text.split())
+    if len(text) > limit:
+        text = text[:limit].rsplit(" ", 1)[0]
+    return text.strip(edge)
 
 
 def _speakable(text: str, limit: int) -> str:
-    """Case-derived words that are spoken aloud (and recorded): no amounts, numbers, emails or links, and short.
-    Words only; whatever is not clearly harmless is dropped rather than read out."""
-    for pattern in (_EMAIL, _URL, _MONEY, _LONG_NUMBER):
+    """Case-derived words that are spoken in the greeting (and so recorded): no amounts, numbers of three or more digits,
+    emails or links, and short. Words only; whatever is not clearly harmless is dropped rather than read out."""
+    for pattern in (_EMAIL, _URL, _MONEY, _LONG_NUMBER, _BARE_NUMBER):
         text = pattern.sub(" ", text)
-    text = " ".join(text.replace("£", " ").split())
-    if len(text) > limit:
-        text = text[:limit].rsplit(" ", 1)[0]
-    return text.strip(" ,;:-")
+    return _cut(text.replace("£", " "), limit)
+
+
+def _prompt_text(text: str, limit: int) -> str:
+    """Case-derived text the agent may rely on in conversation. Lighter than _speakable (an amount to confirm with the
+    right person is fine), but never an email, a link or a phone or account number."""
+    for pattern in (_EMAIL, _URL, _LONG_NUMBER):
+        text = pattern.sub(" ", text)
+    return _cut(text, limit, edge=" ")  # keep the sentence as written, including its full stop
 
 
 def _job(facts: Dict[str, str]) -> str:
@@ -127,25 +146,37 @@ def _job(facts: Dict[str, str]) -> str:
 
 
 def _agency(facts: Dict[str, str]) -> str:
-    """The agency's name as spoken. A real name is short and plain, so one that had to be cleaned or cut (a number,
-    an amount, a link, too long) is not trusted: the neutral wording is spoken instead."""
-    raw = " ".join(facts.get("agency_name", "").split())
-    name = _speakable(raw, AGENCY_CHARS)
-    if name != raw or name in ("", "the agency"):  # "the agency" is the case-reading code's own placeholder
-        return UNNAMED_AGENCY
-    return name
+    """The agency's name as spoken. A real name is short and plain, so one that had to be cleaned for safety (a number,
+    an amount, a link) or cut is not trusted: the neutral wording is spoken instead. Trailing punctuation is harmless."""
+    raw = " ".join(facts.get("agency_name", "").split()).strip(_EDGE)
+    if raw in ("", "the agency") or re.search(r"\d", raw) or _speakable(raw, AGENCY_CHARS) != raw:
+        return UNNAMED_AGENCY  # "the agency" is the case-reading code's own placeholder
+    return raw
+
+
+_FACT_KEY = re.compile(r"[A-Za-z][A-Za-z0-9 _-]{0,29}\Z")
+KNOWN_FACTS_CHARS = 500
+
+
+def _known_facts(facts: Dict[str, str]) -> str:
+    """'key: value' pairs the agent may rely on, cleaned. The job and agency are already said elsewhere."""
+    parts = []
+    for key, value in facts.items():
+        text = _prompt_text(value, 150)
+        if key not in ("agency_name", "job") and _FACT_KEY.match(key) and text:
+            parts.append("%s: %s" % (key, text))
+    return "; ".join(parts)[:KNOWN_FACTS_CHARS].rsplit("; ", 1)[0] if len("; ".join(parts)) > KNOWN_FACTS_CHARS else "; ".join(parts) or "nothing further"
 
 
 def dynamic_variables(req: CallRequest) -> Dict[str, Any]:
-    """Every value is a string. Case facts are added under their own names too."""
+    """Exactly the declared variables, every value a string. Raw case facts are never passed on as they are: what
+    the agent can say comes from the cleaned job, agency name, objective and known facts."""
     facts = {str(k): str(v) for k, v in req.facts.items()}
-    out: Dict[str, Any] = dict(facts)
-    out.update({
+    return {
         "agency_name": _agency(facts),
         "party": req.party,
         "job": _job(facts),
-        "objective": req.objective or "Find out where the job stands.",
-        "known_facts": "; ".join("%s: %s" % (k, v) for k, v in facts.items()) or "nothing further",
-        "case_id": req.case_id,
-    })
-    return out
+        "objective": _prompt_text(req.objective, 300) or "Find out where the job stands.",
+        "known_facts": _known_facts(facts),
+        "case_id": _cut(req.case_id, 40) or "none",
+    }

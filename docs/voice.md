@@ -60,14 +60,14 @@ python3 -m agent voice-setup --update-agent          # describes the change; nee
 python3 -m agent voice-setup --update-agent --yes    # sends it
 ```
 
-Create and update send the same configuration. `--create-agent` and `--update-agent` cannot be combined (update would patch the old agent): create, set `ELEVENLABS_AGENT_ID` to the printed id, then update. An update changes only the fields it sends; on a live check the voice id, tools and built-in settings were left as they were.
+Create and update send the same configuration. `--create-agent` and `--update-agent` cannot be combined (update would patch the old agent): create, set `ELEVENLABS_AGENT_ID` to the printed id, then update. An update sends the prompt, first message, voice model, data collection, `built_in_tools` (voicemail and end_call), the length limit, the silence timeout and the variable defaults. On a throwaway copy of the live agent, the API merged these maps and kept the voice id and every other tool and setting already on the agent.
 
 ## What the phone agent says
 
 - **Opening:** one short statement and then it waits, for example: "Hello, this is an automated assistant calling for Northbridge Lettings about the dishwasher repair. This call is recorded." It does not ask the person to confirm who they are. The job comes from the call's `job` fact (cut to 80 characters at a word), else "a maintenance job"; the objective is an instruction and is never read out as the topic. The agency name comes from the case (a sender's name or a sign-off such as "Kind regards, Northbridge Lettings"), else "the letting agency".
 - **During the call:** one or two short sentences per turn, one question at a time, it stops when interrupted, and it offers a colleague's callback if the person cannot talk. It writes plain words only (no bracketed tags such as `[sad]`).
 - **Voice:** a non-expressive English model (`eleven_flash_v2`, expressive mode off). The expressive models read stage directions aloud.
-- **Ending:** after the goodbye the agent hangs up with the `end_call` tool, and a call where the person goes quiet ends after 20 seconds of silence (the platform default never hangs up). A call ends by itself after 3 minutes (the agent says "A colleague will follow up. Goodbye."), and the phone stops ringing after 30 seconds (`call_ring_timeout_s`).
+- **Ending:** after the goodbye the agent hangs up with the `end_call` tool, and a call where the person goes quiet ends after 60 seconds of silence (the platform default never hangs up; the agent still re-prompts every few seconds in between). A call ends by itself after 3 minutes (the agent says "A colleague will follow up. Goodbye."), and the phone stops ringing after 30 seconds (`call_ring_timeout_s`).
 - **Voicemail:** if a machine answers, a fixed message plays: the agency name and "a maintenance job", nothing from the case (no job text, objective, price, name or number). The outcome is `no_answer`.
 - **What is spoken from the case:** the job (a short phrase) and the agency name have amounts, numbers, emails and links removed. A name that needed cleaning or was too long is replaced by "the letting agency"; the job is cut to 80 characters.
 - **Someone phones the number back:** every field has a spoken default ("the letting agency", "a maintenance job"), and the agent says this is an automated line that cannot take requests and asks them to contact the agency. If the caller reports a danger (gas, fire, flooding, injury) it tells them to call 999 first.
@@ -94,8 +94,8 @@ Use a phone you control and say so to whoever answers. Keep the number out of ev
 
 ## Not done
 
-- Inbound calls (a tenant phoning the agency) are not handled.
-- Text-to-speech replies and voicemail drops are not used.
+- Inbound calls (someone phoning the number back) get a short scripted answer only: an automated line, please contact the agency, and 999 for a danger. No requests are taken and no case is created.
+- Text-to-speech replies are not used. Voicemail is handled by the platform's detection with one fixed message.
 - The live path (real STT, real call) has only been tested against mocked HTTP.
 - Calling hours and the run cap are checked in the runner and again inside the dialer; dry runs skip the hours check, so they do not rehearse an out-of-hours hold.
 - Voicemail uses ElevenLabs' built-in detection only; Twilio's own machine detection is not turned on.

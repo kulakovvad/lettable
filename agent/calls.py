@@ -126,7 +126,12 @@ def _collect_case(case_out: Path, out_dir: Path, get_dialer, summary: Dict[str, 
         if path.is_file():
             record = json.loads(path.read_text(encoding="utf-8"))
         else:
-            conv = get_dialer().fetch(cid)
+            try:
+                conv = get_dialer().fetch(cid)
+            except Exception as exc:  # one failed fetch must not drop the other calls of this case
+                summary["errors"].append({"case_id": decision["case_id"], "conversation_id": cid,
+                                          "error": "%s: %s" % (type(exc).__name__, str(exc)[:200])})
+                continue
             if conv.status not in ("done", "failed"):
                 summary["pending"].append({"case_id": decision["case_id"], "conversation_id": cid, "status": conv.status})
                 continue
