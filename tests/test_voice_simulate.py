@@ -55,8 +55,9 @@ class RequestTests(unittest.TestCase):
         self.assertEqual(spec["simulated_user_config"]["language"], "en")
         self.assertIn("Sam", spec["simulated_user_config"]["prompt"]["prompt"])
         self.assertEqual(set(spec["dynamic_variables"]),
-                         {"agency_name", "party", "job", "objective", "known_facts", "case_id"})
+                         {"agency_name", "party", "job", "objective", "known_facts", "case_id", "audience"})
         self.assertEqual(spec["dynamic_variables"]["agency_name"], "Northbridge Lettings")
+        self.assertEqual(spec["dynamic_variables"]["audience"], "external")
 
     def test_every_scenario_has_checks_a_persona_and_a_name_once(self):
         names = [s.name for s in vs.SCENARIOS]
