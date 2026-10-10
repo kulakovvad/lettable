@@ -27,11 +27,13 @@ def policy_topics(cfg: Config) -> Dict[str, str]:
         "amounts": (
             "Compare every quote and invoice with what the landlord approved, on the same VAT basis: "
             "'GBP 35 + VAT' is GBP 42 including VAT (VAT 20%), not GBP 35. An approval stated including VAT does "
-            "not cover a higher invoice. 'Around' or 'approximately' a figure is not an approved amount. "
+            "not cover a higher invoice. A figure given as 'around', 'approximately', 'a minimum of', 'from', "
+            "'starting at' or 'plus parts' is not a fixed quote: an approval of it covers that figure only, and "
+            "a higher invoice goes back to the landlord. "
             "Invoice above the approved amount with no new approval: ROUTE_FOR_APPROVAL with the new amount; do "
             "not pay or close. Invoice with no approved quote anywhere in the history: ROUTE_FOR_APPROVAL or "
-            "ESCALATE, never treat it as payable. Amount that matches none of the quoted options: ESCALATE "
-            "(route accounts) asking the provider for an itemised invoice. An invoice below the quote needs a "
+            "ESCALATE, never treat it as payable. Amount that matches none of the quoted options: ASK_PROVIDER "
+            "for an itemised invoice and do not pay meanwhile. An invoice below the quote needs a "
             "reason (for example part of the work was not done): check that before closing. Never say 'the "
             "landlord approved' unless the approval event is in the case."
         ),
@@ -44,6 +46,8 @@ def policy_topics(cfg: Config) -> Dict[str, str]:
             "(same flat and street, different house number or town). Not a mismatch: a note listing several "
             "properties (portfolio, keys, empty units), a reference to a previous or another property, or "
             "quoted earlier mail below 'Subject:' or 'On ... wrote:' unless it carries its own 'Address:' line. "
+            "If our own agency messages or job header carry an address that differs from the job's property, "
+            "the record is wrong: ESCALATE to a person to correct it; do not ask the tenant which property it is. "
             "PROVIDER AND PAYEE: an invoice or completion from a firm that is not the assigned provider is a "
             "mismatch, unless the landlord said they use their own contractor. A request to set up new bank "
             "details or a Direct Debit for a firm not assigned to the job is suspected fraud: ESCALATE (P1, "
@@ -60,8 +64,9 @@ def policy_topics(cfg: Config) -> Dict[str, str]:
             "with the file missing or unavailable is not an invoice. Missing before/after photos mean there is "
             "no proof, not that the work was not done; say so in the reason. "
             "ON A MISMATCH: do not close, pay, forward the invoice or report the job as done on this record. "
-            "Ask one specific question (which property is this for, which firm did the work): ASK_TENANT if "
-            "only the tenant can answer, otherwise ESCALATE with that question in the handover. A missing "
+            "Ask the sender of the document one specific question (which property is this for, which firm did "
+            "the work) with ASK_PROVIDER, ASK_LANDLORD or ASK_TENANT; ESCALATE instead when the answer needs a "
+            "person's judgement (suspected fraud, a dispute, conflicting versions). A missing "
             "document alone does not block safe steps such as a chase or a reminder."
         ),
         "chasing": (
@@ -83,8 +88,9 @@ def policy_topics(cfg: Config) -> Dict[str, str]:
         "damp_mould": (
             "Damp and mould are a health hazard, not a routine repair. Treat reports with health impact, "
             "children, elderly or vulnerable occupants, or spreading mould as P1 and escalate to the property "
-            "manager; statutory timescales may apply (Awaab's Law requires emergency hazards to be dealt with "
-            "within 24 hours and sets fixed investigation deadlines). Never tell the tenant it is caused by their "
+            "manager regardless of any statutory timescale. Statutory timescales may apply (Awaab's Law sets "
+            "fixed deadlines for social landlords and may be extended to private rentals); do not quote legal "
+            "deadlines to the tenant or the landlord. Never tell the tenant it is caused by their "
             "lifestyle or that it is their responsibility to fix; do not close a damp/mould case on cosmetic "
             "treatment alone."
         ),

@@ -68,10 +68,10 @@ These are filled by every path: the tool loop, the single-call backends and the 
 | Field | Type | Meaning |
 |---|---|---|
 | `case_id` | string | Case folder name |
-| `action` | enum | Final action after code gates. `WAIT`, `CHASE_LANDLORD`, `CHASE_PROVIDER`, `ASK_TENANT`, `ROUTE_FOR_APPROVAL`, `INSTRUCT_PROVIDER`, `SEND_REMINDER`, `CLOSE`, `ESCALATE` |
+| `action` | enum | Final action after code gates. `WAIT`, `CHASE_LANDLORD`, `CHASE_PROVIDER`, `ASK_TENANT`, `ASK_PROVIDER`, `ASK_LANDLORD`, `ROUTE_FOR_APPROVAL`, `INSTRUCT_PROVIDER`, `SEND_REMINDER`, `CLOSE`, `ESCALATE` |
 | `reason` | string | Model reason. Gate changes are appended as ` [gate: ...]`. Fallback reasons start `Automatic escalation:` |
 | `source` | `model` \| `fallback` | `fallback` means the worker crashed, timed out, errored or never started, and plain code wrote the escalation |
-| `message` | string | Body of the staged action that matches the final action. Empty unless the final action is `CHASE_LANDLORD`, `CHASE_PROVIDER`, `ASK_TENANT`, `INSTRUCT_PROVIDER` or `SEND_REMINDER`. For `ROUTE_FOR_APPROVAL`, read the body from `actions` |
+| `message` | string | Body of the staged action that matches the final action. Empty unless the final action is `CHASE_LANDLORD`, `CHASE_PROVIDER`, `ASK_TENANT`, `ASK_PROVIDER`, `ASK_LANDLORD`, `INSTRUCT_PROVIDER` or `SEND_REMINDER`. For `ROUTE_FOR_APPROVAL`, read the body from `actions` |
 | `unknowns` | string[] | Open questions |
 | `options` | string[] | Choices for a person. Always filled on `ESCALATE` |
 | `confidence` | number 0–1 or null | Model's confidence. `null` on fallback |
@@ -176,7 +176,7 @@ Per-kind keys:
 
 ### Phone calls
 
-A call is staged like a message and can stand in for it on `CHASE_*`, `ASK_TENANT` and `INSTRUCT_PROVIDER`. It follows the same commit rule. After the final checks the runner places each committed call once (`call_backend`: `dry_run` records it and dials nothing, `elevenlabs` places it). Nothing waits for the call to finish. A call to the tenant with purpose `safety_advice` commits on a code-found hazard, like safety advice by message.
+A call is staged like a message and can stand in for it on `CHASE_*`, `ASK_TENANT`, `ASK_PROVIDER`, `ASK_LANDLORD` and `INSTRUCT_PROVIDER`. It follows the same commit rule. After the final checks the runner places each committed call once (`call_backend`: `dry_run` records it and dials nothing, `elevenlabs` places it). Nothing waits for the call to finish. A call to the tenant with purpose `safety_advice` commits on a code-found hazard, like safety advice by message.
 
 - `call_status` `not_placed` with state `held_for_review`: the run's call limit (`max_calls_per_run`) was reached, or a live call fell outside UK calling hours (`call_hours`).
 - `call_failed`: the dialer raised or returned `failed`. The decision stays; `blocked` gets a `call_failed` item and a ticket (or the existing escalation's `unknowns`) tells a person the call did not happen.

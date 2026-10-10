@@ -146,6 +146,8 @@ _PRIMARY_NEEDS = {
     "CHASE_LANDLORD": ("message", "landlord"),
     "CHASE_PROVIDER": ("message", "provider"),
     "ASK_TENANT": ("message", "tenant"),
+    "ASK_PROVIDER": ("message", "provider"),
+    "ASK_LANDLORD": ("message", "landlord"),
     "SEND_REMINDER": ("message", None),
     "ROUTE_FOR_APPROVAL": ("approval", "landlord"),
     "INSTRUCT_PROVIDER": ("message", "provider"),
@@ -379,6 +381,14 @@ class Toolbox:
                 return self._blocked("too_early", "only %.1f days since we wrote to the %s (%s); policy is %.0f days" %
                                      (days, to, ref(out), self.cfg.chase_after_days),
                                      "Schedule a follow-up and WAIT. Only an open hazard found by code allows an early chase.")
+        if purpose == "request_info" and to != "tenant":
+            out, inn = self._last(to, True), self._last(to, False)
+            unanswered = out is not None and out.ts is not None and (inn is None or inn.index < out.index)
+            days = (self.now - out.ts).total_seconds() / 86400 if unanswered else None
+            if days is not None and days < self.cfg.chase_after_days and not urgent:
+                return self._blocked("too_early", "we wrote to the %s %.1f days ago (%s) and they have not replied; "
+                                     "policy is %g days" % (to, days, ref(out), self.cfg.chase_after_days),
+                                     "WAIT for their reply, or add the question to the chase once it is due.")
         if purpose == "instruct_provider":
             if to != "provider":
                 return {"status": "error", "error": "instruct_provider messages go to the provider"}
@@ -590,6 +600,8 @@ class Toolbox:
                 match = [s for s in match if s.get("purpose") == "reminder"]
             if action.startswith("CHASE"):
                 match = [s for s in match if s.get("purpose") == "chase"]
+            if action.startswith("ASK_"):
+                match = [s for s in match if s.get("purpose") == "request_info"]
             if action == "INSTRUCT_PROVIDER":
                 match = [s for s in match if s.get("purpose") == "instruct_provider"]
             if not match:
