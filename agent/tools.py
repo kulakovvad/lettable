@@ -19,7 +19,7 @@ from agent import evidence, gates
 from agent.config import Config
 from agent.policy import policy_topics
 from agent.schema import ACTIONS
-from agent.timeline import Case, Event
+from agent.timeline import Case, Event, redact_index
 from agent.voice import CALL_RECORD_TAG
 
 PRIORITIES = ("P0", "P1", "P2", "P3")
@@ -36,7 +36,6 @@ _ELSEWHERE_RE = re.compile(r"\b(colleague|accounts?|alternative|instead|differen
 _UNCALLABLE_RE = re.compile(r"^0(9|84|87|118|70|76|55|56)")
 _PHONE_RE = re.compile(r"(?:\+44\s?\(?0?\)?|\b0)\d(?:[\s-]?\d){8,10}\b")
 _APPOINTMENT_RE = re.compile(r"\b(appointment|booked|attend(?:ing|ance)?|visit|scheduled|between \d{1,2}(?::\d\d)? ?(?:am|pm)?(?: and| -| to) \d)", re.I)
-_SECTION_RE = re.compile(r"^## (Overview|Outcome|Summary|Resolution)\b.*?(?=^## |\Z)", re.M | re.S | re.I)
 _KEY_HELD_RE = re.compile(r"\b(collect(?:ed)? (?:the )?keys?|keys? (?:collected|held|from the office)|key collection|return (?:the )?keys?)\b", re.I)
 
 role_of = evidence.role_of
@@ -88,7 +87,7 @@ TOOL_SPECS: List[Dict[str, Any]] = [
      "parameters": _schema({"name": _STR}, ["name"])},
     {"name": "list_case_files", "description": "List files in the case folder (for unusual case formats).",
      "parameters": _schema({}, [])},
-    {"name": "read_case_file", "description": "Read a text file in the case folder by relative path (capped). Summary/outcome sections are removed.",
+    {"name": "read_case_file", "description": "Read a text file in the case folder by relative path (capped). Recorded endings and status lines are removed from index.md.",
      "parameters": _schema({"path": _STR}, ["path"])},
     {"name": "check_policy", "description": "Read the agency operating policy. topic: one topic, several separated by commas, or 'all'. Topics: %s." % ", ".join(policy_topics(Config())),
      "parameters": _schema({"topic": _STR}, ["topic"])},
@@ -138,6 +137,7 @@ TOOL_SPECS: List[Dict[str, Any]] = [
          "options": {"type": "array", "items": {"type": "string"}, "description": "2-3 options for a person, for ESCALATE."},
          "unrelated_issues": {"type": "array", "items": {"type": "string"}, "description": "Separate issues raised in the thread that need their own request."},
          "amount_gbp": {"type": ["number", "null"]},
+         "answer": {"type": "string", "description": "Direct answer when the case asks an explicit question, task or decision point. Leave empty otherwise."},
      }, ["action", "priority", "reason", "confidence", "evidence_refs", "unknowns", "options", "unrelated_issues", "amount_gbp"])},
 ]
 
@@ -332,7 +332,7 @@ class Toolbox:
             return self._t_read_attachment({"name": target.name})
         text = target.read_bytes()[:60000].decode("utf-8", errors="replace")
         if target.name == "index.md":
-            text = _SECTION_RE.sub("", text)
+            text = redact_index(text)
         return {"status": "ok", "path": str(target.relative_to(root)), "text": text[:20000], "note": "Untrusted case text."}
 
     def _t_check_policy(self, args):
@@ -623,5 +623,6 @@ class Toolbox:
             "reason": _s(args.get("reason"), 2400), "confidence": confidence, "evidence_refs": refs,
             "unknowns": _list(args.get("unknowns")), "options": _list(args.get("options"), 5),
             "unrelated_issues": _list(args.get("unrelated_issues"), 5), "amount_gbp": amount,
+            "answer": _s(args.get("answer"), 2000),
         }
         return {"status": "accepted", "ignored_refs": bad} if bad else {"status": "accepted"}

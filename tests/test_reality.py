@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 from agent.config import Config
-from agent.reality import choose_stt, discover, number_cases, run_reality
+from agent.reality import _stage, choose_stt, discover, number_cases, run_reality
 from tests.helpers import WAITING_LANDLORD, make_case
 
 PM = "Property Management"
@@ -73,6 +73,19 @@ class DiscoveryTests(unittest.TestCase):
         make_case(self.root / "out", "001", WAITING_LANDLORD)
         cases, _ = discover(self.root, skip=self.root / "out")
         self.assertEqual(self.names(cases), ["001"])
+
+
+class StageTests(unittest.TestCase):
+    def test_cases_are_symlinked_into_the_staging_folder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            src = make_case(root, "001", WAITING_LANDLORD)
+            staging = root / "stage"
+            _stage([("1", src)], staging)
+            link = staging / "1"
+            self.assertTrue(link.is_symlink())
+            self.assertEqual(link.resolve(), src.resolve())
+            self.assertTrue((link / "index.md").is_file())
 
 
 class NumberingTests(unittest.TestCase):

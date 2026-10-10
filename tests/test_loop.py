@@ -125,7 +125,33 @@ class LoopTests(unittest.TestCase):
         text = json.loads(chat.seen[1][-1]["results"][0]["content"])["text"]
         self.assertNotIn("OUTCOME-SECRET", text)
         self.assertNotIn("OVERVIEW-SECRET", text)
+        self.assertNotIn("**Status:**", text)
         self.assertIn("Initial request", text)
+
+    def test_explicit_question_is_answered_and_images_go_only_to_claude(self):
+        folder = make_case(self.root, "q1", WAITING_LANDLORD)
+        idx = (folder / "index.md").read_text(encoding="utf-8")
+        (folder / "index.md").write_text(idx.replace(
+            "## Attachments", "## Question\n\nWhich contractor should attend?\n\n## Attachments"), encoding="utf-8")
+        (folder / "attachments").mkdir()
+        (folder / "attachments" / "photo.png").write_bytes(b"\x89PNG\r\n")
+        case = load_case(folder)
+        chat = ScriptedChat([Turn(calls=[submit("WAIT", answer="Send the usual gardener.")])])
+        chat.name = "anthropic"
+        d = run_loop(case, chat, dataclasses.replace(CFG, as_of="now"), NOW, folder)
+        opening = chat.seen[0][0]
+        self.assertIn("Which contractor should attend?", opening["text"])
+        self.assertIn("answer field", opening["text"])
+        from agent.loop import SYSTEM_PROMPT
+        self.assertIn("answer field", SYSTEM_PROMPT)
+        self.assertEqual(opening["images"][0]["name"], "photo.png")
+        self.assertEqual(d.answer, "Send the usual gardener.")
+        rendered = answer_md(d.to_dict())
+        self.assertLess(rendered.find("## Answer"), rendered.find("**Decision:**"))
+        self.assertIn("Send the usual gardener.", rendered)
+        plain = ScriptedChat([Turn(calls=[submit("WAIT")])])
+        run_loop(case, plain, dataclasses.replace(CFG, as_of="now"), NOW, folder)
+        self.assertNotIn("images", plain.seen[0][0])
 
     def test_report_renders_actions_and_trace(self):
         d, _ = self.run_script([Turn(calls=[call("send_message", 1, **CHASE)]), Turn(calls=[submit("CHASE_LANDLORD")])], now=LATER)

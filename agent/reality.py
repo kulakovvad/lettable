@@ -150,8 +150,14 @@ def choose_stt(cfg: Config, cases: List[Path], explicit: Optional[str]) -> Tuple
 
 
 def _stage(numbered: List[Tuple[str, Path]], staging: Path) -> None:
+    """Point the runner at the source cases. A copy is only the fallback when a symlink cannot be made."""
+    staging.mkdir(parents=True, exist_ok=True)
     for n, src in numbered:
-        shutil.copytree(src, staging / n, symlinks=True)
+        dest = staging / n
+        try:
+            dest.symlink_to(src.resolve(), target_is_directory=True)
+        except OSError:
+            shutil.copytree(src, dest, symlinks=True)
 
 
 def _read_decision(out_dir: Path, n: str) -> Optional[Dict[str, Any]]:

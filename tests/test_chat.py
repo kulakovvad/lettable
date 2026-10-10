@@ -3,7 +3,7 @@ import unittest
 from unittest import mock
 
 from agent import chat
-from agent.chat import AnthropicChat, ToolCall
+from agent.chat import AnthropicChat, OpenAIChat, ToolCall
 from agent.config import Config
 from agent.loop import SYSTEM_PROMPT
 
@@ -42,6 +42,16 @@ class AnthropicCacheTests(unittest.TestCase):
 
     def test_system_prompt_has_no_per_case_placeholders(self):
         self.assertNotIn("{agency}", SYSTEM_PROMPT)
+
+    def test_claude_inlines_images_and_openai_keeps_text(self):
+        image = {"media_type": "image/png", "data": "QQ=="}
+        msgs = AnthropicChat._messages([{"role": "user", "text": "see this", "images": [image]}])
+        self.assertEqual(msgs[0]["content"][0]["text"], "see this")
+        self.assertEqual(msgs[0]["content"][1]["source"]["data"], "QQ==")
+        with mock.patch.dict(os.environ, {"OPENAI_API_KEY": "x"}):
+            client = OpenAIChat(Config())
+        openai = client._messages("sys", [{"role": "user", "text": "see this", "images": [image]}])
+        self.assertEqual(openai[-1]["content"], "see this")
 
 
 if __name__ == "__main__":

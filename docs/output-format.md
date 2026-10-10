@@ -24,6 +24,26 @@ Every input folder gets a `decision.json`, including crashes and timeouts. The e
 
 `--resume` skips a case whose existing `decision.json` has `source: "model"`. Skipped cases keep their old files.
 
+## Reality Test export
+
+`python3 -m agent reality <challenge_dir> --out ANSWERS` finds case folders at any depth, stages them, and runs the same writer. It adds an index on top of the per-case files. Numeric folders are unpadded (`001` becomes `1`).
+
+```text
+ANSWERS/
+  manifest.json     # one object: challenge dir, track, backend, and cases[{n, source}]
+  README.md         # index of action, priority, escalation and fallback per case
+  summary.json      # reality run summary
+  trace.jsonl       # same rows as a normal run
+  <n>/
+    ANSWER.md
+    REASONING.md
+    decision.json
+```
+
+`manifest.json` `cases` maps each output number to the source path relative to the challenge folder.
+
+The reality `summary.json` records `total`, `written`, `missing` (numbers with no `decision.json`), `by_action`, `fallbacks`, `escalated`, `passes` (one object per pass: `written`, `skipped`, `by_action`, `fallbacks`, `seconds`), `seconds`, `track`, `backend`, `stt`, `finished_at` and `reconciled`. `reconciled` is true when `missing` is empty. A later pass resumes only cases whose `source` is not `model`, so fallbacks are retried and finished model decisions are kept.
+
 ## Run summary
 
 `summary.json`, also printed to stdout:
@@ -86,6 +106,7 @@ These are filled by every path: the tool loop, the single-call backends and the 
 | `idempotency_key` | string | 16 hex chars from case id, events seen, action and message |
 | `decided_at` | string | Time the gates judged against. In the tool loop this is the decision time (`as_of`). On fallback it is the wall clock or `--now` |
 | `warnings` | string[] | Input problems, such as a missing `index.md` or unreadable event time |
+| `answer` | string | Direct answer when the case asks an explicit question. Empty on fallback, on the single-call backends, and when the case does not ask one. When non-empty, `ANSWER.md` starts with an `## Answer` section |
 
 ### Tool-loop fields
 

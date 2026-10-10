@@ -114,6 +114,7 @@ class Decision:
     blocked: List[Dict[str, Any]] = field(default_factory=list)  # gate refusals the model received
     trace: List[Dict[str, Any]] = field(default_factory=list)  # every tool call, in order
     consistency: Optional[Dict[str, Any]] = None  # agent.consistency report when the check is on
+    answer: str = ""  # direct answer when the case asks an explicit question
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)

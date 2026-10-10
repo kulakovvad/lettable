@@ -20,7 +20,7 @@ from agent import consistency, evidence, gates
 from agent.chat import ChatBackend
 from agent.config import Config
 from agent.schema import Decision, Proposal
-from agent.timeline import Case, render_case
+from agent.timeline import Case, case_images, render_case
 from agent.tools import TOOL_SPECS, Toolbox
 
 SYSTEM_PROMPT = """You are the operations agent for a UK letting agency (named in the first message). You work ONE \
@@ -142,6 +142,9 @@ def _initial_message(case: Case, box: Toolbox, cfg: Config, wall: datetime,
             consistency.describe(consistency_report),
             "",
         ]
+    if case.explicit_question:
+        lines.append("This case asks an explicit question. Put the direct answer in submit_decision's answer field, then choose the next action.")
+        lines.append("")
     lines.append("Work the case with the tools, then call submit_decision.")
     return "\n".join(lines)
 
@@ -201,7 +204,12 @@ def run_loop(case: Case, chat: ChatBackend, cfg: Config, now: datetime, folder: 
         trace.append({"step": 0, "tool": "consistency_check", "result": {
             "status": report["status"], "checks": ["%s:%s" % (c["field"], c["tier"]) for c in report["checks"]],
             "dropped": report["dropped"], "error": report.get("error")}})
-    transcript: List[Dict[str, Any]] = [{"role": "user", "text": _initial_message(case, box, cfg, now, report)}]
+    opening: Dict[str, Any] = {"role": "user", "text": _initial_message(case, box, cfg, now, report)}
+    if folder is not None and getattr(chat, "name", "") == "anthropic":
+        images = case_images(folder, cfg.image_max_bytes, cfg.max_images)
+        if images:
+            opening["images"] = images
+    transcript: List[Dict[str, Any]] = [opening]
     stop_reason = ""
     system = SYSTEM_PROMPT.replace("{min_confidence}", "%g" % cfg.min_confidence)
 
@@ -298,6 +306,7 @@ def finalize(case: Case, box: Toolbox, cfg: Config, as_of: datetime, trace, step
     decision.blocked = box.blocked
     decision.trace = trace
     decision.consistency = consistency_report
+    decision.answer = str(d.get("answer") or "")[:2000]
     if stop_reason:
         decision.cause = "loop_" + stop_reason.split()[0]
     return decision

@@ -1,8 +1,8 @@
 """Turn a case folder (index.md, history.md, attachments/) into a Case.
 
-Loading never raises on bad content: problems become warnings. The summary and
-outcome sections of index.md are dropped on purpose, so a recorded ending can
-never reach the model.
+Loading never raises on bad content: problems become warnings. Overview, outcome,
+summary, resolution and the history link are dropped, as are Status, Completed
+and Updated lines, so a recorded ending cannot reach the model.
 """
 
 from __future__ import annotations
@@ -30,33 +30,6 @@ _WAIT_RE = re.compile(
 )
 _WAIT_PARTY = {"ll": "landlord", "contractor": "provider", "tt": "tenant", "t": "tenant"}
 _LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
-# Ending sections and the history link are the recorded answer. Everything else is part of the task.
-_DROP_SECTIONS = ("overview", "outcome", "summary", "resolution", "history")
-_DROP_BULLET = re.compile(
-    r"^[ \t]*[-*][ \t]+(?:\*\*)?(?:Status|Completed|Updated)(?:\*\*)?\s*:.*(?:\n|$)",
-    re.I | re.M,
-)
-_QUESTION_HEADS = ("question", "questions", "task", "decision point", "instructions")
-_HEADING_RE = re.compile(r"^(#{1,6})[ \t]+(.+?)[ \t]*$", re.M)
-_ISO_TS_RE = re.compile(r"(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}(?::\d{2})?))?")
-_NAMED_TS_RE = re.compile(
-    r"(\d{1,2})(?:st|nd|rd|th)?\s+"
-    r"(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|"
-    r"Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{4})"
-    r"(?:[ T](\d{2}:\d{2}(?::\d{2})?))?",
-    re.I,
-)
-_EVENT_WORD_RE = re.compile(
-    r"\b(event|e-?mail|email|call|sms|text message|note|message|update|voicemail|letter|chat|whatsapp)\b",
-    re.I,
-)
-_MONTHS = {
-    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
-}
-TEXT_PRELOAD = {".txt", ".csv", ".json", ".eml", ".md"}
-IMAGE_MEDIA = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
-               ".gif": "image/gif", ".webp": "image/webp"}
 # Recorded endings. A Reality Test case may add Question, Task or other sections; those stay.
 _DROP_HEADS = {"overview", "outcome", "summary", "resolution", "history"}
 _EXPLICIT_HEADS = {

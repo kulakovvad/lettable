@@ -54,8 +54,10 @@ def _action_line(a: Dict[str, Any]) -> str:
 
 
 def answer_md(d: Dict[str, Any]) -> str:
-    out = ["# Case %s%s" % (d["case_id"], ": %s" % d["title"] if d.get("title") else ""), "",
-           "**Decision:** %s" % _TITLES.get(d["action"], d["action"])]
+    out = ["# Case %s%s" % (d["case_id"], ": %s" % d["title"] if d.get("title") else ""), ""]
+    if str(d.get("answer") or "").strip():
+        out += ["## Answer", "", str(d["answer"]).strip(), ""]
+    out.append("**Decision:** %s" % _TITLES.get(d["action"], d["action"]))
     if d.get("priority"):
         out.append("**Priority:** %s" % d["priority"])
     out += [""]
