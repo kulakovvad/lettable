@@ -8,6 +8,8 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict
 
+from agent import consistency
+
 _TITLES = {
     "WAIT": "Wait, nothing to do yet",
     "CHASE_LANDLORD": "Chase the landlord",
@@ -114,6 +116,8 @@ def reasoning_md(d: Dict[str, Any]) -> str:
     out += ["", "## Why", "", d["reason"], "", "## Checks applied by code", "", _bullets(d.get("gate_notes")), "",
             "## Not known", "", _bullets(d.get("unknowns")), "", "## Input warnings", "", _bullets(d.get("warnings")), "",
             "Idempotency key: `%s`" % d["idempotency_key"], ""]
+    if d.get("consistency"):
+        out[-2:-2] = ["## Document consistency check", "", consistency.describe(d["consistency"]), ""]
     if d.get("trace"):
         out[3:3] = ["- Model: %s, %d turn(s), %d tokens" % (d.get("model") or "?", d.get("steps", 0), d.get("tokens", 0)),
                     "- Evidence cited: %s" % (", ".join(d.get("evidence_refs") or []) or "none")]

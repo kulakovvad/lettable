@@ -169,7 +169,7 @@ class AnthropicChat(ChatBackend):
             "system": system,
             "messages": self._messages(transcript),
             "tools": [{"name": t["name"], "description": t["description"], "input_schema": t["parameters"]} for t in tools],
-            "tool_choice": {"type": "any"},
+            "tool_choice": {"type": "auto"},
         }
         headers = {"x-api-key": self.key, "anthropic-version": "2023-06-01"}
         data = _post(self.url, headers, body, self.cfg)
