@@ -159,11 +159,35 @@ def _is_compliance_line(text: str, start: int, end: int) -> bool:
         r"\b(sounding|going off|beeping|triggered|activated|smell)\b", sentence, re.I)
 
 
+_NAME = r"[A-Z][A-Za-z&'.-]*(?: [A-Z][A-Za-z&'.-]*){0,3}"
+_AGENCY_WORD = re.compile(r"\b(Lettings?|Estates?|Estate Agents?|Properties|Property|Management|Homes|Residential)\b")
+# How the agency introduces or signs itself in its own messages: "Hello, this is X!" or "Kind regards,\nX".
+_INTRO = re.compile(r"\bthis is (%s)\s*[!.,]" % _NAME)
+_SIGN_OFF = re.compile(r"(?:regards|thanks|thank you|sincerely|best wishes|best)\s*,?[ \t]*\r?\n+[ \t]*(%s)[ \t]*$" % _NAME, re.I | re.M)
+
+
+def _named_in_own_messages(case: Case) -> Optional[str]:
+    """An agency-sounding name the agency uses for itself in its own messages (sender 'Agency / system' has none)."""
+    counts: dict = {}
+    for e in case.events:
+        if role_of(e.sender) != "agency":
+            continue
+        for pattern in (_INTRO, _SIGN_OFF):
+            for m in pattern.finditer(e.body):
+                name = m.group(1).strip()
+                if _AGENCY_WORD.search(name) and " from " not in name:
+                    counts[name] = counts.get(name, 0) + 1
+    return max(counts, key=counts.get) if counts else None
+
+
 def agency_name(case: Case) -> str:
-    """The agency's own name as it signs in the history (e.g. 'Northbridge Lettings'), else 'the agency'."""
+    """The agency's own name (e.g. 'Northbridge Lettings'): a sender's name, else how it introduces or signs
+    itself in its own messages, else 'the agency'."""
     counts = {}
     for e in case.events:
         name = e.sender.strip()
         if role_of(name) == "agency" and "system" not in name.lower() and "agency" not in name.lower():
             counts[name] = counts.get(name, 0) + 1
-    return max(counts, key=counts.get) if counts else "the agency"
+    if counts:
+        return max(counts, key=counts.get)
+    return _named_in_own_messages(case) or "the agency"
