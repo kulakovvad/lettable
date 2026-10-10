@@ -24,6 +24,8 @@ from agent.timeline import Case, Event
 PRIORITIES = ("P0", "P1", "P2", "P3")
 PARTIES = evidence.PARTIES
 PURPOSES = ("chase", "request_info", "reminder", "update", "safety_advice", "instruct_provider")
+# A call can also give safety advice, but only to the tenant and only on a hazard found by code.
+CALL_PURPOSES = ("chase", "request_info", "instruct_provider", "update", "safety_advice")
 INVOICE_STATES = ("sent_to_landlord", "landlord_pays_directly", "no_charge", "unknown")
 # Numbers a safety message may always contain: gas emergency, emergency services, NHS 111, power cut 105.
 SAFE_NUMBERS = {"0800111999", "999", "111", "105"}
@@ -84,7 +86,7 @@ TOOL_SPECS: List[Dict[str, Any]] = [
      "parameters": _schema({}, [])},
     {"name": "read_case_file", "description": "Read a text file in the case folder by relative path (capped). Summary/outcome sections are removed.",
      "parameters": _schema({"path": _STR}, ["path"])},
-    {"name": "check_policy", "description": "Read the agency operating policy. Topics: authority, chasing, safety, damp_mould, compliance, never_touch, closing, communication, escalation, scope, data, or 'all'.",
+    {"name": "check_policy", "description": "Read the agency operating policy. Topics: authority, chasing, safety, damp_mould, compliance, never_touch, closing, communication, calls, escalation, scope, data, or 'all'.",
      "parameters": _schema({"topic": _STR}, ["topic"])},
     {"name": "send_message", "description": "Stage a message to a party. Gates check the party exists in the case, chase timing, landlord approval before instructing a provider, appointment evidence for reminders, and that every phone number and amount in the body appears in the case. Returns staged or blocked with a reason.",
      "parameters": _schema({
@@ -94,6 +96,15 @@ TOOL_SPECS: List[Dict[str, Any]] = [
          "evidence_refs": _STRS,
          "priority": _PRIORITY,
      }, ["to", "purpose", "body", "evidence_refs", "priority"])},
+    {"name": "place_call", "description": "Stage a phone call to a party instead of a message (use when an email has gone unanswered, a voicemail was left, or the matter is urgent). Code finds the number in the case; you never give one. The caller only asks and reports back: it has no authority to approve spend or promise anything. Same gates as send_message, at most one call per case, and during an open hazard only a safety_advice call to the tenant. Returns staged or blocked with a reason.",
+     "parameters": _schema({
+         "party": {"type": "string", "enum": list(PARTIES)},
+         "purpose": {"type": "string", "enum": list(CALL_PURPOSES)},
+         "objective": {"type": "string", "description": "What the call must achieve, one or two sentences."},
+         "facts": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Short facts the caller may rely on (address, job, dates from the case)."},
+         "evidence_refs": _STRS,
+         "priority": _PRIORITY,
+     }, ["party", "purpose", "objective", "facts", "evidence_refs", "priority"])},
     {"name": "route_for_approval", "description": "Stage a request to the landlord to approve a quote or cost. The amount must appear in the case. Blocked if the landlord already approved it.",
      "parameters": _schema({"amount_gbp": {"type": "number"}, "scope": _STR, "body": _STR, "evidence_refs": _STRS},
                            ["amount_gbp", "scope", "body", "evidence_refs"])},
@@ -126,7 +137,7 @@ TOOL_SPECS: List[Dict[str, Any]] = [
      }, ["action", "priority", "reason", "confidence", "evidence_refs", "unknowns", "options", "unrelated_issues", "amount_gbp"])},
 ]
 
-ACTION_TOOLS = {"send_message", "route_for_approval", "schedule_followup", "escalate_to_human", "close_case"}
+ACTION_TOOLS = {"send_message", "place_call", "route_for_approval", "schedule_followup", "escalate_to_human", "close_case"}
 _PRIMARY_NEEDS = {
     "CHASE_LANDLORD": ("message", "landlord"),
     "CHASE_PROVIDER": ("message", "provider"),
@@ -337,20 +348,8 @@ class Toolbox:
                 return "amount GBP %.2f does not appear in the case" % a
         return None
 
-    def _t_send_message(self, args):
-        to, purpose, body = _s(args.get("to"), 20), _s(args.get("purpose"), 30), _s(args.get("body"), 3000)
-        priority = _s(args.get("priority"), 3) or "P3"
-        if to not in PARTIES or purpose not in PURPOSES:
-            return {"status": "error", "error": "to must be one of %s and purpose one of %s" % (PARTIES, PURPOSES)}
-        if len(body) < 15:
-            return self._blocked("empty_message", "message body is missing or too short", "Write the full message text.")
-        refs, bad = self._resolve_refs(args.get("evidence_refs"))
-        if not self.party_exists(to):
-            return self._blocked("unknown_party", "no %s appears in this case, so there is no recipient on record" % to,
-                                 "Escalate if this party must be contacted, or pick a party that is in the case.")
-        fab = self._fabrication(body)
-        if fab:
-            return self._blocked("unverified_detail", fab, "Only use numbers and amounts from the case, or leave them out.")
+    def _contact_gates(self, to: str, purpose: str) -> Optional[Dict[str, Any]]:
+        """Rules shared by messages and calls: chase timing, already replied, approval before instructing."""
         urgent = self.urgent
         if purpose == "chase":
             if to == "tenant":
@@ -376,6 +375,79 @@ class Toolbox:
                 return self._blocked("no_landlord_approval",
                                      "no landlord approval in force (none recorded, negated, or older than the latest quote)",
                                      "Route the quote to the landlord first, or escalate. Urgency never skips approval.")
+        return None
+
+    def number_for(self, party: str) -> Optional[str]:
+        """The party's own phone number from the case (E.164), newest first. Never taken from the model."""
+        texts = [e.body for e in reversed(self.case.events) if role_of(e.sender) == party]
+        if party == "tenant":
+            texts.append(self.case.request)
+        for text in texts:
+            m = _PHONE_RE.search(text or "")
+            if m:
+                d = _digits(m.group(0))
+                return "+" + d if d.startswith("44") else "+44" + d.lstrip("0")
+        return None
+
+    def _t_place_call(self, args):
+        party, purpose = _s(args.get("party"), 20), _s(args.get("purpose"), 30)
+        objective, priority = _s(args.get("objective"), 500), _s(args.get("priority"), 3) or "P3"
+        raw = args.get("facts")
+        facts = {_s(k, 40): _s(v, 200) for k, v in list(raw.items())[:10]} if isinstance(raw, dict) else {}
+        if party not in PARTIES or purpose not in CALL_PURPOSES:
+            return {"status": "error", "error": "party must be one of %s and purpose one of %s" % (PARTIES, CALL_PURPOSES)}
+        if len(objective) < 15:
+            return self._blocked("empty_objective", "the call objective is missing or too short", "Say what the call must achieve.")
+        refs, bad = self._resolve_refs(args.get("evidence_refs"))
+        if not self.party_exists(party):
+            return self._blocked("unknown_party", "no %s appears in this case, so there is nobody to call" % party,
+                                 "Escalate if this party must be reached.")
+        fab = self._fabrication(" ".join([objective] + list(facts.values())))
+        if fab:
+            return self._blocked("unverified_detail", fab, "Only use numbers and amounts from the case, or leave them out.")
+        # Hazards: the final gate turns any other action into an escalation, so the only call that makes
+        # sense is safety advice to the tenant. Everything else follows the normal message rules.
+        if purpose == "safety_advice" and (party != "tenant" or not self.urgent):
+            return self._blocked("no_hazard", "safety_advice calls go to the tenant and need an open hazard found by code",
+                                 "Use another purpose, or escalate.")
+        if purpose != "safety_advice" and self.urgent and party != "tenant":
+            return self._blocked("hazard_escalate", "an open hazard is on this case; a person must decide before the %s is called" % party,
+                                 "Escalate, and call the tenant with safety advice if they are at risk.")
+        if sum(1 for s in self.staged if s["kind"] == "call") >= self.cfg.max_calls_per_case:
+            return self._blocked("call_limit", "this case already has the maximum of %d call(s)" % self.cfg.max_calls_per_case,
+                                 "Use send_message or escalate.")
+        if purpose != "safety_advice":
+            blocked = self._contact_gates(party, purpose)
+            if blocked:
+                return blocked
+        number = self.number_for(party)
+        if number is None:
+            return self._blocked("no_number", "no phone number for the %s appears in the case" % party,
+                                 "Send a message instead, or escalate so a person can find the number.")
+        result = self._stage("call", {"to": party, "purpose": purpose, "priority": priority, "number": number,
+                                      "objective": objective, "facts": facts, "evidence_refs": refs,
+                                      "body": "Phone call: " + objective})
+        if bad:
+            result["ignored_refs"] = bad
+        return result
+
+    def _t_send_message(self, args):
+        to, purpose, body = _s(args.get("to"), 20), _s(args.get("purpose"), 30), _s(args.get("body"), 3000)
+        priority = _s(args.get("priority"), 3) or "P3"
+        if to not in PARTIES or purpose not in PURPOSES:
+            return {"status": "error", "error": "to must be one of %s and purpose one of %s" % (PARTIES, PURPOSES)}
+        if len(body) < 15:
+            return self._blocked("empty_message", "message body is missing or too short", "Write the full message text.")
+        refs, bad = self._resolve_refs(args.get("evidence_refs"))
+        if not self.party_exists(to):
+            return self._blocked("unknown_party", "no %s appears in this case, so there is no recipient on record" % to,
+                                 "Escalate if this party must be contacted, or pick a party that is in the case.")
+        fab = self._fabrication(body)
+        if fab:
+            return self._blocked("unverified_detail", fab, "Only use numbers and amounts from the case, or leave them out.")
+        blocked = self._contact_gates(to, purpose)
+        if blocked:
+            return blocked
         if purpose == "reminder":
             booked = self._event_refs(refs)
             if not any(_APPOINTMENT_RE.search(e.body) for e in booked):
@@ -485,8 +557,8 @@ class Toolbox:
         need = _PRIMARY_NEEDS.get(action)
         if need:
             kind, party = need
-            kinds = {"message": "message", "approval": "approval_request", "close": "closure"}
-            match = [s for s in self.staged if s["kind"] == kinds[kind] and (party is None or s.get("to") == party)]
+            kinds = {"message": ("message", "call"), "approval": ("approval_request",), "close": ("closure",)}
+            match = [s for s in self.staged if s["kind"] in kinds[kind] and (party is None or s.get("to") == party)]
             if action == "SEND_REMINDER":
                 match = [s for s in match if s.get("purpose") == "reminder"]
             if action.startswith("CHASE"):
@@ -494,7 +566,7 @@ class Toolbox:
             if action == "INSTRUCT_PROVIDER":
                 match = [s for s in match if s.get("purpose") == "instruct_provider"]
             if not match:
-                return self._blocked("action_not_staged", "%s needs a staged %s%s first" % (action, kinds[kind], " to the %s" % party if party else ""),
+                return self._blocked("action_not_staged", "%s needs a staged %s%s first" % (action, kind, " to the %s" % party if party else ""),
                                      "Call the matching action tool, or choose WAIT/ESCALATE if it was blocked.")
         refs, bad = self._resolve_refs(args.get("evidence_refs"))
         try:
