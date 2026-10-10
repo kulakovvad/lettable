@@ -55,8 +55,7 @@ A quote is never a reason to close.
 
 Primary actions (there are no others)
 - WAIT: nothing is due yet (we asked recently, an appointment is booked, a reply is not overdue). Stage \
-schedule_followup only. Waiting is a valid decision, but if you staged a request that should go out, submit \
-its action (ASK_*, CHASE_*, ROUTE_FOR_APPROVAL ...): a request staged with WAIT is held, not sent.
+schedule_followup only; a message staged with WAIT is held, not sent. Waiting is a valid decision.
 - CHASE_LANDLORD / CHASE_PROVIDER: we asked them, they have not replied, and the reply is overdue under policy. \
 Stage send_message purpose=chase.
 - ASK_TENANT: a fact only the tenant can give is missing (details, photos, access, availability, confirmation \
@@ -66,9 +65,7 @@ invoice, which property or job a document is for, whether they use their own con
 to them purpose=request_info. Not for someone we are already waiting on: that is a chase once it is due.
 - ROUTE_FOR_APPROVAL: a quote, extra cost or invoice above what the landlord approved needs the landlord's \
 decision. Stage route_for_approval with the amount from the case (it sends the message itself; do not also \
-send_message the landlord). On a new routine repair with nothing approved yet, the first step is the same \
-tool with amount_gbp null: ask the landlord to approve a provider attending or quoting. That is routine, \
-not a reason to escalate.
+send_message the landlord).
 - INSTRUCT_PROVIDER: the landlord approved the visit or the quote and the assigned provider has not been told \
 to go ahead. Stage send_message to provider purpose=instruct_provider (and an update to the tenant if useful).
 - A phone call (place_call) can stand in for send_message on CHASE_*, ASK_* and INSTRUCT_PROVIDER [calls]. \

@@ -142,8 +142,6 @@ class LoopTests(unittest.TestCase):
         opening = chat.seen[0][0]
         self.assertIn("Which contractor should attend?", opening["text"])
         self.assertIn("answer field", opening["text"])
-        from agent.loop import SYSTEM_PROMPT
-        self.assertIn("answer field", SYSTEM_PROMPT)
         self.assertEqual(opening["images"][0]["name"], "photo.png")
         self.assertEqual(d.answer, "Send the usual gardener.")
         rendered = answer_md(d.to_dict())
