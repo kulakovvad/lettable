@@ -59,7 +59,8 @@ _SUBJECT_RE = re.compile(
     r"freezer|dishwasher|washing machine|dryer|lights?|bulbs?|sockets?|fuse|garden|fence|gate|shed|gutters?|roof|"
     r"ceiling|walls?|floor|carpets?|stairs|pests?|mice|extractor|fan|blinds?|curtains?|wardrobe|furniture|"
     r"inventory|tenancy|renewal|viewing|inspection)\b", re.I)
-_SPEND_OK = ("ROUTE_FOR_APPROVAL", "ESCALATE")
+_SPEND_OK = ("ROUTE_FOR_APPROVAL", "ESCALATE", "WAIT", "ASK_TENANT", "ASK_PROVIDER", "ASK_LANDLORD",
+             "CHASE_LANDLORD", "CHASE_PROVIDER", "SEND_REMINDER")
 
 
 def _is_harmless(body: str) -> bool:

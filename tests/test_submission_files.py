@@ -17,7 +17,7 @@ HEADINGS = [
     "## 8. What we would build next",
 ]
 FORM_FIELDS = [
-    "Public repository URL", "Team name", "Track", "Names of all team members", "Commit hash at the 17:00 freeze",
+    "Public repository URL", "Team name", "Track", "Names of all team members", "Commit hash at the 17:15 freeze",
     "Reality Test results", "Path to the demo video", "LinkedIn post URL", "X post URL",
 ]
 
