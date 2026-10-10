@@ -70,7 +70,7 @@ These are filled by every path: the tool loop, the single-call backends and the 
 | `action` | enum | Final action after code gates. `WAIT`, `CHASE_LANDLORD`, `CHASE_PROVIDER`, `ASK_TENANT`, `ROUTE_FOR_APPROVAL`, `INSTRUCT_PROVIDER`, `SEND_REMINDER`, `CLOSE`, `ESCALATE` |
 | `reason` | string | Model reason. Gate changes are appended as ` [gate: ...]`. Fallback reasons start `Automatic escalation:` |
 | `source` | `model` \| `fallback` | `fallback` means the worker crashed, timed out, errored or never started, and plain code wrote the escalation |
-| `message` | string | First staged message or approval body. Empty unless the final action is `CHASE_LANDLORD`, `CHASE_PROVIDER`, `ASK_TENANT`, `INSTRUCT_PROVIDER` or `SEND_REMINDER`. For `ROUTE_FOR_APPROVAL`, read the body from `actions` |
+| `message` | string | Body of the staged action that matches the final action. Empty unless the final action is `CHASE_LANDLORD`, `CHASE_PROVIDER`, `ASK_TENANT`, `INSTRUCT_PROVIDER` or `SEND_REMINDER`. For `ROUTE_FOR_APPROVAL`, read the body from `actions` |
 | `unknowns` | string[] | Open questions |
 | `options` | string[] | Choices for a person. Always filled on `ESCALATE` |
 | `confidence` | number 0–1 or null | Model's confidence. `null` on fallback |
@@ -94,7 +94,7 @@ These are filled only by the `claude`, `anthropic`, `openai` and `auto` backends
 | `priority` | `P0`–`P3` or null | Model priority. A hazard raises P2 or P3 to P1. Null outside the tool loop |
 | `title` | string | Case title from `index.md` |
 | `request` | string | Initial request |
-| `as_of` | string | Decision time. Defaults to the case's last event, not today |
+| `as_of` | string | Decision time. `--as-of last_event` (default): the case's latest event; `now`: the wall clock or `--now` (an explicit `--now` implies this); `later`: whichever is later |
 | `model` | string | Model name |
 | `steps` | integer | Model turns used, max `loop_max_steps` (12) |
 | `tokens` | integer | Tokens across all turns |
@@ -115,6 +115,7 @@ These are filled only by the `claude`, `anthropic`, `openai` and `auto` backends
 | `crash` | fallback | Worker exited without reporting |
 | `error` | fallback | Worker raised, or returned an invalid decision |
 | `deadline` | fallback | Run deadline passed before this case started |
+| `spend_cap` | fallback | Run-wide `run_token_budget` was used up before this case started. No model call |
 | `runner` | fallback | Worker process could not be started |
 
 A fallback `reason` includes the exception type and message, truncated to 300 characters. Hide it from end users if that matters.
@@ -133,7 +134,7 @@ Common keys:
 | `state` | `committed` \| `held_for_review` | Items are `staged` during the run. Finished output has only these two |
 | `note` | string | Why it is in that state |
 
-When the final gates change the model's action, every staged item is set to `held_for_review`. Escalations and `safety_advice` messages are exempt and stay `committed`. If the final action is `ESCALATE` and the model staged no escalation, code adds one with note `Created automatically because the final decision is an escalation.`
+Only the staged item that matches the final action is `committed` (for example the chase message for `CHASE_LANDLORD`, the follow-up for `WAIT`, the closure for `CLOSE`). Escalations always commit. A `safety_advice` message commits only when it goes to the tenant and code found an open hazard. Everything else is `held_for_review`, including every message when the loop ran out of budget or the final action is `ESCALATE`. If the final action is `ESCALATE` and the model staged no escalation, code adds one with note `Created automatically because the final decision is an escalation.`
 
 Per-kind keys:
 
@@ -143,21 +144,21 @@ Per-kind keys:
 | `approval_request` | `to` (`landlord`), `amount_gbp`, `scope`, `body`, `evidence_refs`, `above_limit` (amount over `approval_limit_gbp`, default 300) |
 | `followup` | `review_at`, `waiting_on` (`tenant`, `landlord`, `provider`, `internal`), `reason` |
 | `escalation` | `priority`, `route` (`on_call_emergency`, `property_manager`, `accounts`, `complaints`), `summary`, `known`, `unknowns`, `tried`, `options`, `evidence_refs` |
-| `closure` | `completion_refs`, `invoice_status` (`sent_to_landlord`, `landlord_pays_directly`, `no_charge`), `keys_status` (`returned`, `not_applicable`), `reason` |
+| `closure` | `completion_refs` (events where a provider, tenant or landlord says the job is done), `invoice_status` (`sent_to_landlord`, `landlord_pays_directly`, `no_charge`), `invoice_refs`, `keys_status` (`returned`, `not_applicable`), `key_refs`, `reason` |
 
 ## Blocked calls
 
 Each item in `blocked` is a tool call a gate refused. The model saw the reason and could adapt. A non-empty list does not mean the case failed. Shape, with illustrative values:
 
 ```json
-{"tool": "send_message", "status": "blocked", "code": "too_early", "why": "only 1.2 days since we wrote to the provider (event-004); policy is 3 days", "hint": "Schedule a follow-up and WAIT, unless the risk is P0/P1."}
+{"tool": "send_message", "status": "blocked", "code": "too_early", "why": "only 1.2 days since we wrote to the provider (event-004); policy is 3 days", "hint": "Schedule a follow-up and WAIT. Only an open hazard found by code allows an early chase."}
 ```
 
 | `code` | Tool |
 |---|---|
 | `empty_message`, `unknown_party`, `unverified_detail`, `wrong_purpose`, `nothing_to_chase`, `already_replied`, `too_early`, `no_landlord_approval`, `no_appointment` | `send_message` |
 | `amount_not_in_case`, `unknown_party`, `unverified_detail`, `already_approved` | `route_for_approval` |
-| `no_confirmation`, `possibly_reopened`, `invoice_unknown`, `keys_unknown` | `close_case` |
+| `no_confirmation`, `possibly_reopened`, `invoice_unknown`, `invoice_unverified`, `keys_unknown`, `keys_unverified` | `close_case` |
 | `action_not_staged` | `submit_decision` |
 
 ## Trace
