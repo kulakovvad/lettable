@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from agent import evidence, gates
+from agent import channel, evidence, gates
 from agent.config import Config
 from agent.policy import policy_topics
 from agent.schema import ACTIONS
@@ -103,7 +103,7 @@ TOOL_SPECS: List[Dict[str, Any]] = [
          "evidence_refs": _STRS,
          "priority": _PRIORITY,
      }, ["to", "purpose", "body", "evidence_refs", "priority"])},
-    {"name": "place_call", "description": "Stage a phone call to a party instead of a message (use when an email has gone unanswered, a voicemail was left, or the matter is urgent). Code finds the number in the case; you never give one. The caller only asks and reports back: it has no authority to approve spend or promise anything. Same gates as send_message, at most one call per case, and during an open hazard only a safety_advice call to the tenant. Returns staged or blocked with a reason.",
+    {"name": "place_call", "description": "Ask for a phone call to a party instead of a message. The code decides whether the phone is the right channel (after two unanswered emails or texts, a bounce, or an urgent hazard) and tells you if not: then send a message. Code finds the number in the case; you never give one. The caller only asks and reports back: it has no authority to approve spend or promise anything. Same gates as send_message, at most one call per case, and during an open hazard only a safety_advice call to the tenant. Returns staged or blocked with a reason.",
      "parameters": _schema({
          "party": {"type": "string", "enum": list(PARTIES)},
          "purpose": {"type": "string", "enum": list(CALL_PURPOSES)},
@@ -475,6 +475,10 @@ class Toolbox:
             blocked = self._contact_gates(party, purpose)
             if blocked:
                 return blocked
+            # Channel policy (agent/channel.py): the model asks, the code decides whether the phone is the right channel.
+            allowed, why, hint = channel.phone_allowed(self.case, party, purpose, self.now, self.cfg, self.urgent)
+            if not allowed:
+                return self._blocked("channel_policy", why, hint)
         number = self.number_for(party)
         if number is None:
             return self._blocked("no_number", "no phone number for the %s appears in the case" % party,

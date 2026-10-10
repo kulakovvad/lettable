@@ -20,6 +20,10 @@ class Config:
 
     # Decision thresholds. Starting values; tune on the public cases.
     chase_after_days: float = 3.0
+    # Who decides to phone is code (agent/channel.py): a call needs this many unanswered emails/texts to the party,
+    # the latest at least this many hours old (or a bounce, or a hazard found by code).
+    call_after_unanswered: int = 2
+    call_after_hours: float = 24.0
     approval_limit_gbp: float = 300.0  # placeholder until the real limit is known
     min_confidence: float = 0.5
 

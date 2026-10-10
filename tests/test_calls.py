@@ -26,6 +26,8 @@ PROVIDER = [
     ("2025-12-30 11:00:00", "Email", "Contractor", "Agency / system", "Hello, I am the assigned engineer. Call me on 07700 900123."),
     ("2026-01-01 09:10:00", "Email", "Agency / system", "Contractor", "Please confirm a visit date for the dishwasher repair."),
     ("2026-01-01 09:11:00", "Update", "Agency / system", "Not specified", "Waiting for Provider (3 days)"),
+    # a second unanswered written message: the channel policy allows a call after two (agent/channel.py)
+    ("2026-01-04 09:00:00", "Email", "Agency / system", "Contractor", "A reminder: please confirm a visit date for the dishwasher repair."),
 ]
 NO_NUMBER = [PROVIDER[0], ("2025-12-30 11:00:00", "Email", "Contractor", "Agency / system", "Hello, I am the assigned engineer.")] + PROVIDER[2:]
 GAS = PROVIDER + [("2026-01-01 10:00:00", "SMS", "Tenant", "Agency / system", "I can smell gas! My number is 07700 900456")]

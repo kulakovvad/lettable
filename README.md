@@ -110,7 +110,7 @@ python3 -m agent replay "<cases folder>" out-replay/ --points 2 --backend claude
 
 Cuts each finished case at a few points, shows the agent only the events up to that point and compares its proposed action with what the agency actually did next. The "what happened next" label is a rough rule, so read the numbers as agreement, not accuracy.
 
-**Voice.** Details and safety rules: [docs/voice.md](docs/voice.md).
+**Voice.** Details and safety rules: [docs/voice.md](docs/voice.md). The model asks for a call, but code decides whether the phone is the right channel (two unanswered messages, a bounce, or an urgent hazard).
 
 ```
 python3 -m agent run cases/ out/ --stt elevenlabs --calls dry_run   # transcribe audio; record calls, dial nothing

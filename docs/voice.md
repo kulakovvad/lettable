@@ -19,6 +19,16 @@ Both directions are off or harmless by default, because they cost money and can 
 
 The model can only **stage** a call (`place_call`). It never supplies a number: code takes it from the case. The call goes through the same gates as a message (chase timing, already replied, landlord approval before instructing a provider). After the final decision passes the gates, the runner places it, once, and the case does not wait for the call.
 
+### Who decides to phone
+
+The model decides **what** to do (a message, or a call objective, to a party, and why). The code decides **whether the phone is the right channel**. Keeping intent and channel apart makes the choice testable, cost-controlled and the same every time, and the model can only suggest. The policy (`agent/channel.py`) allows a call when:
+
+- **writing has failed:** at least `call_after_unanswered` (default 2) of our emails or texts to that party are unanswered since their last reply, and the latest is at least `call_after_hours` (default 24) old; or the latest message bounced ("delivery failed", "mailbox full"); or
+- **it is urgent:** a hazard found by code (the model's own priority never counts); or
+- **the tenant phoned in:** a `request_info` question to a tenant who called the agency themselves.
+
+Anything else is refused with a reason and a hint the model sees ("only 1 unanswered written message to the provider so far; send a message first"), and the model sends a message instead. Notes, updates and earlier calls do not count as written contact. The other safety rules below still apply on top of this one.
+
 Safety rules in code:
 - At most `max_calls_per_case` calls in a case's whole history (earlier calls are counted from their call records) and `max_calls_per_run` per run.
 - Live calls only between `call_hours` (default 08:00 to 21:00 UK time); otherwise the call is held and a person is told.
