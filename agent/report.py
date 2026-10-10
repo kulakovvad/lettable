@@ -34,6 +34,13 @@ def _action_line(a: Dict[str, Any]) -> str:
     kind = a.get("kind")
     if kind == "message":
         head = "Message to %s (%s, %s)" % (a.get("to"), a.get("purpose"), a.get("priority"))
+    elif kind == "call" and a.get("purpose") == "oncall_brief":
+        head = "On-call briefing call (%s), %s: %s" % (a.get("priority"), a.get("call_status", "?"), a.get("objective"))
+        if a.get("conversation_id"):
+            head += " [conversation %s]" % a["conversation_id"]
+        if a.get("call_result"):
+            head += ". Acknowledgement: %s" % ((a["call_result"].get("data") or {}).get("outcome")
+                                               or a["call_result"].get("summary") or a["call_result"].get("status"))
     elif kind == "call":
         head = "Phone call to %s (%s, %s), %s: %s" % (a.get("to"), a.get("purpose"), a.get("priority"),
                                                       a.get("call_status", "?"), a.get("objective"))

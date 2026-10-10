@@ -135,6 +135,7 @@ class LoopTests(unittest.TestCase):
             "## Attachments", "## Question\n\nWhich contractor should attend?\n\n## Attachments"), encoding="utf-8")
         (folder / "attachments").mkdir()
         (folder / "attachments" / "photo.png").write_bytes(b"\x89PNG\r\n")
+        (folder / "attachments" / "quote.pdf").write_bytes(b"%PDF-1.1\n")
         case = load_case(folder)
         chat = ScriptedChat([Turn(calls=[submit("WAIT", answer="Send the usual gardener.")])])
         chat.name = "anthropic"
@@ -143,6 +144,9 @@ class LoopTests(unittest.TestCase):
         self.assertIn("Which contractor should attend?", opening["text"])
         self.assertIn("answer field", opening["text"])
         self.assertEqual(opening["images"][0]["name"], "photo.png")
+        self.assertEqual(opening["documents"][0]["name"], "quote.pdf")
+        self.assertIn("quote.pdf", opening["text"])
+        self.assertIn("untrusted case data", opening["text"])
         self.assertEqual(d.answer, "Send the usual gardener.")
         rendered = answer_md(d.to_dict())
         self.assertLess(rendered.find("## Answer"), rendered.find("**Decision:**"))
@@ -150,6 +154,7 @@ class LoopTests(unittest.TestCase):
         plain = ScriptedChat([Turn(calls=[submit("WAIT")])])
         run_loop(case, plain, dataclasses.replace(CFG, as_of="now"), NOW, folder)
         self.assertNotIn("images", plain.seen[0][0])
+        self.assertNotIn("documents", plain.seen[0][0])
 
     def test_report_renders_actions_and_trace(self):
         d, _ = self.run_script([Turn(calls=[call("send_message", 1, **CHASE)]), Turn(calls=[submit("CHASE_LANDLORD")])], now=LATER)

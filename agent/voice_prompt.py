@@ -10,9 +10,9 @@ import re
 
 from typing import Any, Dict
 
-from agent.voice import CallRequest
+from agent.voice import STAFF_PARTY, CallRequest
 
-VARIABLES = ("agency_name", "party", "job", "objective", "known_facts", "case_id")
+VARIABLES = ("agency_name", "party", "job", "objective", "known_facts", "case_id", "audience")
 
 PROMPT = """You are an automated phone assistant calling on behalf of {{agency_name}}, a UK letting agency. \
 You are calling the {{party}} about {{job}} (case {{case_id}}).
@@ -20,6 +20,11 @@ You are calling the {{party}} about {{job}} (case {{case_id}}).
 Your objective: {{objective}}
 
 What you know (use only this; never invent anything): {{known_facts}}
+
+Who you are speaking to: {{audience}}. If this is "staff", you are briefing a colleague on call, not asking for \
+anything: say the case and the property, what was found and what has already been done, using only what you know; \
+then ask "Can you confirm you have this?", take a yes or a no, repeat the briefing once if they ask, say thank you, \
+and use the end_call tool. Do not ask for a visit date or a price. Every rule below still applies.
 
 How to behave
 - The first message has already said who you are, why you are calling and that the call is recorded. Do not repeat \
@@ -71,7 +76,7 @@ VOICEMAIL_MESSAGE = ("Hello, this is an automated assistant calling for {{agency
 PLACEHOLDERS: Dict[str, str] = {
     "agency_name": "the letting agency", "party": "the contact", "job": "a maintenance job",
     "objective": "This is an automated line: ask the caller to contact the agency directly.",
-    "known_facts": "nothing further", "case_id": "none",
+    "known_facts": "nothing further", "case_id": "none", "audience": "external",
 }
 
 # Plain, non-expressive voice: the expressive models read stage directions such as [sad] aloud.
@@ -179,4 +184,5 @@ def dynamic_variables(req: CallRequest) -> Dict[str, Any]:
         "objective": _prompt_text(req.objective, 300) or "Find out where the job stands.",
         "known_facts": _known_facts(facts),
         "case_id": _cut(req.case_id, 40) or "none",
+        "audience": "staff" if req.party == STAFF_PARTY else "external",  # set by code from the party, never from facts
     }

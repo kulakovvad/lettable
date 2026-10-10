@@ -4,7 +4,7 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
-from agent.timeline import case_images, load_case, parse_history, parse_index, redact_index, render_case
+from agent.timeline import case_images, case_pdfs, load_case, parse_history, parse_index, redact_index, render_case
 from tests.helpers import WAITING_LANDLORD, make_case
 
 
@@ -112,9 +112,13 @@ class TimelineTests(unittest.TestCase):
         self.assertTrue(case.explicit_question)
         self.assertIn("Which contractor", case.index_notes)
 
-    def test_a_question_mark_in_the_request_is_an_explicit_question(self):
+    def test_a_question_mark_in_the_request_is_not_an_explicit_question(self):
         _title, _role, _prop, _request, _names, _notes, explicit = parse_index(
             "# Case 9: Transfer\n\n## Initial request\n\nWas the payment sent?\n")
+        self.assertFalse(explicit)
+        _title, _role, _prop, _request, _names, _notes, explicit = parse_index(
+            "# Case 9: Transfer\n\n## Initial request\n\nThe payment was sent.\n\n"
+            "## Question\n\nWas it the right account?\n")
         self.assertTrue(explicit)
 
     def test_generic_history_headings(self):
@@ -165,6 +169,34 @@ Booked Friday.
         self.assertTrue(images[0]["data"])
         (att / "huge.jpg").write_bytes(b"\xff" * 200)
         self.assertEqual([i["name"] for i in case_images(folder, max_bytes=100)], ["photo.png"])
+        (folder / "secret.png").write_bytes(b"\x89PNG\r\nsecret")
+        names = [i["name"] for i in case_images(folder)]
+        self.assertIn("photo.png", names)
+        self.assertNotIn("secret.png", names)
+        idx = (folder / "index.md").read_text(encoding="utf-8")
+        (folder / "index.md").write_text(idx.replace(
+            "## Attachments", "## Outcome\n\nSee outcome.png\n\n## Attachments"), encoding="utf-8")
+        (att / "outcome.png").write_bytes(b"\x89PNG\r\noutcome")
+        names = [i["name"] for i in case_images(folder)]
+        self.assertIn("photo.png", names)
+        self.assertNotIn("outcome.png", names)
+
+    def test_pdfs_are_attachment_files_with_a_header_and_a_total_cap(self):
+        folder = make_case(self.root, "pdfs", WAITING_LANDLORD)
+        att = folder / "attachments"
+        att.mkdir()
+        (att / "quote.pdf").write_bytes(b"%PDF-1.1\n" + b"a" * 20)
+        (att / "notes.pdf").write_bytes(b"not a pdf")
+        (folder / "letter.pdf").write_bytes(b"%PDF-1.1\nbeside the timeline")
+        found, skipped = case_pdfs(folder, max_bytes=100)
+        self.assertEqual([item["name"] for item in found], ["quote.pdf"])
+        self.assertEqual(found[0]["media_type"], "application/pdf")
+        self.assertTrue(any(note.startswith("notes.pdf") for note in skipped))
+        self.assertFalse(any("letter.pdf" in note for note in skipped))
+        (att / "second.pdf").write_bytes(b"%PDF-1.1\n" + b"b" * 20)
+        found, skipped = case_pdfs(folder, max_bytes=40)
+        self.assertEqual([item["name"] for item in found], ["quote.pdf"])
+        self.assertTrue(any("second.pdf" in note and "cap" in note for note in skipped))
 
     def test_redact_index_strips_status_lines(self):
         raw = "## Case details\n\n- **Status:** Completed\n- **Updated:** yesterday\n- **Completed:** today\n- **Created:** Monday\n\n## Outcome\n\nOUTCOME-SECRET\n"
