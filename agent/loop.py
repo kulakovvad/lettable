@@ -69,8 +69,8 @@ send_message the landlord).
 - INSTRUCT_PROVIDER: the landlord approved the visit or the quote and the assigned provider has not been told \
 to go ahead. Stage send_message to provider purpose=instruct_provider (and an update to the tenant if useful).
 - A phone call (place_call) can stand in for send_message on CHASE_*, ASK_* and INSTRUCT_PROVIDER [calls]. \
-Prefer a call over a message when an email chase went unanswered, a voicemail was already left, or the matter is \
-urgent. A call is only a request: the caller has no authority to approve spend or promise anything. Never give a \
+A call is a request you make; the code decides whether the phone is the right channel (two unanswered emails or \
+texts, a bounce, or an urgent hazard) and tells you if not: then send a message. A call is only a request: the caller has no authority to approve spend or promise anything. Never give a \
 number; code uses the one in the case.
 - SEND_REMINDER: a recorded appointment needs a reminder. Cite the booking event.
 - CLOSE: every closing condition holds. Stage close_case.

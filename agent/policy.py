@@ -140,7 +140,10 @@ def policy_topics(cfg: Config) -> Dict[str, str]:
             "A phone call is a request, not an authority. The caller may ask questions, confirm a visit date, "
             "pass on facts from the case and record what was said; it may not approve or promise spend, share one "
             "party's details with another, or discuss deposits, rent, notices or complaints. Use a call when an "
-            "email chase went unanswered, a voicemail was already left, or the matter is urgent. One call per case. "
+            "email chase went unanswered, a voicemail was already left, or the matter is urgent; the code decides whether the "
+            f"phone is the right channel ({cfg.call_after_unanswered} unanswered emails or texts, the latest "
+            f"{cfg.call_after_hours:g} hours old, or a bounce, or an urgent hazard found by code) and tells you if not. "
+            "One call per case. "
             "The number always comes from the case. Calls only happen in UK calling hours. If a call cannot be "
             "placed, a person is told."
         ),
