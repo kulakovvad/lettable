@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lettable — case workspace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
+        <rect x="0" y="12" width="4" height="10" fill="#14161A"></rect>
+        <rect x="6" y="4" width="4" height="18" fill="#14161A"></rect>
+        <rect x="12" y="8" width="4" height="14" fill="var(--accent)"></rect>
+        <rect x="18" y="14" width="4" height="8" fill="#14161A"></rect>
+      </svg>
+      <span class="brand-name">Lettable</span>
+    </div>
+    <div class="topbar-meta mono">
+      <span id="top-case">No case</span>
+      <span class="divider" aria-hidden="true"></span>
+      <span id="top-asof" class="muted"></span>
+    </div>
+  </header>
+
+  <main id="main" class="main">
+    <section aria-label="Cases" class="panel panel-cases">
+      <div class="panel-head">
+        <div class="row-between">
+          <h2 class="label">Case</h2>
+          <span id="run-secs" class="mono small muted"></span>
+        </div>
+        <p id="run-counts" class="mono small run-counts"></p>
+      </div>
+      <div id="case-list" role="radiogroup" aria-label="Cases in this run" class="case-list"></div>
+    </section>
+
+    <section id="info" aria-label="Case info" class="panel panel-info"></section>
+    <section id="decision" aria-label="Decision" class="panel-decision"></section>
+    <section id="reasoning" aria-label="Reasoning" class="panel panel-reasoning"></section>
+  </main>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>

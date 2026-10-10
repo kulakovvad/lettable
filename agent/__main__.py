@@ -1,4 +1,4 @@
-"""python3 -m agent run|replay INPUT_DIR OUT_DIR [options]  |  calls collect OUT_DIR  |  export OUT_DIR"""
+"""python3 -m agent run|replay INPUT_DIR OUT_DIR [options]  |  calls collect OUT_DIR  |  export OUT_DIR  |  ui OUT_DIR"""
 
 from __future__ import annotations
 
@@ -94,9 +94,21 @@ def main(argv=None) -> int:
     vs.add_argument("--update-agent", action="store_true", help="apply the current configuration to ELEVENLABS_AGENT_ID")
     vs.add_argument("--import-number", metavar="E164", help="Twilio number to import (uses TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN)")
     vs.add_argument("--yes", action="store_true", help="actually call the API; without it only describe")
+    ui = sub.add_parser("ui", help="open a local page over a run's results (read-only, except a person's choice in review.json)")
+    ui.add_argument("out_dir")
+    ui.add_argument("--port", type=int, default=8765)
+    ui.add_argument("--open", action="store_true", help="open the page in a browser")
     args = p.parse_args(argv)
     if args.cmd == "voice-setup":
         return _voice_setup(args)
+    if args.cmd == "ui":
+        from agent.ui import serve
+
+        if not Path(args.out_dir).is_dir():
+            print("output directory not found: %s" % args.out_dir, file=sys.stderr)
+            return 2
+        serve(Path(args.out_dir), args.port, args.open)
+        return 0
     if args.cmd == "export":
         from agent.export import ExportError, export
 

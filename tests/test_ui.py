@@ -1,0 +1,191 @@
+import http.client
+import json
+import tempfile
+import threading
+import unittest
+from pathlib import Path
+
+from agent.ui import ReviewError, case_dir, case_view, list_cases, make_server, save_review, step_summary
+
+
+def decision(cid, **over):
+    d = {"case_id": cid, "action": "ESCALATE", "reason": "See event-003 and event-013/015.", "source": "model",
+         "message": "", "unknowns": ["Who attended"], "options": ["Ask the provider", "Ask the tenant"],
+         "confidence": 0.8, "hazard": False, "waiting_on": None, "waiting_days": None, "events_seen": 19,
+         "gate_notes": [], "proposed_action": None, "cause": None, "warnings": [], "priority": "P2",
+         "title": "Front Door Repair", "request": "Door sticks.", "as_of": "2025-01-12T09:37:00+00:00",
+         "model": "claude", "steps": 2, "tokens": 1000, "evidence_refs": ["event-003"], "unrelated_issues": [],
+         "actions": [{"id": "escalation-1", "kind": "escalation", "state": "committed", "priority": "P2", "route": "accounts"}],
+         "blocked": [],
+         "trace": [{"step": 1, "tool": "read_events", "args": {"first": 15, "last": 19}, "result": {"status": "ok", "events": "5 item(s)"}},
+                   {"step": 1, "thought": "Looking at the invoice."},
+                   {"step": 2, "tool": "submit_decision", "args": {"action": "ESCALATE", "priority": "P2", "confidence": 0.8,
+                                                                    "amount_gbp": 68.97}, "result": {"status": "accepted"}}]}
+    d.update(over)
+    return d
+
+
+def make_run(root: Path, decisions):
+    out = root / "out"
+    for d in decisions:
+        (out / d["case_id"]).mkdir(parents=True)
+        (out / d["case_id"] / "decision.json").write_text(json.dumps(d))
+    (out / "summary.json").write_text(json.dumps({"total": len(decisions), "written": len(decisions), "skipped": 0,
+                                                  "by_action": {}, "seconds": 3.2}))
+    (out / "trace.jsonl").write_text('{"case_id": "015", "seconds": 9.0}\nnot json\n{"case_id": "015", "seconds": 10.57}\n')
+    return out
+
+
+class AdapterTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_case_list_puts_escalations_first_then_priority(self):
+        out = make_run(self.root, [decision("001", action="WAIT", priority="P1"), decision("002", priority="P3"),
+                                   decision("003", priority="P1")])
+        (out / "no-decision").mkdir()
+        run = list_cases(out)
+        self.assertEqual([c["id"] for c in run["cases"]], ["003", "002", "001"])
+        self.assertEqual(run["summary"]["seconds"], 3.2)
+
+    def test_view_derives_the_mockup_fields(self):
+        out = make_run(self.root, [decision("015")])
+        x = case_view(out, "015")["derived"]
+        self.assertEqual(x["action_label"], "Escalate to a person")
+        self.assertEqual(x["amount"], 68.97)
+        self.assertEqual(x["route"], {"route": "accounts", "state": "committed"})
+        self.assertEqual(x["seconds"], 10.57)
+        self.assertFalse(x["followup_missing"])
+        self.assertEqual(x["calls"], 2)
+        self.assertEqual([p["t"] for p in x["reason_parts"] if p["ref"]], ["event-003", "event-013/015"])
+        self.assertEqual(x["steps"][0]["arg"], "events 15–19 · 5 items")
+        self.assertEqual(x["steps"][1], {"step": 1, "thought": "Looking at the invoice."})
+        self.assertEqual(x["steps"][2]["arg"], "ESCALATE · P2 · conf 0.80")
+
+    def test_skipped_followup_is_flagged(self):
+        trace = [{"step": 3, "tool": "schedule_followup", "args": {"after_hours": 72, "waiting_on": "tenant"},
+                  "result": {"status": "skipped", "error": "decision already submitted"}}]
+        out = make_run(self.root, [decision("014", action="WAIT", trace=trace, actions=[])])
+        x = case_view(out, "014")["derived"]
+        self.assertTrue(x["followup_missing"])
+        self.assertIsNone(x["route"])
+        self.assertEqual(x["steps"][0]["arg"], "72 h · waiting on tenant — decision already submitted")
+
+    def test_fallback_with_empty_fields_renders(self):
+        fb = decision("009", source="fallback", cause="timeout", priority=None, confidence=None, title="", request="",
+                      as_of="", model="", steps=0, tokens=0, evidence_refs=[], actions=[], trace=[])
+        out = make_run(self.root, [fb])
+        view = case_view(out, "009")
+        self.assertIsNone(view["derived"]["amount"])
+        self.assertEqual(view["derived"]["steps"], [])
+        self.assertEqual(list_cases(out)["cases"][0]["source"], "fallback")
+
+    def test_step_summaries(self):
+        self.assertEqual(step_summary({"tool": "search_case", "args": {"query": "quote"}, "result": {"hits": "1 item(s)"}}),
+                         "“quote” · 1 hit")
+        self.assertEqual(step_summary({"tool": "case_facts", "args": {}, "result": {"status": "ok"}}), "—")
+        self.assertEqual(step_summary({"tool": "send_message", "args": {"to": "landlord", "purpose": "chase"},
+                                       "result": {"status": "blocked", "why": "too early"}}), "to landlord · chase — too early")
+
+    def test_case_ids_cannot_escape_the_run(self):
+        out = make_run(self.root, [decision("015")])
+        (self.root / "decision.json").write_text("{}")
+        for bad in ("..", ".", "", "../out/015", "015/../..", "a\\b", "missing"):
+            self.assertIsNone(case_dir(out, bad), bad)
+            self.assertIsNone(case_view(out, bad), bad)
+        self.assertIsNotNone(case_dir(out, "015"))
+
+
+class ReviewTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.out = make_run(Path(self.tmp.name), [decision("015", unrelated_issues=["Flat 10 door"])])
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_choices_are_appended_and_latest_wins(self):
+        save_review(self.out, "015", {"choice": "option", "option": 2})
+        save_review(self.out, "015", {"choice": "new_case", "text": "Flat 10 door"})
+        review = save_review(self.out, "015", {"choice": "take_over"})
+        self.assertEqual(review["latest"]["choice"], "take_over")
+        self.assertEqual(review["new_cases"], ["Flat 10 door"])
+        data = json.loads((self.out / "015" / "review.json").read_text())
+        self.assertEqual(data["entries"][0]["option_text"], "Ask the tenant")
+        self.assertEqual(len(data["entries"]), 3)
+        self.assertEqual(case_view(self.out, "015")["review"]["latest"]["choice"], "take_over")
+
+    def test_decision_json_is_never_touched(self):
+        before = (self.out / "015" / "decision.json").read_bytes()
+        save_review(self.out, "015", {"choice": "take_over"})
+        self.assertEqual((self.out / "015" / "decision.json").read_bytes(), before)
+
+    def test_bad_reviews_are_refused(self):
+        for payload in ({"choice": "delete"}, {"choice": "option", "option": 3}, {"choice": "option", "option": True},
+                        {"choice": "option", "option": "1"}, {"choice": "new_case", "text": " "},
+                        {"choice": "new_case", "text": "x" * 2001}, []):
+            with self.assertRaises(ReviewError, msg=payload):
+                save_review(self.out, "015", payload)
+        with self.assertRaises(ReviewError):
+            save_review(self.out, "..", {"choice": "take_over"})
+        self.assertFalse((self.out / "015" / "review.json").exists())
+
+
+class ServerTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.out = make_run(Path(self.tmp.name), [decision("015")])
+        self.server = make_server(self.out, 0)
+        self.port = self.server.server_address[1]
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def tearDown(self):
+        self.server.shutdown()
+        self.server.server_close()
+        self.tmp.cleanup()
+
+    def request(self, method, path, body=None, headers=None):
+        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        conn.request(method, path, body=body, headers=headers or {})
+        res = conn.getresponse()
+        data = res.read()
+        conn.close()
+        return res.status, res.getheader("Content-Type"), data
+
+    def test_page_and_api(self):
+        status, ctype, body = self.request("GET", "/")
+        self.assertEqual(status, 200)
+        self.assertIn("text/html", ctype)
+        self.assertIn(b"/static/app.js", body)
+        for name in ("app.js", "styles.css"):
+            self.assertEqual(self.request("GET", "/static/" + name)[0], 200)
+        status, _, body = self.request("GET", "/api/run")
+        self.assertEqual(json.loads(body)["cases"][0]["id"], "015")
+        status, _, body = self.request("GET", "/api/cases/015")
+        self.assertEqual(json.loads(body)["decision"]["case_id"], "015")
+
+    def test_review_post(self):
+        payload = json.dumps({"choice": "option", "option": 1})
+        status, _, body = self.request("POST", "/api/cases/015/review", payload, {"Content-Type": "application/json"})
+        self.assertEqual(status, 200, body)
+        self.assertEqual(json.loads(body)["latest"]["option"], 1)
+        status, _, _ = self.request("POST", "/api/cases/015/review", payload, {"Content-Type": "text/plain"})
+        self.assertEqual(status, 415)
+        status, _, _ = self.request("POST", "/api/cases/015/review", "{", {"Content-Type": "application/json"})
+        self.assertEqual(status, 400)
+
+    def test_unknown_paths_and_traversal_are_404(self):
+        for path in ("/api/cases/%2e%2e", "/api/cases/..%2Fsummary.json", "/static/..%2Fui.py", "/static/.hidden",
+                     "/../agent/ui.py", "/api/cases/missing", "/nope"):
+            self.assertEqual(self.request("GET", path)[0], 404, path)
+
+    def test_foreign_host_is_refused(self):
+        self.assertEqual(self.request("GET", "/api/run", headers={"Host": "evil.example"})[0], 403)
+
+
+if __name__ == "__main__":
+    unittest.main()

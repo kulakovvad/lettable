@@ -56,6 +56,7 @@ flowchart LR
 | `agent/replay.py` | cut-and-compare check on finished cases |
 | `agent/stt.py`, `agent/voice*.py`, `agent/calls.py` | speech-to-text, phone calls, collecting call results |
 | `agent/consistency.py` | opt-in document consistency check |
+| `agent/ui.py`, `agent/ui_static/` | local case workspace page over a run's results |
 
 ## 4. How to run it
 
@@ -113,6 +114,14 @@ python3 -m agent calls collect out/ --backend elevenlabs             # bring fin
 
 **Document consistency check (opt-in).** `echo '{"consistency_check": true}' > jev.json` then add `--config jev.json` and set `TYPESAFE_API_KEY`. See [docs/design.md](docs/design.md#document-consistency-check-opt-in).
 
+**UI (case workspace).**
+
+```
+python3 -m agent ui out/ --open      # http://127.0.0.1:8765/  (--port to change)
+```
+
+A local page over a finished run: the case list, the case info and what is not known, the decision with its reasoning and evidence refs, and the model's tool calls. It reads `decision.json`, `summary.json` and `trace.jsonl` and never changes them. "Go with option N", "Take over case" and "Open as new case" record a person's choice in `<case>/review.json` ([docs/output-format.md](docs/output-format.md#review)); nothing is sent anywhere. The server listens on 127.0.0.1 only and needs no dependencies.
+
 **Export the results for submission.**
 
 ```
@@ -162,4 +171,4 @@ Everything else is the Python standard library. Optional: `pypdf` for PDF text. 
 3. Send the first landlord approval request instead of holding it.
 4. Tune thresholds and the policy on more cases, including a large held-out split.
 5. Inbound calls and voicemail for tenants, with a human handover that keeps the call transcript.
-6. A dashboard over `decision.json` for the operations team.
+6. Grow the local UI into a dashboard for the operations team: feed `review.json` choices back into the case, ask the agent about a case, and re-run a case from the page.
