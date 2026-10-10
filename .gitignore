@@ -13,3 +13,4 @@ results/
 interface/
 build/
 *.egg-info/
+out-voice-test/
