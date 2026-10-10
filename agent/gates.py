@@ -58,10 +58,27 @@ def find_hazard(case: Case, cfg: Config) -> Optional[str]:
     texts += [e.body for j, e in enumerate(events[:split]) if done_at is None or done_at < j]
     blob = "\n".join(texts)
     for pattern in cfg.hazard_patterns:
-        m = re.search(pattern, blob, re.I)
-        if m:
-            return m.group(0)
+        for m in re.finditer(pattern, blob, re.I):
+            if not _is_compliance_line(blob, m.start(), m.end()):
+                return m.group(0)
     return None
+
+
+# Inspection reports routinely say "smoke and carbon monoxide alarms were checked"; that is not a reported hazard.
+_COMPLIANCE_RE = re.compile(
+    r"\b(alarms?|detectors?)\b.{0,60}\b(checked|tested|test(?:ed)?\s*[:—-]\s*yes|working|fitted|present|in place|will have been)\b"
+    r"|\b(checked|tested)\b.{0,40}\b(alarms?|detectors?)\b",
+    re.I | re.S,
+)
+
+
+def _is_compliance_line(text: str, start: int, end: int) -> bool:
+    """Report lines wrap mid-sentence, so the sentence runs from full stop to full stop."""
+    left = max(text.rfind(".", 0, start) + 1, start - 200)
+    right = text.find(".", end)
+    sentence = text[left:right if 0 <= right < end + 200 else end + 200]
+    return bool(_COMPLIANCE_RE.search(sentence)) and not re.search(
+        r"\b(sounding|going off|beeping|triggered|activated|smell)\b", sentence, re.I)
 
 
 def wait_days(wait: Optional[WaitState], now: datetime) -> Optional[float]:

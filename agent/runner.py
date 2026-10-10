@@ -37,7 +37,7 @@ def _child(conn, path: str, cfg: Dict[str, Any], backend: str, now_iso: str) -> 
     try:
         config = Config.from_dict(cfg)
         case = load_case(Path(path), config)
-        result = decide(case, make_backend(backend, config), config, parse_now(now_iso))
+        result = decide(case, make_backend(backend, config), config, parse_now(now_iso), Path(path))
         conn.send(("ok", result.to_dict()))
     except BaseException as exc:  # a child must always report, whatever went wrong
         try:

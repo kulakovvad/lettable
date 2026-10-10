@@ -17,15 +17,24 @@ Each case folder holds `index.md`, `history.md` and optional `attachments/`. For
 
 Useful options: `--timeout` (seconds per case), `--deadline` (whole run), `--concurrency`, `--resume` (skip cases the model already decided), `--now <ISO time>` (replay as of a past moment), `--config file.json` (override any value in `agent/config.py`).
 
-### Real model
+### Real model (tool loop)
+
+Claude is the main driver; OpenAI is a fallback. The clients use the standard library, so no SDK is needed (`pip install pypdf` to read PDF attachments).
 
 ```
-pip install anthropic            # optional: pip install pypdf to read PDF attachments
-cp .env.example .env             # set ANTHROPIC_API_KEY, then export it
-python3 -m agent run "<cases folder>" out/ --backend anthropic
+cp .env.example .env             # set ANTHROPIC_API_KEY (or OPENAI_API_KEY), then export it
+python3 -m agent run "<cases folder>" out/ --backend claude     # or: openai, auto
 ```
 
-The real model is only used when you ask for `--backend anthropic`. A key in the environment never turns on spending by itself.
+`claude`/`anthropic`, `openai` and `auto` run the bounded tool loop (`agent/loop.py`). `anthropic-single` is the original one-call backend. Model names come from `ANTHROPIC_MODEL` / `OPENAI_MODEL` or `agent/config.py`. The real model is only used when you ask for it by name; a key in the environment never turns on spending by itself.
+
+### Replay public cases at a decision point
+
+```
+python3 -m agent replay "<public Property Management>" replay/ --points 2   # cut after inbound messages, hide the ending
+python3 -m agent run replay/ out/ --backend claude
+python3 -m agent compare replay/ out/                                        # agent action vs what the agency did next
+```
 
 ## How it stays reliable
 

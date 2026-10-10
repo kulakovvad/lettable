@@ -20,7 +20,13 @@ _EVENT_RE = re.compile(
 )
 _META_RE = re.compile(r"^- \*\*(Channel|From|To):\*\*\s*(.*)$")
 _ANCHOR_RE = re.compile(r"^<a id=.*</a>\s*$")
-_WAIT_RE = re.compile(r"waiting for\s+(landlord|provider|tenant)", re.I)
+# Hold wording varies: "Waiting for Provider", "Awaiting TT response", "await T reply", "waiting for contractor".
+_WAIT_RE = re.compile(
+    r"\b(?:waiting (?:for|on)|awaiting|await)\s+(?:a |an |the )?(?:(?:response|reply|update) from (?:the )?)?"
+    r"(landlord|LL|provider|contractor|tenant|TT|T)\b",
+    re.I,
+)
+_WAIT_PARTY = {"ll": "landlord", "contractor": "provider", "tt": "tenant", "t": "tenant"}
 _LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 
 # Who counts as a reply from the party we wait on.
@@ -83,6 +89,7 @@ class Case:
             if not m or e.ts is None:
                 continue
             party = m.group(1).lower()
+            party = _WAIT_PARTY.get(party, party)
             roles = _ROLES[party]
             if any(
                 any(role in later.sender.lower() for role in roles) for later in self.events[i + 1:]

@@ -94,6 +94,30 @@ class GateTests(unittest.TestCase):
         case = load_case(make_case(self.root, "old", events))
         self.assertTrue(gates.apply(case, prop("WAIT", message=""), CFG, SINCE).hazard)
 
+    def test_routine_alarm_checks_in_reports_are_not_hazards(self):
+        from dataclasses import replace
+        from agent.timeline import Attachment
+        case = load_case(make_case(self.root, "report", WAITING_LANDLORD))
+        for i, text in enumerate([
+            "The report says that smoke and carbon monoxide alarms will have been checked and will be working.",
+            "Smoke and carbon monoxide detectors: tested — Yes. No general defects.",
+            "Smoke and carbon monoxide alarms were stated to have\nbeen checked at check-in.",
+        ]):
+            c = replace(case, attachments=(Attachment("r%d.pdf" % i, text),))
+            self.assertFalse(gates.apply(c, prop("WAIT", message=""), CFG, SINCE).hazard, text)
+
+    def test_reported_alarm_or_gas_is_still_a_hazard_in_reports(self):
+        from dataclasses import replace
+        from agent.timeline import Attachment
+        case = load_case(make_case(self.root, "report2", WAITING_LANDLORD))
+        for i, text in enumerate([
+            "Tenant reports the carbon monoxide alarm keeps going off in the kitchen.",
+            "Alarms tested and working. There is a gas leak at the meter.",
+            "Carbon monoxide detected near the boiler.",
+        ]):
+            c = replace(case, attachments=(Attachment("h%d.pdf" % i, text),))
+            self.assertTrue(gates.apply(c, prop("WAIT", message=""), CFG, SINCE).hazard, text)
+
     def test_old_hazard_is_dropped_once_the_job_is_confirmed_done(self):
         filler = [("2026-01-0%d 10:00:00" % (i + 4), "Update", "Agency / system", "Not specified", "note %d" % i) for i in range(6)]
         events = (WAITING_LANDLORD

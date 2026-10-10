@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 ACTIONS = (
     "WAIT",
@@ -12,11 +12,12 @@ ACTIONS = (
     "CHASE_PROVIDER",
     "ASK_TENANT",
     "ROUTE_FOR_APPROVAL",
+    "INSTRUCT_PROVIDER",
     "SEND_REMINDER",
     "CLOSE",
     "ESCALATE",
 )
-NEEDS_MESSAGE = ("CHASE_LANDLORD", "CHASE_PROVIDER", "ASK_TENANT", "SEND_REMINDER")
+NEEDS_MESSAGE = ("CHASE_LANDLORD", "CHASE_PROVIDER", "ASK_TENANT", "INSTRUCT_PROVIDER", "SEND_REMINDER")
 MAX_TEXT = 1200
 
 
@@ -96,6 +97,19 @@ class Decision:
     idempotency_key: str = ""
     decided_at: str = ""
     warnings: Tuple[str, ...] = field(default_factory=tuple)
+    # Filled by the tool loop (agent.loop); empty for the single-call backends.
+    priority: Optional[str] = None
+    title: str = ""
+    request: str = ""
+    as_of: str = ""
+    model: str = ""
+    steps: int = 0
+    tokens: int = 0
+    evidence_refs: List[str] = field(default_factory=list)
+    unrelated_issues: List[str] = field(default_factory=list)
+    actions: List[Dict[str, Any]] = field(default_factory=list)  # staged -> committed / held_for_review
+    blocked: List[Dict[str, Any]] = field(default_factory=list)  # gate refusals the model received
+    trace: List[Dict[str, Any]] = field(default_factory=list)  # every tool call, in order
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
