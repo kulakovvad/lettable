@@ -162,12 +162,25 @@ class AnthropicChat(ChatBackend):
                     {"type": "tool_result", "tool_use_id": r["id"], "content": r["content"]} for r in entry["results"]]})
         return out
 
+    @staticmethod
+    def _mark_cache(messages: List[Dict[str, Any]]) -> None:
+        """Cache the conversation so far, so the next turn re-reads it instead of paying for it again."""
+        if not messages:
+            return
+        last = messages[-1]
+        if isinstance(last["content"], str):
+            last["content"] = [{"type": "text", "text": last["content"]}]
+        last["content"][-1]["cache_control"] = {"type": "ephemeral"}
+
     def chat(self, system, transcript, tools):
+        messages = self._messages(transcript)
+        self._mark_cache(messages)
         body = {
             "model": self.model,
             "max_tokens": self.cfg.loop_max_tokens_per_turn,
-            "system": system,
-            "messages": self._messages(transcript),
+            # Tools and this system block form the cached prefix; it must not contain per-case text.
+            "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
+            "messages": messages,
             "tools": [{"name": t["name"], "description": t["description"], "input_schema": t["parameters"]} for t in tools],
             "tool_choice": {"type": "auto"},
         }
@@ -180,8 +193,9 @@ class AnthropicChat(ChatBackend):
             elif block.get("type") == "tool_use":
                 calls.append(ToolCall(id=block["id"], name=block["name"], arguments=_parse_args(block.get("input"))))
         usage = data.get("usage") or {}
-        return Turn(text="\n".join(text), calls=calls,
-                    tokens=int(usage.get("input_tokens", 0)) + int(usage.get("output_tokens", 0)))
+        tokens = sum(int(usage.get(k) or 0) for k in (
+            "input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "output_tokens"))
+        return Turn(text="\n".join(text), calls=calls, tokens=tokens)
 
 
 class ScriptedChat(ChatBackend):

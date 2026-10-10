@@ -14,6 +14,8 @@ _TITLES = {
     "CHASE_LANDLORD": "Chase the landlord",
     "CHASE_PROVIDER": "Chase the provider",
     "ASK_TENANT": "Ask the tenant for more information",
+    "ASK_PROVIDER": "Ask the provider for more information",
+    "ASK_LANDLORD": "Ask the landlord for more information",
     "ROUTE_FOR_APPROVAL": "Send for landlord approval",
     "INSTRUCT_PROVIDER": "Instruct the provider (landlord approved)",
     "SEND_REMINDER": "Send an appointment reminder",

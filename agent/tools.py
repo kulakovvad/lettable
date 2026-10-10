@@ -90,7 +90,7 @@ TOOL_SPECS: List[Dict[str, Any]] = [
      "parameters": _schema({}, [])},
     {"name": "read_case_file", "description": "Read a text file in the case folder by relative path (capped). Summary/outcome sections are removed.",
      "parameters": _schema({"path": _STR}, ["path"])},
-    {"name": "check_policy", "description": "Read the agency operating policy. Topics: authority, chasing, safety, damp_mould, compliance, never_touch, closing, communication, calls, escalation, scope, data, or 'all'.",
+    {"name": "check_policy", "description": "Read the agency operating policy. topic: one topic, several separated by commas, or 'all'. Topics: %s." % ", ".join(policy_topics(Config())),
      "parameters": _schema({"topic": _STR}, ["topic"])},
     {"name": "send_message", "description": "Stage a message to a party. Gates check the party exists in the case, chase timing, landlord approval before instructing a provider, appointment evidence for reminders, and that every phone number and amount in the body appears in the case. Returns staged or blocked with a reason.",
      "parameters": _schema({
@@ -146,6 +146,8 @@ _PRIMARY_NEEDS = {
     "CHASE_LANDLORD": ("message", "landlord"),
     "CHASE_PROVIDER": ("message", "provider"),
     "ASK_TENANT": ("message", "tenant"),
+    "ASK_PROVIDER": ("message", "provider"),
+    "ASK_LANDLORD": ("message", "landlord"),
     "SEND_REMINDER": ("message", None),
     "ROUTE_FOR_APPROVAL": ("approval", "landlord"),
     "INSTRUCT_PROVIDER": ("message", "provider"),
@@ -335,10 +337,16 @@ class Toolbox:
 
     def _t_check_policy(self, args):
         topics = policy_topics(self.cfg)
-        topic = _s(args.get("topic"), 40).lower()
-        if topic in topics:
-            return {"status": "ok", "topic": topic, "policy": topics[topic]}
-        return {"status": "ok", "policy": topics}
+        asked = [t for t in re.split(r"[\s,]+", _s(args.get("topic"), 200).lower()) if t]
+        known = [t for t in asked if t in topics]
+        unknown = [t for t in asked if t not in topics and t != "all"]
+        if len(known) == 1 and not unknown:
+            return {"status": "ok", "topic": known[0], "policy": topics[known[0]]}
+        chosen = topics if not known or "all" in asked else {t: topics[t] for t in known}
+        result = {"status": "ok", "policy": chosen}
+        if unknown:
+            result["note"] = "unknown topic(s) %s; known topics: %s" % (", ".join(unknown), ", ".join(topics))
+        return result
 
     # ---------- action tools ----------
 
@@ -373,6 +381,14 @@ class Toolbox:
                 return self._blocked("too_early", "only %.1f days since we wrote to the %s (%s); policy is %.0f days" %
                                      (days, to, ref(out), self.cfg.chase_after_days),
                                      "Schedule a follow-up and WAIT. Only an open hazard found by code allows an early chase.")
+        if purpose == "request_info" and to != "tenant":
+            out, inn = self._last(to, True), self._last(to, False)
+            unanswered = out is not None and out.ts is not None and (inn is None or inn.index < out.index)
+            days = (self.now - out.ts).total_seconds() / 86400 if unanswered else None
+            if days is not None and days < self.cfg.chase_after_days and not urgent:
+                return self._blocked("too_early", "we wrote to the %s %.1f days ago (%s) and they have not replied; "
+                                     "policy is %g days" % (to, days, ref(out), self.cfg.chase_after_days),
+                                     "WAIT for their reply, or add the question to the chase once it is due.")
         if purpose == "instruct_provider":
             if to != "provider":
                 return {"status": "error", "error": "instruct_provider messages go to the provider"}
@@ -584,6 +600,8 @@ class Toolbox:
                 match = [s for s in match if s.get("purpose") == "reminder"]
             if action.startswith("CHASE"):
                 match = [s for s in match if s.get("purpose") == "chase"]
+            if action.startswith("ASK_"):
+                match = [s for s in match if s.get("purpose") == "request_info"]
             if action == "INSTRUCT_PROVIDER":
                 match = [s for s in match if s.get("purpose") == "instruct_provider"]
             if not match:

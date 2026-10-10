@@ -28,6 +28,7 @@ _QUOTE = re.compile(r"\b(quote|quotation|estimate|invoice|approv\w*)\b", re.I)
 _BOOKING = re.compile(r"\b(appointment|scheduled|reminder|booked|booking|visit)\b", re.I)
 _CLOSE = re.compile(r"\b(closed|case closed|request closed|all done|completed)\b", re.I)
 _WAIT = re.compile(r"waiting for|on hold|put on hold", re.I)
+_CHASE = re.compile(r"\b(follow(?:ing)? up|chas\w*|remind\w*|still waiting|any update|(?:not|haven't) heard)\b", re.I)
 _INTERNAL = ("agency", "northbridge", "system")
 
 
@@ -41,10 +42,13 @@ def label_next(e: Event) -> str:
     if _is_internal(e.sender):
         to = e.recipient.lower()
         if e.channel in ("Email", "SMS", "Call"):
+            asks = "?" in e.body and not _CHASE.search(e.body)
             if "landlord" in to:
-                return "ROUTE_FOR_APPROVAL" if _QUOTE.search(e.body) else "CHASE_LANDLORD"
+                if _QUOTE.search(e.body):
+                    return "ROUTE_FOR_APPROVAL"
+                return "ASK_LANDLORD" if asks else "CHASE_LANDLORD"
             if any(t in to for t in ("contractor", "provider", "supplier")):
-                return "CHASE_PROVIDER"
+                return "ASK_PROVIDER" if asks else "CHASE_PROVIDER"
             if "tenant" in to:
                 return "SEND_REMINDER" if _BOOKING.search(e.body) else "ASK_TENANT"
         if e.channel in ("Hold", "Update") and _WAIT.search(e.body):

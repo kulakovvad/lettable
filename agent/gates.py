@@ -112,6 +112,12 @@ def apply(case: Case, proposal: Proposal, cfg: Config, now: datetime,
         elif days is not None and days < cfg.chase_after_days:
             stricter("WAIT", "waiting on the %s for %.1f days; chase after %.1f" % (party, days, cfg.chase_after_days))
 
+    if action in ("ASK_PROVIDER", "ASK_LANDLORD"):
+        party = action[len("ASK_"):].lower()
+        if wait is not None and wait.party == party and days is not None and days < cfg.chase_after_days:
+            stricter("WAIT", "already waiting on the %s for %.1f days; a new question before %.1f days is an early chase"
+                     % (party, days, cfg.chase_after_days))
+
     if action == "INSTRUCT_PROVIDER" and evidence.covering_approval(case)[0] is None:
         stricter("ESCALATE", "instructing the provider without a landlord approval in force (missing, negated, or older than the latest quote)")
 
