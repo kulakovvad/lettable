@@ -63,6 +63,18 @@ Rewrite or drop:
 - The one-shot nine-outcome packet and the grader upload
 - The fraud, identity and PII gates, which suit the old task more than routine repairs
 
+## Amendment (proposed): bounded tool loop instead of one call
+
+Status: proposed in the `vikkash/agent-loop` PR, needs team agreement.
+
+"Propose" becomes a bounded loop: the model may call read tools (events, search, attachments, case files, policy) and *stage* actions through gated tools before one `submit_decision`. The principle is unchanged: the model only proposes, code decides.
+
+- Nothing leaves the case during the loop. Action tools only stage; each is checked by code first and a refusal is returned to the model with a reason and a hint, so it can pick a different action.
+- After `submit_decision`, the existing `gates.apply` runs as before. If it changes the decision, every staged action except escalations and safety advice is held for a person instead of committed.
+- Bounded by turns (`loop_max_steps`), a token budget and repeated-call detection. If the model never submits, the case escalates with its trace; no extra model call.
+- Waits are judged as of the latest event (`as_of = last_event`), because synthetic case dates do not relate to the wall clock.
+- Adds one action, `INSTRUCT_PROVIDER` (landlord approved, provider not yet told to go ahead), gated on a landlord approval dated after the latest quote.
+
 ## Open questions
 
 The output format and any tools or CRM for the real challenge cases are not known yet. The packet and the "Act" step stay provisional until we see them.

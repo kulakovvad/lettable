@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional, Tuple
 @dataclass(frozen=True)
 class Config:
     # Time budgets (seconds)
-    case_timeout_s: float = 120.0
+    case_timeout_s: float = 240.0  # the tool loop makes up to loop_max_steps model calls
     run_deadline_s: Optional[float] = None
     call_timeout_s: float = 60.0
     max_retries: int = 2
@@ -22,10 +22,20 @@ class Config:
     approval_limit_gbp: float = 300.0  # placeholder until the real limit is known
     min_confidence: float = 0.5
 
-    # Model
+    # Model. Claude is the main driver; OpenAI is a fallback (env ANTHROPIC_MODEL / OPENAI_MODEL override).
     model: str = "claude-sonnet-5-5"
+    openai_model: str = "gpt-5.4-mini"
     max_prompt_chars: int = 24000
     max_tokens: int = 1200
+
+    # Tool loop budgets
+    loop_max_steps: int = 12  # model turns before the loop is forced to finish
+    loop_max_tokens_per_turn: int = 2500
+    loop_token_budget: int = 150_000  # whole case, across all turns
+    run_token_budget: Optional[int] = 3_000_000  # whole run; later cases fall back to escalation once spent
+    # When waits are judged. last_event: the case's latest event (synthetic dates do not relate to the clock);
+    # now: the wall clock or --now; later: whichever of the two is later. An explicit --now implies "now".
+    as_of: str = "last_event"
 
     # Input caps
     max_file_bytes: int = 2_000_000

@@ -20,9 +20,11 @@ def main(argv=None) -> int:
     r.add_argument("input_dir")
     r.add_argument("out_dir")
     r.add_argument("--backend", default=os.environ.get("LETTABLE_BACKEND", "fake"),
-                   help="fake (default, free) or anthropic")
+                   help="fake (default, free); claude/anthropic, openai or auto run the tool loop; "
+                        "anthropic-single is one call without tools; or module:Class")
     r.add_argument("--config", help="JSON file overriding Config values")
-    r.add_argument("--now", help="treat this ISO time as 'now' (for replays)")
+    r.add_argument("--now", help="treat this ISO time as 'now' (implies --as-of now)")
+    r.add_argument("--as-of", choices=["last_event", "now", "later"], help="when waits are judged (default: config)")
     r.add_argument("--timeout", type=float, help="seconds allowed per case")
     r.add_argument("--deadline", type=float, help="seconds allowed for the whole run")
     r.add_argument("--concurrency", type=int)
@@ -51,8 +53,9 @@ def main(argv=None) -> int:
         print(json.dumps(replay(Path(args.input_dir), Path(args.out_dir), rcfg, args.backend, args.points, cap), indent=2))
         return 0
     cfg = Config.load(Path(args.config) if args.config else None)
+    as_of = args.as_of or ("now" if args.now else None)
     overrides = {k: v for k, v in (("case_timeout_s", args.timeout), ("run_deadline_s", args.deadline),
-                                   ("concurrency", args.concurrency)) if v is not None}
+                                   ("concurrency", args.concurrency), ("as_of", as_of)) if v is not None}
     cfg = dataclasses.replace(cfg, **overrides)
 
     summary = run_all(Path(args.input_dir), Path(args.out_dir), cfg, args.backend, args.now, args.resume)

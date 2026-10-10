@@ -114,11 +114,16 @@ def _extract_json(text: str) -> Dict[str, Any]:
     return data
 
 
-def make_backend(name: str, cfg: Config) -> Backend:
+def make_backend(name: str, cfg: Config):
+    """claude/anthropic, openai and auto run the tool loop (agent.loop); anthropic-single is one call, no tools."""
+    from agent.chat import make_chat
+
     name = (name or "fake").strip()
     if name == "fake":
         return FakeBackend()
-    if name == "anthropic":
+    if name in ("claude", "anthropic", "openai", "auto"):
+        return make_chat(name, cfg)
+    if name == "anthropic-single":
         if not os.environ.get("ANTHROPIC_API_KEY"):
             raise RuntimeError("ANTHROPIC_API_KEY is not set")
         return AnthropicBackend(cfg)

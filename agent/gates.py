@@ -10,6 +10,7 @@ import re
 from datetime import datetime
 from typing import List, Optional
 
+from agent import evidence
 from agent.config import Config
 from agent.schema import (
     MAX_TEXT,
@@ -20,8 +21,6 @@ from agent.schema import (
 )
 from agent.timeline import Case, WaitState
 
-_DONE_RE = re.compile(r"\b(completed|all done|job complete|works? complete|finished the work)\b", re.I)
-_NEGATION_RE = re.compile(r"\b(not|never|no|yet to|still|incomplete|unfinished)\b|n't", re.I)
 # A tenant message after a completion only keeps CLOSE open if it is short, clearly
 # positive, and has no problem or negation words. Anything else escalates.
 _HARMLESS_RE = re.compile(
@@ -42,45 +41,33 @@ def _is_harmless(body: str) -> bool:
 
 
 def confirmed_completion(case: Case) -> Optional[int]:
-    """Position of the latest event that reports the job done, or None.
+    """Position of the latest event in which a provider, tenant or landlord reports the job done, or None.
 
-    A mention does not count when it is negated ("not completed") or when the
-    tenant wrote again afterwards with anything other than a short, clearly
-    positive reply (the job may have been reopened).
+    Agency/system notes, negated mentions ("not completed") and questions ("has it
+    been completed?") do not count. A tenant writing again afterwards with anything
+    other than a short, clearly positive reply means the job may have been reopened.
+    This is the single definition of completion; the close_case tool uses it too.
     """
     events = case.events
     for i in range(len(events) - 1, -1, -1):
-        for m in _DONE_RE.finditer(events[i].body):
-            before = re.split(r"[.!?\n]", events[i].body[: m.start()])[-1][-40:]
-            if _NEGATION_RE.search(before):
-                continue
-            reopened = any(
-                "tenant" in later.sender.lower() and not _is_harmless(later.body) for later in events[i + 1:]
-            )
-            return None if reopened else i
+        if not evidence.reports_completion(events[i]):
+            continue
+        reopened = any(
+            "tenant" in later.sender.lower() and not _is_harmless(later.body) for later in events[i + 1:]
+        )
+        return None if reopened else i
     return None
+
+
+def hazard_hits(case: Case, cfg: Config):
+    """Every open hazard mention as (source ref, phrase). Shared with the case_facts tool."""
+    return evidence.hazard_hits(case, cfg, confirmed_completion(case))
 
 
 def find_hazard(case: Case, cfg: Config) -> Optional[str]:
-    """Return the matched phrase if the case mentions a safety hazard that is still open.
-
-    Checked: the request, the text of every attachment, the latest events, and
-    any older event unless the job was confirmed done after it.
-    """
-    events = case.events
-    window = cfg.hazard_window if cfg.hazard_window > 0 else len(events)
-    split = max(0, len(events) - window)
-    done_at = confirmed_completion(case)
-    texts = [case.request]
-    texts += [a.text for a in case.attachments if a.text]
-    texts += [e.body for e in events[split:]]
-    texts += [e.body for j, e in enumerate(events[:split]) if done_at is None or done_at < j]
-    blob = "\n".join(texts)
-    for pattern in cfg.hazard_patterns:
-        m = re.search(pattern, blob, re.I)
-        if m:
-            return m.group(0)
-    return None
+    """Return the matched phrase if the case mentions a safety hazard that is still open."""
+    hits = hazard_hits(case, cfg)
+    return hits[0][1] if hits else None
 
 
 def wait_days(wait: Optional[WaitState], now: datetime) -> Optional[float]:
@@ -119,13 +106,19 @@ def apply(case: Case, proposal: Proposal, cfg: Config, now: datetime) -> Decisio
         elif days is not None and days < cfg.chase_after_days:
             stricter("WAIT", "waiting on the %s for %.1f days; chase after %.1f" % (party, days, cfg.chase_after_days))
 
+    if action == "INSTRUCT_PROVIDER" and evidence.covering_approval(case)[0] is None:
+        stricter("ESCALATE", "instructing the provider without a landlord approval in force (missing, negated, or older than the latest quote)")
+
     if action == "CLOSE" and confirmed_completion(case) is None:
         stricter("ESCALATE", "close proposed but no confirmed completion (missing, negated, or a tenant follow-up that is not a clear all-clear)")
 
+    landlord_covered = (action == "INSTRUCT_PROVIDER" and proposal.amount_gbp is not None
+                        and evidence.approval_covers(case, proposal.amount_gbp))
     if (
         proposal.amount_gbp is not None
         and proposal.amount_gbp > cfg.approval_limit_gbp
         and action not in _SPEND_OK
+        and not landlord_covered
     ):
         stricter(
             "ESCALATE",
