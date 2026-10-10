@@ -1,4 +1,4 @@
-"""python3 -m agent run|replay INPUT_DIR OUT_DIR [options]  |  python3 -m agent calls collect OUT_DIR"""
+"""python3 -m agent run|replay INPUT_DIR OUT_DIR [options]  |  calls collect OUT_DIR  |  export OUT_DIR"""
 
 from __future__ import annotations
 
@@ -72,6 +72,11 @@ def main(argv=None) -> int:
     rp.add_argument("--timeout", type=float)
     rp.add_argument("--concurrency", type=int)
     rp.add_argument("--config")
+    ex = sub.add_parser("export", help="copy a run's results into ANSWERS/<n>/ for the submission")
+    ex.add_argument("out_dir")
+    ex.add_argument("--to", default="ANSWERS", help="destination folder (default: ANSWERS)")
+    ex.add_argument("--force", action="store_true", help="overwrite ANSWERS/<n> folders that came from another run")
+    ex.add_argument("--skip-incomplete", action="store_true", help="export the finished cases and list those missing ANSWER.md or REASONING.md")
     vs = sub.add_parser("voice-setup", help="create the ElevenLabs phone agent and/or import a Twilio number")
     vs.add_argument("--create-agent", action="store_true")
     vs.add_argument("--import-number", metavar="E164", help="Twilio number to import (uses TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN)")
@@ -79,6 +84,15 @@ def main(argv=None) -> int:
     args = p.parse_args(argv)
     if args.cmd == "voice-setup":
         return _voice_setup(args)
+    if args.cmd == "export":
+        from agent.export import ExportError, export
+
+        try:
+            print(json.dumps(export(Path(args.out_dir), Path(args.to), args.force, args.skip_incomplete), indent=2))
+        except ExportError as exc:
+            print("export refused: %s" % exc, file=sys.stderr)
+            return 2
+        return 0
 
     if args.cmd == "calls":
         from agent.calls import collect
