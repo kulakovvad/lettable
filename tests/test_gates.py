@@ -78,6 +78,32 @@ class GateTests(unittest.TestCase):
         d = gates.apply(case, prop("CLOSE", message=""), CFG, SINCE)
         self.assertEqual(d.action, "ESCALATE")
 
+    def _done_then_tenant(self, cid, text):
+        events = WAITING_LANDLORD + [
+            ("2026-01-05 10:00:00", "Email", "Contractor", "Agency", "Job completed, invoice attached."),
+            ("2026-01-06 10:00:00", "SMS", "Tenant", "Agency", text),
+        ]
+        return load_case(make_case(self.root, cid, events))
+
+    def test_harmless_tenant_thanks_after_completion_still_closes(self):
+        for i, text in enumerate(("Thanks, all fine now", "Perfect, thank you!", "All fixed, working now")):
+            case = self._done_then_tenant("ok%d" % i, text)
+            d = gates.apply(case, prop("CLOSE", message=""), CFG, SINCE)
+            self.assertEqual(d.action, "CLOSE", text)
+
+    def test_problem_or_unrecognised_tenant_replies_after_completion_escalate(self):
+        for i, text in enumerate((
+            "Thanks but it's leaking again",
+            "Thank you, it still doesn't flush",
+            "Thanks. When will the invoice be sorted?",
+            "Can someone call me",
+            "Received your email",
+            "Thanks " + "x" * 300,
+        )):
+            case = self._done_then_tenant("bad%d" % i, text)
+            d = gates.apply(case, prop("CLOSE", message=""), CFG, SINCE)
+            self.assertEqual(d.action, "ESCALATE", text)
+
     def test_attachment_only_hazard_is_found(self):
         from dataclasses import replace
         from agent.timeline import Attachment
