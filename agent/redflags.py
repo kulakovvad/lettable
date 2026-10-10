@@ -150,14 +150,34 @@ def _flag(category: str, ref: str, excerpt: str, force: bool, route: Optional[st
     return item
 
 
+def _affirmed(pattern: Pattern[str], text: str) -> Optional[re.Match]:
+    return next((m for m in pattern.finditer(text or "") if not _negated(text, m.start(), m.end())), None)
+
+
 def _vulnerability(sources: Sequence[Tuple[str, str]]) -> Optional[Dict[str, Any]]:
+    """A vulnerable occupant and a loss of heating, water or power, even in different parts of the case."""
+    person = service = None
     for ref, text in sources:
-        vuln = next((m for m in _VULN.finditer(text) if not _negated(text, m.start(), m.end())), None)
-        loss = next((m for m in _LOSS.finditer(text) if not _negated(text, m.start(), m.end())), None)
-        if vuln and loss:
-            start, end = min(vuln.start(), loss.start()), max(vuln.end(), loss.end())
-            return _flag("vulnerability", ref, _excerpt(text, start, end), True, "property_manager", "P1")
-    return None
+        if person is None:
+            match = _affirmed(_VULN, text)
+            if match:
+                person = (ref, text, match)
+        if service is None:
+            match = _affirmed(_LOSS, text)
+            if match:
+                service = (ref, text, match)
+        if person and service:
+            break
+    if person is None or service is None:
+        return None
+    pref, ptext, pmatch = person
+    sref, stext, smatch = service
+    if pref == sref:
+        start, end = min(pmatch.start(), smatch.start()), max(pmatch.end(), smatch.end())
+        return _flag("vulnerability", pref, _excerpt(ptext, start, end), True, "property_manager", "P1")
+    excerpt = "%s | %s" % (
+        _excerpt(ptext, pmatch.start(), pmatch.end()), _excerpt(stext, smatch.start(), smatch.end()))
+    return _flag("vulnerability", "%s, %s" % (pref, sref), excerpt[:180], True, "property_manager", "P1")
 
 
 def _failed(sources: Sequence[Tuple[str, str]]) -> Optional[Dict[str, Any]]:
@@ -199,7 +219,8 @@ def _payment(case: Case) -> Optional[Tuple[str, str]]:
     """New bank details, or a Direct Debit request that is not with the assigned provider.
 
     A confirmation of a Direct Debit (public case 039, event-029) is not a request.
-    A request whose own text names the assigned provider is with that provider.
+    A request sentence that names the assigned provider is with that provider.
+    Naming that provider elsewhere in the same event does not hide a different firm's request.
     """
     sources = _sources(case)
     bank = _first(sources, _BANK)
@@ -207,14 +228,14 @@ def _payment(case: Case) -> Optional[Tuple[str, str]]:
         return bank
     firms = [n.lower() for n in _assigned_firms(case)]
     for ref, text in sources:
-        if _DD_CONFIRM.search(text or ""):
-            continue
-        low = (text or "").lower()
-        if any(firm in low for firm in firms):
-            continue
-        hit = _first([(ref, text)], _DD)
-        if hit:
-            return hit
+        for sentence in re.split(r"(?<=[.!?])\s+|\n+", text or "") or [text or ""]:
+            if not sentence.strip() or _DD_CONFIRM.search(sentence):
+                continue
+            if any(re.search(r"\b%s\b" % re.escape(firm), sentence, re.I) for firm in firms):
+                continue
+            hit = _first([(ref, sentence)], _DD)
+            if hit:
+                return hit
     return None
 
 

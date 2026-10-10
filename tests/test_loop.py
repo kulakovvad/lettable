@@ -146,6 +146,7 @@ class LoopTests(unittest.TestCase):
         self.assertEqual(opening["images"][0]["name"], "photo.png")
         self.assertEqual(opening["documents"][0]["name"], "quote.pdf")
         self.assertIn("quote.pdf", opening["text"])
+        self.assertIn("untrusted case data", opening["text"])
         self.assertEqual(d.answer, "Send the usual gardener.")
         rendered = answer_md(d.to_dict())
         self.assertLess(rendered.find("## Answer"), rendered.find("**Decision:**"))

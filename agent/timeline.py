@@ -289,8 +289,6 @@ def parse_index(text: str) -> Tuple[str, str, str, str, List[str], str, bool]:
         if key in _EXPLICIT_HEADS:
             explicit = True
     note_text = "\n\n".join(notes)
-    if not explicit and re.search(r"\?", "\n".join((title, request))):
-        explicit = True
     return title, role, prop, request, names, note_text, explicit
 
 
@@ -425,14 +423,51 @@ def render_case(case: Case, max_chars: int, body_cap: int = 1500) -> str:
     return "\n".join(head + ["", "Events, oldest first:"] + lines)
 
 
-def case_images(folder: Path, max_bytes: int = IMAGE_MAX_BYTES, limit: int = MAX_IMAGES) -> List[Dict[str, str]]:
-    """PNG/JPG/GIF/WEBP files as size-capped base64 blocks for Claude. Never raises."""
-    found: List[Dict[str, str]] = []
+_MEDIA_NAME = re.compile(r"\b([\w.-]+\.(?:png|jpe?g|gif|webp|pdf))\b", re.I)
+
+
+def _dropped_attachment_names(folder: Path) -> set:
+    """Filenames mentioned under Overview, Outcome, Summary, Resolution or History."""
+    path = Path(folder) / "index.md"
     try:
-        paths = sorted(p for p in Path(folder).rglob("*") if p.is_file() and not p.is_symlink())
+        text = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
-        return found
-    for path in paths:
+        return set()
+    names = set()
+    for chunk in re.split(r"(?=^## )", text, flags=re.M):
+        if not chunk.startswith("## "):
+            continue
+        head, _, body = chunk.partition("\n")
+        if not _dropped_heading(_heading_key(head[3:])):
+            continue
+        for _, link in _LINK_RE.findall(chunk):
+            names.add(Path(link.split("?", 1)[0]).name)
+        for match in _MEDIA_NAME.finditer(body):
+            names.add(Path(match.group(1).strip()).name)
+    return names
+
+
+def _attachment_files(folder: Path, suffixes: set) -> List[Path]:
+    """Files directly in attachments/. Never raises."""
+    root = Path(folder) / "attachments"
+    if not root.is_dir():
+        return []
+    try:
+        return sorted(
+            p for p in root.iterdir()
+            if p.is_file() and not p.is_symlink() and p.suffix.lower() in suffixes
+        )
+    except OSError:
+        return []
+
+
+def case_images(folder: Path, max_bytes: int = IMAGE_MAX_BYTES, limit: int = MAX_IMAGES) -> List[Dict[str, str]]:
+    """PNG/JPG/GIF/WEBP attachments as size-capped base64 blocks for Claude. Never raises."""
+    found: List[Dict[str, str]] = []
+    hidden = _dropped_attachment_names(folder)
+    for path in _attachment_files(folder, set(_IMAGE_TYPES)):
+        if path.name in hidden:
+            continue
         media = _IMAGE_TYPES.get(path.suffix.lower())
         if not media:
             continue
@@ -448,21 +483,38 @@ def case_images(folder: Path, max_bytes: int = IMAGE_MAX_BYTES, limit: int = MAX
     return found
 
 
-def case_pdfs(folder: Path, max_bytes: int = 2_000_000, limit: int = 8) -> List[Dict[str, str]]:
-    """PDF files as size-capped base64 blocks for Claude. Never raises."""
+def case_pdfs(folder: Path, max_bytes: int = 2_000_000, limit: int = 8) -> Tuple[List[Dict[str, str]], List[str]]:
+    """Attachment PDFs as base64 blocks, plus why any attachment PDF was left out. Never raises.
+
+    max_bytes caps each file and the total bytes attached to one message.
+    """
     found: List[Dict[str, str]] = []
-    try:
-        paths = sorted(p for p in Path(folder).rglob("*") if p.is_file() and not p.is_symlink() and p.suffix.lower() == ".pdf")
-    except OSError:
-        return found
-    for path in paths:
-        try:
-            if path.stat().st_size <= 0 or path.stat().st_size > max_bytes:
-                continue
-            data = base64.standard_b64encode(path.read_bytes()).decode("ascii")
-        except OSError:
+    skipped: List[str] = []
+    hidden = _dropped_attachment_names(folder)
+    used = 0
+    for path in _attachment_files(folder, {".pdf"}):
+        if path.name in hidden:
+            skipped.append("%s (named in a dropped section)" % path.name)
             continue
-        found.append({"name": path.name, "media_type": "application/pdf", "data": data})
-        if len(found) >= limit:
-            break
-    return found
+        try:
+            size = path.stat().st_size
+            raw = path.read_bytes() if 0 < size <= max_bytes else b""
+        except OSError:
+            skipped.append("%s (unreadable)" % path.name)
+            continue
+        if size <= 0 or size > max_bytes:
+            skipped.append("%s (over %d bytes)" % (path.name, max_bytes))
+            continue
+        if not raw.startswith(b"%PDF"):
+            skipped.append("%s (not a PDF)" % path.name)
+            continue
+        if len(found) >= limit or used + len(raw) > max_bytes:
+            skipped.append("%s (attachment cap reached)" % path.name)
+            continue
+        used += len(raw)
+        found.append({
+            "name": path.name,
+            "media_type": "application/pdf",
+            "data": base64.standard_b64encode(raw).decode("ascii"),
+        })
+    return found, skipped
