@@ -73,22 +73,26 @@ class Config:
     reality_resume_passes: int = 1
     reality_min_resume_s: float = 60.0
 
-    # Phrases that force an escalation. Checked on the most recent events.
+    # Phrases that force an escalation. Checked on the most recent events; denied mentions ("no smell of
+    # gas") and advice or questions in agency messages do not count (agent.evidence.hazard_hits).
     hazard_patterns: Tuple[str, ...] = (
         r"smell(?:s|ing)? (?:of )?gas",
-        r"gas leak",
+        r"gas (?:leak|escape)",
         r"carbon monoxide",
         r"\bco alarm\b",
-        r"\bflood(?:ing|ed)?\b",
+        r"\bflood(?:ing|ed)\b(?! with)|\bflood (?:in|through|from|everywhere)\b|water (?:is )?(?:pouring|gushing|streaming)",
         r"burst pipe",
         r"exposed wir",
-        r"\bsparking\b",
-        r"\bon fire\b",
-        r"\bfire\b",
+        r"\bsparking\b|\bsparks (?:from|coming)",
+        r"\bon fire\b|\bcaught fire\b|\b(?:a|the) fire (?:in|at|broke|started|has)\b|\bfire (?:brigade|service)\b|"
+        r"\bburning smell\b|\bsmell of burning\b|\b(?:fire|smoke) alarm (?:is |keeps )?(?:going off|sounding)",
         r"ceiling (?:has )?collaps",
         r"no heating.{0,40}(?:baby|elderly|vulnerable)",
-        r"\bunsafe\b",
-        r"\bthreat",
+        r"\b(?:unsafe|dangerous) to (?:use|live|enter|stay)\b|\b(?:is|are|was|were) (?:unsafe|dangerous)\b|"
+        r"\b(?:deemed|declared|classed|marked|condemned as) (?:unsafe|dangerous)\b|\bimmediately dangerous\b|"
+        r"\bunsafe (?:gas|electrics?|electrical|wiring|appliance|boiler|structure)\b",
+        r"\bthreat(?:en(?:ed|ing|s)?)? (?:to )?(?:hurt|harm|kill|attack|assault)\b|\bthreats? of violence\b|"
+        r"\bthreatening (?:behaviou?r|me|us)\b",
     )
     hazard_window: int = 5  # how many latest events to scan
 
