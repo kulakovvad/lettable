@@ -1,4 +1,4 @@
-"""python3 -m agent run|replay INPUT_DIR OUT_DIR [options]  |  calls collect OUT_DIR  |  export OUT_DIR  |  ui OUT_DIR"""
+"""python3 -m agent run|replay INPUT_DIR OUT_DIR [options]  |  calls collect OUT_DIR  |  export OUT_DIR  |  ui OUT_DIR  |  reality CHALLENGE_DIR --out ANSWERS  |  doctor"""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Optional
 
 from agent.config import Config
 from agent.runner import run_all
@@ -49,6 +50,49 @@ def _voice_setup(args) -> int:
             return 2
         print("ELEVENLABS_PHONE_NUMBER_ID=%s" % import_twilio_number(key, args.import_number, sid, token))
     return 0
+
+
+REALITY_CONFIG = Path(__file__).resolve().parent.parent / "reality.json"
+
+
+def _reality_config(path: Optional[str]) -> Config:
+    if path:
+        return Config.load(Path(path))
+    return Config.load(REALITY_CONFIG if REALITY_CONFIG.is_file() else None)
+
+
+def _reality(args) -> int:
+    from agent.reality import run_reality
+
+    if not Path(args.challenge_dir).is_dir():
+        print("challenge directory not found: %s" % args.challenge_dir, file=sys.stderr)
+        return 2
+    cfg = _reality_config(args.config)
+    overrides = {k: v for k, v in (("run_deadline_s", args.deadline), ("case_timeout_s", args.timeout),
+                                   ("concurrency", args.concurrency), ("call_backend", args.calls)) if v is not None}
+    cfg = dataclasses.replace(cfg, **overrides)
+    try:
+        summary = run_reality(Path(args.challenge_dir), Path(args.out), cfg, args.backend, args.track, args.resume,
+                              args.stt, args.now, log=lambda m: print(m, file=sys.stderr))
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    print(json.dumps(summary, indent=2))
+    return 0 if summary["reconciled"] else 1
+
+
+def _doctor(args) -> int:
+    from agent.doctor import report, run_checks
+
+    try:
+        cfg = _reality_config(args.config)
+    except Exception as exc:
+        print("FAIL config             %s: %s" % (args.config or REALITY_CONFIG, exc))
+        return 1
+    checks = run_checks(args.backend, cfg, Path(args.out), live=args.live,
+                        challenge_dir=Path(args.challenge_dir) if args.challenge_dir else None, track=args.track)
+    print(report(checks))
+    return 1 if any(c.status == "fail" for c in checks) else 0
 
 
 def main(argv=None) -> int:
@@ -98,6 +142,27 @@ def main(argv=None) -> int:
     ui.add_argument("out_dir")
     ui.add_argument("--port", type=int, default=8765)
     ui.add_argument("--open", action="store_true", help="open the page in a browser")
+    rl = sub.add_parser("reality", help="find every case under CHALLENGE_DIR at any depth and write ANSWERS/<n>/")
+    rl.add_argument("challenge_dir")
+    rl.add_argument("--out", default="ANSWERS")
+    rl.add_argument("--track", help="track folder to run when the drop is split by track (default: %r; 'all' for every track)"
+                    % "Property Management")
+    rl.add_argument("--backend", default="claude", help="claude (default), openai, auto, fake, or module:Class")
+    rl.add_argument("--config", help="JSON file overriding Config values (default: reality.json at the repo root)")
+    rl.add_argument("--deadline", type=float, help="seconds allowed for the whole run, including passes over fallbacks")
+    rl.add_argument("--timeout", type=float, help="seconds allowed per case")
+    rl.add_argument("--concurrency", type=int)
+    rl.add_argument("--resume", action="store_true", help="keep cases already decided by the model; redo only fallbacks")
+    rl.add_argument("--stt", choices=["off", "fake", "elevenlabs"], help="default: elevenlabs when cases have audio and the key is set")
+    rl.add_argument("--calls", choices=["dry_run", "elevenlabs"], help="phone calls (default dry_run: nothing is dialled)")
+    rl.add_argument("--now", help="treat this ISO time as 'now'")
+    dr = sub.add_parser("doctor", help="preflight: keys present, pypdf, output dir writable, optional live model call")
+    dr.add_argument("challenge_dir", nargs="?", help="also check that cases can be found here")
+    dr.add_argument("--backend", default="claude")
+    dr.add_argument("--out", default="ANSWERS")
+    dr.add_argument("--track")
+    dr.add_argument("--config", help="JSON file overriding Config values (default: reality.json at the repo root)")
+    dr.add_argument("--live", action="store_true", help="make one tiny model call to check the key and model name")
     args = p.parse_args(argv)
     if args.cmd == "voice-setup":
         return _voice_setup(args)
@@ -118,6 +183,10 @@ def main(argv=None) -> int:
             print("export refused: %s" % exc, file=sys.stderr)
             return 2
         return 0
+    if args.cmd == "reality":
+        return _reality(args)
+    if args.cmd == "doctor":
+        return _doctor(args)
 
     if args.cmd == "calls":
         from agent.calls import collect

@@ -20,3 +20,15 @@ class ChaosBackend(FakeBackend):
         if cid.startswith("junk"):
             return {"action": "DELETE_EVERYTHING", "reason": "x", "confidence": 1}
         return super().propose(case, now, cfg)
+
+
+class FlakyBackend(FakeBackend):
+    """Fails the first time it sees a case whose title says FLAKY, then works (state in LETTABLE_FLAKY_DIR)."""
+
+    def propose(self, case, now, cfg):
+        if "FLAKY" in case.title:
+            marker = os.path.join(os.environ["LETTABLE_FLAKY_DIR"], "seen-%s" % case.case_id)
+            if not os.path.exists(marker):
+                open(marker, "w").close()
+                raise RuntimeError("transient failure")
+        return super().propose(case, now, cfg)

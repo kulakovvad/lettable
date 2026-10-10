@@ -64,6 +64,11 @@ class Config:
     max_file_bytes: int = 2_000_000
     pdf_chars: int = 3000
 
+    # Reality Test command (agent/reality.py): extra passes over fallbacks while the deadline allows,
+    # and the least time left that is still worth starting one.
+    reality_resume_passes: int = 1
+    reality_min_resume_s: float = 60.0
+
     # Phrases that force an escalation. Checked on the most recent events.
     hazard_patterns: Tuple[str, ...] = (
         r"smell(?:s|ing)? (?:of )?gas",
