@@ -12,3 +12,14 @@ CALL = dict(party="provider", purpose="chase", objective="Ask when the engineer 
 class ProviderCallChat(ScriptedChat):
     def __init__(self):
         super().__init__([Turn(calls=[call("place_call", 1, **CALL)]), Turn(calls=[submit("CHASE_PROVIDER")])])
+
+
+class ReadVoicemailAndCallChat(ScriptedChat):
+    """Reads the transcribed voicemail, then chases the provider by phone."""
+
+    def __init__(self):
+        super().__init__([
+            Turn(calls=[call("read_attachment", 1, name="voicemail.mp3")]),
+            Turn(calls=[call("place_call", 2, **CALL)]),
+            Turn(calls=[submit("CHASE_PROVIDER")]),
+        ])

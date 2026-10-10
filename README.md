@@ -37,6 +37,10 @@ python3 -m agent replay "<cases folder>" out-replay/ --points 2 --backend claude
 
 Cuts each finished case at a few points, shows the agent only the events up to that point (clock set to when the next event happened), and compares its proposed action with what the agency actually did next. Writes `rows.jsonl`, `summary.json` and `report.md` (with the disagreements to read by hand). The "what happened next" label is a rough rule on the next event, so treat the numbers as agreement, not accuracy. Attachments are left out of a cut case, because they cannot be tied to a point in time. A paid backend is capped at 30 points unless you pass `--max-calls`.
 
+### Voice
+
+Audio files in a case can be transcribed (`--stt elevenlabs`), and the agent can phone a provider, landlord or tenant (`--calls elevenlabs`; `dry_run` by default). Both are off unless asked for. See [docs/voice.md](docs/voice.md).
+
 ## How it stays reliable
 
 - Every case runs in its own process with a hard time limit. A crash, hang, model error or malformed answer produces a fallback escalation, so outputs always equal inputs (`summary.json` checks this).

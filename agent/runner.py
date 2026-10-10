@@ -10,8 +10,10 @@ from __future__ import annotations
 import dataclasses
 import json
 import multiprocessing as mp
+import os
 import threading
 import time
+import uuid
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -123,6 +125,7 @@ def run_all(
     input_dir, out_dir = Path(input_dir), Path(out_dir)
     cases = list_cases(input_dir)
     now_iso = now_iso or datetime.now(timezone.utc).isoformat()
+    os.environ["LETTABLE_RUN_ID"] = uuid.uuid4().hex  # scopes the live dialer's per-run call cap
     started = time.monotonic()
     lock = threading.Lock()
     trace_path = out_dir / "trace.jsonl"

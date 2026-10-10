@@ -96,6 +96,7 @@ def place_pending(decision: Dict[str, Any], get_dialer: Callable[[], Dialer], cf
             if result.status == "failed":
                 _record_failure(decision, a)
             else:
+                a["placed_at"] = now.isoformat()
                 a["note"] = "Call %s." % ("recorded, nothing dialled (dry run)" if result.status == "dry_run" else "placed")
 
 
@@ -123,7 +124,7 @@ def _collect_case(case_out: Path, out_dir: Path, get_dialer, summary: Dict[str, 
                 continue
             record = {"conversation_id": cid, "case_id": decision["case_id"], "party": a.get("to"), "status": conv.status,
                       "success": conv.success, "summary": conv.summary, "data": conv.data, "duration_s": conv.duration_s,
-                      "dry_run": cid.startswith("dryrun-"),
+                      "dry_run": cid.startswith("dryrun-"), "placed_at": a.get("placed_at"),
                       "transcript": [{"role": r, "message": m} for r, m in conv.transcript]}
             atomic_write(path, json.dumps(record, indent=2, ensure_ascii=False) + "\n")
             summary["collected"].append({"case_id": decision["case_id"], "conversation_id": cid})
@@ -151,7 +152,7 @@ def with_call_events(case: Case, case_out: Path) -> Case:
     The record is logged as the agency's own contact (sender 'Agency / system'), not as a reply: a call that
     reached voicemail must not clear the wait on that party.
     """
-    ts = case.last_ts() or datetime.now(timezone.utc)
+    fallback_ts = case.last_ts() or datetime.now(timezone.utc)
     index = max([e.index for e in case.events] or [0])
     events: List[Event] = []
     for f in sorted((case_out / "calls").glob("*.json")) if (case_out / "calls").is_dir() else []:
@@ -166,5 +167,9 @@ def with_call_events(case: Case, case_out: Path) -> Case:
         body = "[Automatic call record] Call to the %s. Outcome: %s. Summary: %s%s Excerpt: %s" % (
             r.get("party"), r.get("success") or "unknown", r.get("summary") or "(none)", " Extracted: %s." % data if data else "", excerpt)
         index += 1
+        try:  # the call happened when it was placed, not when the case last changed
+            ts = datetime.fromisoformat(r["placed_at"])
+        except (KeyError, TypeError, ValueError):
+            ts = fallback_ts
         events.append(Event(index, ts, "Call", "Agency / system", _NAMES.get(r.get("party"), "Other"), body[:1500]))
     return replace(case, events=case.events + tuple(events)) if events else case
