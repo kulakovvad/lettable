@@ -80,12 +80,20 @@ def _job(facts: Dict[str, str]) -> str:
     return job or DEFAULT_JOB
 
 
+UNNAMED_AGENCY = "the letting agency"  # said when the case does not name the agency; "the agency" alone sounds odd aloud
+
+
+def _agency(facts: Dict[str, str]) -> str:
+    name = " ".join(facts.get("agency_name", "").split())
+    return UNNAMED_AGENCY if name in ("", "the agency") else name  # "the agency" is the case-reading code's own placeholder
+
+
 def dynamic_variables(req: CallRequest) -> Dict[str, Any]:
     """Every value is a string. Case facts are added under their own names too."""
     facts = {str(k): str(v) for k, v in req.facts.items()}
     out: Dict[str, Any] = dict(facts)
     out.update({
-        "agency_name": facts.get("agency_name") or "the agency",
+        "agency_name": _agency(facts),
         "party": req.party,
         "job": _job(facts),
         "objective": req.objective or "Find out where the job stands.",

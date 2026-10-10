@@ -60,11 +60,11 @@ python3 -m agent voice-setup --update-agent          # describes the change; nee
 python3 -m agent voice-setup --update-agent --yes    # sends it
 ```
 
-Create and update send the same configuration.
+Create and update send the same configuration. `--create-agent` and `--update-agent` cannot be combined (update would patch the old agent): create, set `ELEVENLABS_AGENT_ID` to the printed id, then update. An update changes only the fields it sends; on a live check the voice id, tools and built-in settings were left as they were.
 
 ## What the phone agent says
 
-- **Opening:** one short statement and then it waits, for example: "Hello, this is an automated assistant calling for Northbridge Lettings about the dishwasher repair. This call is recorded." It does not ask the person to confirm who they are. The job comes from the call's `job` fact, else the first sentence of the objective; the agency name comes from the case, else "the agency".
+- **Opening:** one short statement and then it waits, for example: "Hello, this is an automated assistant calling for Northbridge Lettings about the dishwasher repair. This call is recorded." It does not ask the person to confirm who they are. The job comes from the call's `job` fact (cut to 80 characters at a word), else "a maintenance job"; the objective is an instruction and is never read out as the topic. The agency name comes from the case (a sender's name or a sign-off such as "Kind regards, Northbridge Lettings"), else "the letting agency".
 - **During the call:** one or two short sentences per turn, one question at a time, it stops when interrupted, and it offers a colleague's callback if the person cannot talk. It writes plain words only (no bracketed tags such as `[sad]`).
 - **Voice:** a non-expressive English model (`eleven_flash_v2`, expressive mode off). The expressive models read stage directions aloud.
 - **Outcome after the call** (one of): `confirmed`, `declined`, `no_answer` (nobody picked up or only voicemail), `callback_requested`, `needs_human`, `unclear` (a person answered but gave no usable answer). A call that a person answered is never `no_answer`.

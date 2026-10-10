@@ -38,18 +38,24 @@ class WhatTheAgentSaysTests(unittest.TestCase):
         bare = CallRequest("c1", "tenant", "+447000000001", "Confirm the Monday visit works for you. Then say thanks.", {}, "k")
         v = dynamic_variables(bare)
         self.assertEqual(v["job"], "a maintenance job")  # the objective is an instruction, not a topic
-        self.assertEqual(v["agency_name"], "the agency")
+        self.assertEqual(v["agency_name"], "the letting agency")
         said = FIRST_MESSAGE
         for k, val in v.items():
             said = said.replace("{{%s}}" % k, val)
-        self.assertEqual(said, "Hello, this is an automated assistant calling for the agency about a maintenance job. This call is recorded.")
+        self.assertEqual(said, "Hello, this is an automated assistant calling for the letting agency about a maintenance job. This call is recorded.")
+
+    def test_the_case_reading_placeholder_is_not_spoken_and_a_real_name_is(self):
+        named = CallRequest("c1", "tenant", "+447000000001", "x", {"agency_name": "Northbridge Lettings"}, "k")
+        placeholder = CallRequest("c1", "tenant", "+447000000001", "x", {"agency_name": "the agency"}, "k")
+        self.assertEqual(dynamic_variables(named)["agency_name"], "Northbridge Lettings")
+        self.assertEqual(dynamic_variables(placeholder)["agency_name"], "the letting agency")
 
     def test_a_long_job_is_cut_at_a_word_and_empty_values_do_not_leave_blanks(self):
         long = CallRequest("c1", "tenant", "+447000000001", "x", {"job": "word " * 60, "agency_name": ""}, "k")
         v = dynamic_variables(long)
         self.assertLessEqual(len(v["job"]), 80)
         self.assertFalse(v["job"].endswith(" "))
-        self.assertEqual(v["agency_name"], "the agency")
+        self.assertEqual(v["agency_name"], "the letting agency")
         empty = dynamic_variables(CallRequest("c1", "tenant", "+447000000001", "", {"job": "   "}, "k"))
         self.assertEqual((empty["job"], bool(empty["objective"])), ("a maintenance job", True))
 
@@ -127,6 +133,19 @@ class SetupTests(unittest.TestCase):
 
     def test_nothing_to_do_is_still_reported(self):
         self.assertEqual(self.run_cli([], ENV)[0], 2)
+
+
+class CreateAndUpdateTogether(unittest.TestCase):
+    def test_both_flags_together_are_refused_before_anything_happens(self):
+        from unittest import mock
+        import contextlib, io
+        from agent import __main__ as cli
+        err = io.StringIO()
+        with mock.patch.dict("os.environ", {"ELEVENLABS_AGENT_ID": "agent-old", "ELEVENLABS_API_KEY": "k"}), \
+                mock.patch("urllib.request.urlopen") as uo, contextlib.redirect_stderr(err):
+            code = cli.main(["voice-setup", "--create-agent", "--update-agent", "--yes"])
+        self.assertEqual((code, uo.call_count), (2, 0))
+        self.assertIn("cannot be used together", err.getvalue())
 
 
 if __name__ == "__main__":

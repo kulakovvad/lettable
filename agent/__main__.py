@@ -17,6 +17,10 @@ def _voice_setup(args) -> int:
     from agent.voice_setup import create_agent, import_twilio_number, update_agent
 
     agent_id = os.environ.get("ELEVENLABS_AGENT_ID")
+    if args.create_agent and args.update_agent:
+        print("--create-agent and --update-agent cannot be used together: update would patch the old agent, not the new one. "
+              "Create first, set ELEVENLABS_AGENT_ID to the printed id, then update.", file=sys.stderr)
+        return 2
     if args.update_agent and not agent_id:
         print("ELEVENLABS_AGENT_ID is not set: nothing to update", file=sys.stderr)
         return 2
