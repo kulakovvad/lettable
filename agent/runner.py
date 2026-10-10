@@ -10,21 +10,26 @@ from __future__ import annotations
 import dataclasses
 import json
 import multiprocessing as mp
+import os
 import threading
 import time
+import uuid
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from agent import calls
 from agent.config import Config
 from agent.decide import decide
 from agent.fallback import fallback_decision
 from agent.llm import make_backend
 from agent.report import atomic_write, write_case
 from agent.schema import ACTIONS
+from agent.stt import make_transcriber
 from agent.timeline import load_case
+from agent.voice import make_dialer
 
 
 def parse_now(value: Optional[str]) -> datetime:
@@ -34,10 +39,13 @@ def parse_now(value: Optional[str]) -> datetime:
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
-def _child(conn, path: str, cfg: Dict[str, Any], backend: str, now_iso: str, cut: Optional[int] = None) -> None:
+def _child(conn, path: str, cfg: Dict[str, Any], backend: str, now_iso: str, cut: Optional[int] = None,
+           case_out: Optional[str] = None) -> None:
     try:
         config = Config.from_dict(cfg)
-        case = load_case(Path(path), config)
+        case = load_case(Path(path), config, None if cut is not None else make_transcriber(config))  # audio is transcribed here, inside the time limit; a replay cut discards it anyway
+        if case_out:
+            case = calls.with_call_events(case, Path(case_out))  # finished phone calls from an earlier run
         folder: Optional[Path] = Path(path)
         if cut is not None:
             case = case.cut(cut)  # replay: later events do not exist for this run
@@ -56,12 +64,14 @@ def _child(conn, path: str, cfg: Dict[str, Any], backend: str, now_iso: str, cut
 
 
 def run_isolated(
-    path: Path, cfg: Config, backend: str, now_iso: str, timeout: float, cut: Optional[int] = None
+    path: Path, cfg: Config, backend: str, now_iso: str, timeout: float, cut: Optional[int] = None,
+    case_out: Optional[Path] = None,
 ) -> Tuple[str, Any]:
     """Return ("ok", decision_dict) or (cause, detail)."""
     ctx = mp.get_context("spawn")
     parent, child = ctx.Pipe(duplex=False)
-    proc = ctx.Process(target=_child, args=(child, str(path), cfg.to_dict(), backend, now_iso, cut), daemon=True)
+    proc = ctx.Process(target=_child, args=(child, str(path), cfg.to_dict(), backend, now_iso, cut, str(case_out) if case_out else None),
+                       daemon=True)
     proc.start()
     child.close()
     try:
@@ -97,6 +107,13 @@ def _finished(out_dir: Path, case_id: str) -> bool:
         return False
 
 
+def _previous_actions(out_dir: Path, case_id: str) -> List[Dict[str, Any]]:
+    try:
+        return json.loads((out_dir / case_id / "decision.json").read_text(encoding="utf-8")).get("actions") or []
+    except Exception:
+        return []
+
+
 def run_all(
     input_dir: Path,
     out_dir: Path,
@@ -108,12 +125,21 @@ def run_all(
     input_dir, out_dir = Path(input_dir), Path(out_dir)
     cases = list_cases(input_dir)
     now_iso = now_iso or datetime.now(timezone.utc).isoformat()
+    os.environ["LETTABLE_RUN_ID"] = uuid.uuid4().hex  # scopes the live dialer's per-run call cap
     started = time.monotonic()
     lock = threading.Lock()
     trace_path = out_dir / "trace.jsonl"
     out_dir.mkdir(parents=True, exist_ok=True)
     results: List[Dict[str, Any]] = []
     spent = [0]  # model tokens used by finished cases, for the run-wide cap
+    budget = calls.CallBudget(cfg.max_calls_per_run)
+    dialer: List[Any] = []
+
+    def get_dialer():
+        with lock:
+            if not dialer:
+                dialer.append(make_dialer(cfg.call_backend, cfg))
+            return dialer[0]
 
     def trace(row: Dict[str, Any]) -> None:
         with lock:
@@ -137,13 +163,15 @@ def run_all(
         else:
             limit = cfg.case_timeout_s if remaining is None else min(cfg.case_timeout_s, remaining)
             try:
-                kind, payload = run_isolated(path, cfg, backend, now_iso, limit)
+                kind, payload = run_isolated(path, cfg, backend, now_iso, limit, case_out=out_dir / case_id)
             except Exception as exc:  # could not even start a worker
                 kind, payload = "runner", "%s: %s" % (type(exc).__name__, exc)
         if kind == "ok":
             decision = payload
             with lock:
                 spent[0] += int(decision.get("tokens") or 0)
+            before = _previous_actions(out_dir, case_id)  # read before write_case overwrites it
+            calls.place_pending(decision, get_dialer, cfg, budget, before, datetime.now(timezone.utc))
         else:
             try:
                 case = load_case(path, cfg)

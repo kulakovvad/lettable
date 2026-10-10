@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 from agent.config import Config
+from agent.stt import AUDIO_SUFFIXES, Transcriber, case_keyterms, transcript_for
 
 _EVENT_RE = re.compile(
     r"^## (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) UTC\s*[\u2014-]+\s*event (\d+)\s*$", re.M
@@ -187,7 +188,8 @@ def _read_pdf_text(path: Path, limit: int) -> Optional[str]:
         return None
 
 
-def load_case(folder: Path, cfg: Optional[Config] = None) -> Case:
+def load_case(folder: Path, cfg: Optional[Config] = None, transcriber: Optional[Transcriber] = None) -> Case:
+    """Load a case. Audio files are transcribed only when a transcriber is given."""
     cfg = cfg or Config()
     folder = Path(folder)
     warnings: List[str] = []
@@ -216,14 +218,26 @@ def load_case(folder: Path, cfg: Optional[Config] = None) -> Case:
 
     attachments: List[Attachment] = []
     seen = set()
-    adir = folder / "attachments"
-    if adir.is_dir():
-        for f in sorted(adir.iterdir()):
-            if f.is_symlink() or not f.is_file():
-                continue
-            seen.add(f.name)
-            text = _read_pdf_text(f, cfg.pdf_chars) if f.suffix.lower() == ".pdf" else None
-            attachments.append(Attachment(f.name, text))
+    files = [f for d in (folder / "attachments", folder) if d.is_dir() for f in sorted(d.iterdir())]
+    keyterms: Optional[List[str]] = None
+    for f in files:
+        if f.is_symlink() or not f.is_file() or f.name in seen:
+            continue
+        suffix = f.suffix.lower()
+        if f.parent == folder and suffix not in AUDIO_SUFFIXES:
+            continue  # the case's own files (index.md, history.md, ...); only audio is also read from the top level
+        if suffix == ".pdf":
+            text = _read_pdf_text(f, cfg.pdf_chars)
+        elif suffix in AUDIO_SUFFIXES:
+            text = None
+            if transcriber is not None:
+                if keyterms is None:
+                    keyterms = case_keyterms(prop, title, [e.body for e in events])
+                text = transcript_for(f, transcriber, cfg, keyterms)
+        else:
+            text = None
+        seen.add(f.name)
+        attachments.append(Attachment(f.name, text))
     for name in index_names:
         if name not in seen:
             attachments.append(Attachment(name, None))

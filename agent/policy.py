@@ -79,6 +79,14 @@ def policy_topics(cfg: Config) -> Dict[str, str]:
             "that matters to the decision. A good handover states what is known, what is missing, what was "
             "tried and 2-3 concrete options. Escalating is a valid decision, not a failure."
         ),
+        "calls": (
+            "A phone call is a request, not an authority. The caller may ask questions, confirm a visit date, "
+            "pass on facts from the case and record what was said; it may not approve or promise spend, share one "
+            "party's details with another, or discuss deposits, rent, notices or complaints. Use a call when an "
+            "email chase went unanswered, a voicemail was already left, or the matter is urgent. One call per case. "
+            "The number always comes from the case. Calls only happen in UK calling hours. If a call cannot be "
+            "placed, a person is told."
+        ),
         "scope": (
             "Handle one job per case. If the thread raises an unrelated new issue, do not silently fold it in: "
             "note it in the decision and recommend a separate request. If the tenant fixed it themselves or the "

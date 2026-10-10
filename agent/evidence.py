@@ -30,7 +30,7 @@ INVOICE_RE = re.compile(
     r"\b(invoice\w*|paid|payment|no charge|without payment|free of charge|at no cost|pays? (?:the )?(?:contractor|provider) directly)\b",
     re.I)
 KEYS_RE = re.compile(r"\bkeys?\b", re.I)
-MONEY_RE = re.compile(r"£\s?(\d[\d,]*(?:\.\d{1,2})?)|\b(\d[\d,]*(?:\.\d{1,2})?)\s?(?:GBP|pounds)\b", re.I)
+MONEY_RE = re.compile(r"£\s?(\d[\d,]*(?:\.\d{1,2})?)|\b(\d[\d,]*(?:\.\d{1,2})?)\s?(?:GBP|pounds)\b|\bGBP\s?(\d[\d,]*(?:\.\d{1,2})?)", re.I)
 VAT = 1.2
 
 
@@ -50,7 +50,7 @@ def role_of(name: str) -> str:
 def amounts(text: str) -> List[float]:
     out = []
     for m in MONEY_RE.finditer(text or ""):
-        raw = (m.group(1) or m.group(2) or "").replace(",", "")
+        raw = (m.group(1) or m.group(2) or m.group(3) or "").replace(",", "")
         try:
             out.append(round(float(raw), 2))
         except ValueError:

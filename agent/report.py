@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import json
-import os
-import tempfile
 from pathlib import Path
 from typing import Any, Dict
 
 from agent import consistency
+from agent.files import atomic_write  # noqa: F401 (re-exported for existing imports)
 
 _TITLES = {
     "WAIT": "Wait, nothing to do yet",
@@ -23,21 +22,6 @@ _TITLES = {
 }
 
 
-def atomic_write(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".tmp-", suffix=path.suffix)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(text)
-        os.replace(tmp, path)
-    except BaseException:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
-        raise
-
-
 def _bullets(items: Any) -> str:
     return "\n".join("- %s" % i for i in items) if items else "- none"
 
@@ -46,6 +30,13 @@ def _action_line(a: Dict[str, Any]) -> str:
     kind = a.get("kind")
     if kind == "message":
         head = "Message to %s (%s, %s)" % (a.get("to"), a.get("purpose"), a.get("priority"))
+    elif kind == "call":
+        head = "Phone call to %s (%s, %s), %s: %s" % (a.get("to"), a.get("purpose"), a.get("priority"),
+                                                      a.get("call_status", "?"), a.get("objective"))
+        if a.get("conversation_id"):
+            head += " [conversation %s]" % a["conversation_id"]
+        if a.get("call_result"):
+            head += ". Result: %s" % (a["call_result"].get("summary") or a["call_result"].get("status"))
     elif kind == "approval_request":
         head = "Approval request to landlord for GBP %.2f (%s)" % (a.get("amount_gbp") or 0, a.get("scope", ""))
     elif kind == "escalation":
@@ -74,7 +65,7 @@ def answer_md(d: Dict[str, Any]) -> str:
     if d.get("actions"):
         out += ["## Actions taken", ""] + [_action_line(a) for a in d["actions"]] + [""]
         for a in d["actions"]:
-            if a.get("body"):
+            if a.get("body") and a.get("kind") != "call":
                 out += ["### %s `%s`" % ("Message to %s" % a.get("to"), a["id"]), "", a["body"], ""]
     elif d.get("message"):
         out += ["## Message to send", "", d["message"], ""]

@@ -56,6 +56,10 @@ the fix worked). Stage send_message to tenant purpose=request_info.
 the message itself; do not also send_message the landlord).
 - INSTRUCT_PROVIDER: the landlord has approved the visit or the quote and the provider has not been told to \
 go ahead. Stage send_message to provider purpose=instruct_provider (and an update to the tenant if useful).
+- A phone call (place_call) can stand in for send_message on CHASE_*, ASK_TENANT and INSTRUCT_PROVIDER. Prefer a call \
+over a message when an email chase went unanswered, a voicemail was already left, or the matter is urgent. A call is \
+only a request: the caller has no authority to approve spend or promise anything. Never give a number; code uses the one \
+in the case.
 - SEND_REMINDER: a recorded appointment needs a reminder. Cite the booking event.
 - CLOSE: completion is confirmed by provider/tenant/landlord, nothing reopens it, invoice position known. Stage \
 close_case.
@@ -139,7 +143,8 @@ _PRIMARY_KIND = {
 def matches_primary(action: str, staged: Dict[str, Any]) -> bool:
     """Whether a staged action is the one the final primary action needs (ESCALATE needs only the ticket)."""
     kind, to, purpose = _PRIMARY_KIND.get(action, (None, None, None))
-    return (staged["kind"] == kind and (to is None or staged.get("to") == to)
+    same_kind = staged["kind"] == kind or (kind == "message" and staged["kind"] == "call")  # a call can stand in for a message
+    return (same_kind and (to is None or staged.get("to") == to)
             and (purpose is None or staged.get("purpose") == purpose))
 
 
@@ -233,7 +238,11 @@ def finalize(case: Case, box: Toolbox, cfg: Config, as_of: datetime, trace, step
             s.get("purpose") == "safety_advice" and s.get("to") == "tenant" and box.urgent)
         if always or matches_primary(decision.action, s):
             s["state"] = "committed"
-            s["note"] = "Recorded in the local outbox (no external delivery connected)."
+            if s["kind"] == "call":
+                s["call_status"] = "pending"  # the runner places it after the final checks (agent.calls)
+                s["note"] = "Call queued; it is placed after the final checks."
+            else:
+                s["note"] = "Recorded in the local outbox (no external delivery connected)."
         else:
             s["state"] = "held_for_review"
             s["note"] = ("Held: code gates changed the decision to %s." % decision.action if overridden else
