@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from agent import consistency, redflags
+from agent.mismatches import CHECKED
 from agent.files import atomic_write  # noqa: F401 (re-exported for existing imports)
 
 _TITLES = {
@@ -54,6 +55,106 @@ def _action_line(a: Dict[str, Any]) -> str:
     return "- **%s**: %s `%s`. %s" % (a.get("state", "").upper(), head, a.get("id"), a.get("note", ""))
 
 
+def _d(value: Any) -> Dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _l(value: Any) -> list:
+    return value if isinstance(value, list) else []
+
+
+def _refs(entry: Any) -> str:
+    return " [%s]" % ", ".join(str(r) for r in _l(entry.get("refs"))) if isinstance(entry, dict) and _l(entry.get("refs")) else ""
+
+
+def _vals(entries: Any) -> str:
+    return "; ".join("%s%s" % (e.get("value"), _refs(e)) for e in _l(entries) if isinstance(e, dict))
+
+
+def _details_section(det: Any) -> list:
+    """The case card (decision['details'], schema case-card/1): readable groups, then the same data as JSON.
+    Missing or unknown-shaped data gives no section, never an error."""
+    if not isinstance(det, dict) or det.get("schema") != "case-card/1":
+        return []
+    out = ["## Details", ""]
+
+    def group(title: str, rows: list) -> None:
+        rows = [r for r in rows if r]
+        if rows:
+            out.extend(["### %s" % title, ""] + ["- %s" % r for r in rows] + [""])
+
+    def line(label: str, value: Any) -> str:
+        return "**%s:** %s" % (label, value) if value not in ("", None, [], {}) else ""
+
+    c, p = _d(det.get("case")), _d(det.get("property"))
+    group("Case", [line("Id", c.get("id")), line("Title", c.get("title")), line("Raised by", c.get("source_role")),
+                   line("Request", c.get("request"))])
+    variants = [v for v in _l(p.get("address_variants")) if isinstance(v, dict)]
+    group("Property", [line("Address", p.get("address")),
+                       line("Other address forms in the case", _vals(variants[1:] if len(variants) > 1 else [])),
+                       line("References", "; ".join("%s %s%s" % (r.get("kind"), r.get("value"), _refs(r))
+                                                    for r in _l(p.get("references")) if isinstance(r, dict)))])
+    for key, title in (("tenant", "Tenant"), ("landlord", "Landlord")):
+        x = _d(det.get(key))
+        group(title, [line("Name", x.get("name")), line("Names seen", _vals(x.get("names")) if len(_l(x.get("names"))) > 1 else ""),
+                      line("Phones", _vals(x.get("phones"))), line("Emails", _vals(x.get("emails")))])
+    ag = _d(det.get("agency"))
+    group("Agency", [line("Name", ag.get("name")), line("Phones", _vals(ag.get("phones"))),
+                     line("Emails", _vals(ag.get("emails"))), line("Staff who signed", _vals(ag.get("staff")))])
+    pr = _d(det.get("provider"))
+    group("Provider", [line("Name", pr.get("name")), line("Assigned at", pr.get("assigned_ref")),
+                       line("Phones", _vals(pr.get("phones"))), line("Emails", _vals(pr.get("emails")))])
+    m = _d(det.get("money"))
+    ap = _d(m.get("approval"))
+    group("Money", [
+        line("Quotes", "; ".join("GBP %.2f (VAT %s, %s) [%s]" % (q.get("amount_gbp") or 0, q.get("vat"), q.get("from"), q.get("ref"))
+                                 for q in _l(m.get("quotes")) if isinstance(q, dict))),
+        line("Invoices", "; ".join("GBP %.2f (%s) [%s]" % (q.get("amount_gbp") or 0, q.get("from"), q.get("ref"))
+                                   for q in _l(m.get("invoices")) if isinstance(q, dict))),
+        line("Landlord approval", "%s [%s]" % ("GBP %.2f" % ap["amount_gbp"] if ap.get("amount_gbp") is not None else
+                                               "for the visit, no amount", ap.get("ref")) if ap.get("ref") else ""),
+        line("Payments", "; ".join("%s: %s [%s]" % (q.get("kind"), q.get("text"), q.get("ref"))
+                                   for q in _l(m.get("payments")) if isinstance(q, dict))),
+        line("Deposit", "; ".join("%s%s [%s]" % (q.get("text"), " (GBP %.2f)" % q["amount_gbp"] if q.get("amount_gbp") is not None else "",
+                                                 q.get("ref")) for q in _l(m.get("deposit")) if isinstance(q, dict)))])
+    group("Appointments", ["%s [%s]" % (a.get("when_text"), a.get("ref")) for a in _l(det.get("appointments")) if isinstance(a, dict)])
+    t = _d(det.get("timeline"))
+    w = _d(t.get("waiting_on"))
+    group("Timeline", [
+        line("Events", "%s%s" % (t.get("events"), ", first %s, last %s" % (t.get("first"), t.get("last")) if t.get("first") else "")),
+        line("Waiting on", "the %s%s" % (w.get("party"), " for %s days" % w["days"] if w.get("days") is not None else "") if w.get("party") else ""),
+        line("Channels", ", ".join("%s %s" % (k, v) for k, v in _d(t.get("channels")).items()))])
+    group("Attachments", ["%s (%s, %s)" % (a.get("name"), a.get("kind"), "content read" if a.get("available") else "content not available")
+                          for a in _l(det.get("attachments")) if isinstance(a, dict)])
+    dc = _d(det.get("decision"))
+    group("Decision", [line("Action", _TITLES.get(dc.get("action"), dc.get("action"))), line("Priority", dc.get("priority")),
+                       line("Confidence", "%.2f" % dc["confidence"] if isinstance(dc.get("confidence"), (int, float)) else ""),
+                       line("Decided by", "%s%s" % (dc.get("decided_by"), " (%s)" % dc["cause"] if dc.get("cause") else "")),
+                       line("As of", dc.get("as_of")), line("Evidence cited", ", ".join(str(r) for r in _l(dc.get("evidence_refs"))))])
+    group("Calls", ["%s: %s%s" % (c2.get("party"), c2.get("status"), " (%s)" % c2["result_summary"] if c2.get("result_summary") else "")
+                    for c2 in _l(det.get("calls")) if isinstance(c2, dict)])
+    group("Input warnings", [str(x) for x in _l(det.get("warnings"))])
+    out += ["### Case card (machine-readable)", "", "```json", json.dumps(det, indent=2, ensure_ascii=False), "```", ""]
+    return out
+
+
+def _mismatch_section(d: Dict[str, Any]) -> list:
+    """Only when the decision recorded the check (an older decision.json has no 'mismatches' key)."""
+    if "mismatches" not in d or not isinstance(d["mismatches"], list):
+        return []
+    items = [m for m in d["mismatches"] if isinstance(m, dict)]
+    rep = d.get("consistency")
+    state = "off" if rep is None else ("unavailable" if isinstance(rep, dict) and rep.get("status") != "ok" else "on")
+    out = ["## Inconsistencies and mismatches", ""]
+    if not items:
+        return out + ["None found.", "", "Checked: %s; document consistency check %s." % (CHECKED, state), ""]
+    for m in items:
+        refs = ", ".join(str(r) for r in m.get("refs") or [])
+        out.append("- **%s** (%s): %s%s" % (m.get("kind", "mismatch"), m.get("severity", "info"), m.get("summary", ""),
+                                            " [%s]" % refs if refs else ""))
+    return out + ["", "Checked: %s; document consistency check %s." % (CHECKED, state), ""]
+
+
 def answer_md(d: Dict[str, Any]) -> str:
     out = ["# Case %s%s" % (d["case_id"], ": %s" % d["title"] if d.get("title") else ""), ""]
     if str(d.get("answer") or "").strip():
@@ -62,6 +163,7 @@ def answer_md(d: Dict[str, Any]) -> str:
     if d.get("priority"):
         out.append("**Priority:** %s" % d["priority"])
     out += [""]
+    out += _details_section(d.get("details"))
     if d.get("request"):
         out += ["## What the system received", "",
                 "Initial request: %s" % d["request"][:600].replace("\n", " "),
@@ -108,6 +210,7 @@ def answer_md(d: Dict[str, Any]) -> str:
         if d.get("cause"):
             out.append("- Run problem: %s" % d["cause"])
         out.append("")
+    out += _mismatch_section(d)
     if d.get("unrelated_issues"):
         out += ["## Separate issues to raise as new requests", "", _bullets(d["unrelated_issues"]), ""]
     if d.get("hazard"):

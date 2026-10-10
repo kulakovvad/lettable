@@ -116,6 +116,8 @@ class Decision:
     consistency: Optional[Dict[str, Any]] = None  # agent.consistency report when the check is on
     answer: str = ""  # direct answer when the case asks an explicit question
     red_flags: List[Dict[str, Any]] = field(default_factory=list)  # agent.redflags, also on fallback
+    details: Dict[str, Any] = field(default_factory=dict)  # agent.details: the factual block of ANSWER.md
+    mismatches: List[Dict[str, Any]] = field(default_factory=list)  # agent.mismatches: things that do not match
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
