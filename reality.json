@@ -2,7 +2,7 @@
   "concurrency": 8,
   "case_timeout_s": 300,
   "max_retries": 4,
-  "consistency_check": false,
+  "consistency_check": true,
   "reality_resume_passes": 1,
   "reality_min_resume_s": 90
 }
