@@ -11,6 +11,7 @@ refused export leaves nothing behind.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 from pathlib import Path
@@ -48,12 +49,17 @@ def _number_cases(case_ids: List[str]) -> Dict[int, str]:
     return numbered
 
 
-def _from_this_run(dest: Path, out_dir: Path) -> bool:
-    marker = dest / "_run" / "export.json"
+def _run_id(out_dir: Path) -> str:
+    """Identifies a run folder without writing its path (which would put the local checkout path in the submission)."""
+    return hashlib.sha256(str(out_dir.resolve()).encode("utf-8")).hexdigest()[:16]
+
+
+def _owner(dest: Path) -> Optional[str]:
+    """The run id that wrote this ANSWERS folder, or None if it has no marker."""
     try:
-        return json.loads(marker.read_text(encoding="utf-8")).get("out_dir") == str(out_dir.resolve())
-    except (OSError, ValueError):
-        return False
+        return json.loads((dest / "_run" / "export.json").read_text(encoding="utf-8")).get("run_id")
+    except (OSError, ValueError, AttributeError):
+        return None
 
 
 def _plain_file(path: Path) -> bool:
@@ -91,16 +97,19 @@ def export(out_dir: Path, dest: Path, force: bool = False, skip_incomplete: bool
         raise ExportError("every finished case is incomplete; nothing to export")
 
     numbered = _number_cases([p.name for p in finished])
-    clashes = sorted(n for n in numbered if (dest / str(n)).exists())
-    if clashes and not force and not _from_this_run(dest, out_dir):
-        raise ExportError("%s already has folder(s) %s from somewhere else; use --force to overwrite them"
-                          % (dest, ", ".join(str(n) for n in clashes)))
+    run_id = _run_id(out_dir)
+    owner = _owner(dest)
+    previous = _old_index(dest)
+    # Another run's results are never touched without --force, whether or not the folder numbers overlap.
+    if not force:
+        if owner is not None and owner != run_id:
+            raise ExportError("%s holds results from a different run; use --force to replace them" % dest)
+        clashes = sorted(n for n in numbered if (dest / str(n)).exists() and owner != run_id)
+        if clashes:
+            raise ExportError("%s already has folder(s) %s that this export did not write; use --force to overwrite them"
+                              % (dest, ", ".join(str(n) for n in clashes)))
 
-    # All checks passed: write. First drop folders this exporter wrote earlier that this run no longer has,
-    # so ANSWERS/ never mixes two runs.
-    for old in _old_index(dest):
-        if old.isascii() and old.isdecimal() and int(old) not in numbered and (dest / old).is_dir():
-            shutil.rmtree(dest / old)
+    # All checks passed: write the new files first and clean up last, so a failure never leaves ANSWERS/ emptier.
     for n, cid in sorted(numbered.items()):
         for name in CASE_FILES:
             atomic_write_bytes(dest / str(n) / name, (out_dir / cid / name).read_bytes())
@@ -110,7 +119,16 @@ def export(out_dir: Path, dest: Path, force: bool = False, skip_incomplete: bool
     index = {str(n): cid for n, cid in sorted(numbered.items())}
     atomic_write_bytes(dest / "index.json", (json.dumps(index, indent=2) + "\n").encode("utf-8"))
     atomic_write_bytes(dest / "_run" / "export.json", (json.dumps(
-        {"out_dir": str(out_dir.resolve()), "cases": len(numbered), "run_files": run_files}, indent=2) + "\n").encode("utf-8"))
+        {"run_id": run_id, "run_folder": out_dir.name, "cases": len(numbered), "run_files": run_files}, indent=2) + "\n").encode("utf-8"))
+
+    # Clean up what an earlier export of this folder left that this one does not have.
+    for name in RUN_FILES:
+        if name not in run_files and (dest / "_run" / name).is_file():
+            (dest / "_run" / name).unlink()
+    if owner == run_id or force:
+        for old in previous:
+            if old.isascii() and old.isdecimal() and int(old) not in numbered and (dest / old).is_dir():
+                shutil.rmtree(dest / old)
 
     stale = sorted(p.name for p in dest.iterdir() if p.is_dir() and p.name.isdecimal() and int(p.name) not in numbered)
     return {"to": str(dest), "case_folders": len(folders), "exported": len(numbered),

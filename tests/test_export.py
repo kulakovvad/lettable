@@ -65,7 +65,8 @@ class ExportTests(unittest.TestCase):
         self.assertEqual(sha(out / "summary.json"), sha(self.dest / "_run" / "summary.json"))
         self.assertEqual(sha(out / "trace.jsonl"), sha(self.dest / "_run" / "trace.jsonl"))
         marker = json.loads((self.dest / "_run" / "export.json").read_text())
-        self.assertEqual(marker["out_dir"], str(out.resolve()))
+        self.assertEqual(marker["run_folder"], "out")
+        self.assertNotIn(str(self.root), (self.dest / "_run" / "export.json").read_text())  # no local path in the submission
 
     def test_missing_logs_are_not_an_error(self):
         out = make_run(self.root, ["001"], with_logs=False)
@@ -129,6 +130,51 @@ class ExportTests(unittest.TestCase):
         result = export(make_run(self.root, ["001"]), self.dest)
         self.assertTrue((self.dest / "7" / "ANSWER.md").is_file())
         self.assertEqual(result["stale_folders_not_from_this_export"], ["7"])
+
+    def test_another_run_is_refused_even_when_no_folder_numbers_overlap(self):
+        export(make_run(self.root, ["001", "002"]), self.dest)
+        other = self.root / "other"
+        other.mkdir()
+        before = {p.name: sha(p) for p in (self.dest / "1").iterdir()}
+        with self.assertRaisesRegex(ExportError, "different run"):
+            export(make_run(other, ["005"]), self.dest)
+        self.assertEqual({p.name: sha(p) for p in (self.dest / "1").iterdir()}, before)
+        self.assertTrue((self.dest / "2").is_dir())
+        self.assertFalse((self.dest / "5").exists())
+        self.assertEqual(sorted(json.loads((self.dest / "index.json").read_text())), ["1", "2"])
+        export(make_run(other / "again", ["005"]), self.dest, force=True)  # an explicit --force replaces it
+        self.assertEqual(sorted(json.loads((self.dest / "index.json").read_text())), ["5"])
+
+    def test_run_logs_from_an_earlier_export_do_not_linger(self):
+        out = make_run(self.root, ["001"])
+        export(out, self.dest)
+        self.assertTrue((self.dest / "_run" / "trace.jsonl").is_file())
+        (out / "trace.jsonl").unlink()
+        export(out, self.dest)
+        self.assertFalse((self.dest / "_run" / "trace.jsonl").exists())
+        self.assertEqual(json.loads((self.dest / "_run" / "export.json").read_text())["run_files"], ["summary.json"])
+
+    def test_a_failure_while_copying_leaves_the_earlier_folders_in_place(self):
+        out = make_run(self.root, ["001", "002"])
+        export(out, self.dest)
+        out.joinpath("003").mkdir()
+        for name in ("ANSWER.md", "REASONING.md", "decision.json"):
+            (out / "003" / name).write_text("x")
+        import agent.export as mod
+        real, calls = mod.atomic_write_bytes, []
+
+        def flaky(path, data):
+            calls.append(path)
+            if len(calls) == 3:
+                raise OSError("disk full")
+            return real(path, data)
+        mod.atomic_write_bytes = flaky
+        try:
+            with self.assertRaises(OSError):
+                export(out, self.dest)
+        finally:
+            mod.atomic_write_bytes = real
+        self.assertTrue((self.dest / "1" / "ANSWER.md").is_file() and (self.dest / "2" / "ANSWER.md").is_file())
 
     def test_odd_inputs_are_refused_cleanly(self):
         out = make_run(self.root, ["001"])
