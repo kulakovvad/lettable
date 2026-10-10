@@ -1,0 +1,137 @@
+{
+  "challenge_dir": "/Users/vikkash/dev/HackatonChallenges",
+  "track": "Property Management",
+  "tracks_found": [
+    "Banking & Financial Services",
+    "Delivery & Logistics",
+    "Insurance Claims Processing",
+    "Property Management"
+  ],
+  "backend": "claude",
+  "stt": "off",
+  "stt_note": "no audio files in the cases",
+  "consistency_check": "on",
+  "started_at": "2026-10-10T16:01:58.893855+00:00",
+  "cases": [
+    {
+      "n": "1",
+      "source": "Property Management/001"
+    },
+    {
+      "n": "2",
+      "source": "Property Management/002"
+    },
+    {
+      "n": "3",
+      "source": "Property Management/003"
+    },
+    {
+      "n": "4",
+      "source": "Property Management/004"
+    },
+    {
+      "n": "5",
+      "source": "Property Management/005"
+    },
+    {
+      "n": "6",
+      "source": "Property Management/006"
+    },
+    {
+      "n": "7",
+      "source": "Property Management/007"
+    },
+    {
+      "n": "8",
+      "source": "Property Management/008"
+    },
+    {
+      "n": "9",
+      "source": "Property Management/009"
+    },
+    {
+      "n": "10",
+      "source": "Property Management/010"
+    },
+    {
+      "n": "11",
+      "source": "Property Management/011"
+    },
+    {
+      "n": "12",
+      "source": "Property Management/012"
+    },
+    {
+      "n": "13",
+      "source": "Property Management/013"
+    },
+    {
+      "n": "14",
+      "source": "Property Management/014"
+    },
+    {
+      "n": "15",
+      "source": "Property Management/015"
+    },
+    {
+      "n": "16",
+      "source": "Property Management/016"
+    },
+    {
+      "n": "17",
+      "source": "Property Management/017"
+    },
+    {
+      "n": "18",
+      "source": "Property Management/018"
+    },
+    {
+      "n": "19",
+      "source": "Property Management/019"
+    },
+    {
+      "n": "20",
+      "source": "Property Management/020"
+    },
+    {
+      "n": "21",
+      "source": "Property Management/021"
+    },
+    {
+      "n": "22",
+      "source": "Property Management/022"
+    },
+    {
+      "n": "23",
+      "source": "Property Management/023"
+    },
+    {
+      "n": "24",
+      "source": "Property Management/024"
+    },
+    {
+      "n": "25",
+      "source": "Property Management/025"
+    },
+    {
+      "n": "26",
+      "source": "Property Management/026"
+    },
+    {
+      "n": "27",
+      "source": "Property Management/027"
+    },
+    {
+      "n": "28",
+      "source": "Property Management/028"
+    },
+    {
+      "n": "29",
+      "source": "Property Management/029"
+    },
+    {
+      "n": "30",
+      "source": "Property Management/030"
+    }
+  ]
+}

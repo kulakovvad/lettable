@@ -1,0 +1,318 @@
+{
+  "case_id": "18",
+  "action": "ESCALATE",
+  "reason": "The landlord said he would arrange the works himself (event-007), and no contractor, scope or date has been given in the 24 days since. The tenant says the expected contractors did not attend on 8 September and the openings are still unsealed (event-010, event-017). The earlier note said pest control made a final visit on 7 September (event-014), but the intended scope is unclear: under-sink openings versus the wall area. Nothing confirms completion (event-018). The three-day waiting period has expired (event-015, event-018), so a chase is due. We hold no approval to instruct a provider, so INSTRUCT_PROVIDER and ROUTE_FOR_APPROVAL do not apply. Escalation is not yet needed: no danger is reported, the landlord is reachable, and no chase has gone unanswered. The tenant reported rats indoors, but no health hazard or vulnerable occupant is stated, so P2. If the landlord stays silent after this chase, escalate to the property manager or place a call. The wait notes in events 13 and 16 were not a chase. [gate: model wants to chase the landlord but the timeline is not waiting on them]",
+  "source": "model",
+  "message": "",
+  "unknowns": [
+    "Landlord's contractor and the scope of work",
+    "Whether the pest-control report exists",
+    "Whether any openings have been sealed",
+    "Which openings are meant: under the sink, the wall area or the external drain"
+  ],
+  "options": [
+    "Wait for the landlord's reply",
+    "Place a call to the landlord if there is no reply in 48 hours",
+    "Escalate to the property manager to propose an agency inspection with landlord approval"
+  ],
+  "confidence": 0.75,
+  "hazard": false,
+  "waiting_on": null,
+  "waiting_days": null,
+  "events_seen": 19,
+  "gate_notes": [
+    "model wants to chase the landlord but the timeline is not waiting on them"
+  ],
+  "proposed_action": "CHASE_LANDLORD",
+  "cause": null,
+  "idempotency_key": "9bb85c82a8f33dec",
+  "decided_at": "2025-09-11T14:30:00+00:00",
+  "warnings": [],
+  "priority": "P2",
+  "title": "",
+  "request": "The tenant reports rat activity in the kitchen after returning from a short trip and asks for the issue to be addressed. They mention earlier pest-control visits and possible openings near the kitchen drain.",
+  "as_of": "2025-09-11T14:30:00+00:00",
+  "model": "claude-sonnet-5-5",
+  "steps": 3,
+  "tokens": 42071,
+  "evidence_refs": [
+    "event-007",
+    "event-010",
+    "event-014",
+    "event-017",
+    "event-018"
+  ],
+  "unrelated_issues": [],
+  "actions": [
+    {
+      "id": "message-1",
+      "kind": "message",
+      "idempotency_key": "bdc4ba7f7853",
+      "state": "held_for_review",
+      "to": "landlord",
+      "purpose": "chase",
+      "priority": "P2",
+      "body": "Dear Mr Vale, we are following up on the rat activity at 14 Mosswold Crescent, Brindlewick. On 18 August we recorded that you would arrange the works directly, and we asked for an expected completion date and confirmation when complete. We have not had that. The tenant reports that pest control made what they understood to be a final visit on 7 September, but that the contractors expected to fill or work on the openings did not attend on 8 September, and the openings are still unsealed. Please could you tell us: (1) who your contractor is and what work is planned (the under-sink openings, the wall area or the external drain openings), (2) the date it will be done, and (3) whether you can share any pest-control report. If you would rather Northbridge Lettings arrange an inspection, please say so. We cannot instruct anyone without your written approval. Kind regards, Tara Wren, Northbridge Lettings",
+      "evidence_refs": [
+        "event-007",
+        "event-014",
+        "event-017",
+        "event-018"
+      ],
+      "note": "Held: code gates changed the decision to ESCALATE."
+    },
+    {
+      "id": "followup-2",
+      "kind": "followup",
+      "idempotency_key": "8579cfac14bb",
+      "state": "held_for_review",
+      "review_at": "2025-09-13T14:30:00+00:00",
+      "waiting_on": "landlord",
+      "reason": "Chase sent for contractor, scope and date. If there is no reply, consider a call, since the tenant prefers phone and the landlord asked for a call earlier, and consider a handover to the property manager.",
+      "note": "Held: code gates changed the decision to ESCALATE."
+    },
+    {
+      "id": "escalation-3",
+      "kind": "escalation",
+      "idempotency_key": "061a9464dd2c",
+      "state": "committed",
+      "priority": "P2",
+      "route": "property_manager",
+      "summary": "The landlord said he would arrange the works himself (event-007), and no contractor, scope or date has been given in the 24 days since. The tenant says the expected contractors did not attend on 8 September and the openings are still unsealed (event-010, event-017). The earlier note said pest control made a final visit on 7 September (event-014), but the intended scope is unclear: under-sink openings versus the wall area. Nothing confirms completion (event-018). The three-day waiting period has expired (event-015, event-018), so a chase is due. We hold no approval to instruct a provider, so INSTRUCT_PROVIDER and ROUTE_FOR_APPROVAL do not apply. Escalation is not yet needed: no danger is reported, the landlord is reachable, and no chase has gone unanswered. The tenant reported rats indoors, but no health hazard or vulnerable occupant is stated, so P2. If the landlord stays silent after this chase, escalate to the property manager or place a call. The wait notes in events 13 and 16 were not a chase. [gate: model wants to chase the landlord but the timeline is not waiting on them]",
+      "known": [
+        "19 events reviewed",
+        "Property: 14 Mosswold Crescent, Brindlewick, ZZ1 1ZZ (index)",
+        "Request: The tenant reports rat activity in the kitchen after returning from a short trip and asks for the issue to be addressed. They mention earlier pest-control visits and possible openings near the kitchen drain. (request)"
+      ],
+      "unknowns": [
+        "Landlord's contractor and the scope of work",
+        "Whether the pest-control report exists",
+        "Whether any openings have been sealed",
+        "Which openings are meant: under the sink, the wall area or the external drain"
+      ],
+      "tried": [
+        "Agent proposed CHASE_LANDLORD",
+        "model wants to chase the landlord but the timeline is not waiting on them"
+      ],
+      "options": [
+        "Recommended: Wait for the landlord's reply",
+        "Place a call to the landlord if there is no reply in 48 hours",
+        "Escalate to the property manager to propose an agency inspection with landlord approval"
+      ],
+      "evidence_refs": [
+        "event-007",
+        "event-010",
+        "event-014",
+        "event-017",
+        "event-018"
+      ],
+      "note": "Created automatically because the final decision is an escalation.",
+      "respond_by": "2025-09-12T14:30:00+00:00",
+      "conflicts": [],
+      "failed": [],
+      "recommended": "Recommended: Wait for the landlord's reply"
+    }
+  ],
+  "blocked": [],
+  "trace": [
+    {
+      "step": 0,
+      "tool": "consistency_check",
+      "result": {
+        "status": "ok",
+        "checks": [],
+        "dropped": 0,
+        "error": null
+      }
+    },
+    {
+      "step": 1,
+      "tool": "check_policy",
+      "args": {
+        "topic": "chasing,calls,escalation,safety,scope"
+      },
+      "result": {
+        "status": "ok"
+      }
+    },
+    {
+      "step": 2,
+      "tool": "send_message",
+      "args": {
+        "to": "landlord",
+        "purpose": "chase",
+        "body": "Dear Mr Vale, we are following up on the rat activity at 14 Mosswold Crescent, Brindlewick. On 18 August we recorded that you would arrange the works directly, and we asked for an expected completion date and confirmation when complete. We have not had that. The tenant reports that pest control made what they understood to be a final visit on 7 September, but that the contractors expected to fill or work on the openings did not attend on 8 September, and the openings are still unsealed. Please could you tell us: (1) who your contractor is and what work is planned (the under-sink openings, the wall area or the external drain openings), (2) the date it will be done, and (3) whether you can share any pest-control report. If you would rather Northbridge Lettings arrange an inspection, please say so. We cannot instruct anyone without your written approval. Kind regards, Tara Wren, Northbridge Lettings",
+        "evidence_refs": [
+          "event-007",
+          "event-014",
+          "event-017",
+          "event-018"
+        ],
+        "priority": "P2"
+      },
+      "result": {
+        "status": "staged",
+        "id": "message-1",
+        "note": "Staged. Committed only if the final decision passes code checks."
+      }
+    },
+    {
+      "step": 2,
+      "tool": "schedule_followup",
+      "args": {
+        "after_hours": 48,
+        "waiting_on": "landlord",
+        "reason": "Chase sent for contractor, scope and date. If there is no reply, consider a call, since the tenant prefers phone and the landlord asked for a call earlier, and consider a handover to the property manager."
+      },
+      "result": {
+        "status": "staged",
+        "id": "followup-2",
+        "note": "Staged. Committed only if the final decision passes code checks."
+      }
+    },
+    {
+      "step": 3,
+      "tool": "submit_decision",
+      "args": {
+        "action": "CHASE_LANDLORD",
+        "priority": "P2",
+        "reason": "The landlord said he would arrange the works himself (event-007), and no contractor, scope or date has been given in the 24 days since. The tenant says the expected contractors did not attend on 8 September and the openings are still unsealed (event-010, event-017). The earlier note said pest control made a final visit on 7 September (event-014), but the intended scope is unclear: under-sink openings versus the wall area. Nothing confirms completion (event-018). The three-day waiting period has expired (event-015, event-018), so a chase is due. We hold no approval to instruct a provider, so INSTRUCT_PROVIDER and ROUTE_FOR_APPROVAL do not apply. Escalation is not yet needed: no danger is reported, the landlord is reachable, and no chase has gone unanswered. The tenant reported rats indoors, but no health hazard or vulnerable occupant is stated, so P2. If the landlord stays silent after this chase, escalate to the property manager or place a call. The wait notes in events 13 and 16 were not a chase.",
+        "confidence": 0.75,
+        "evidence_refs": [
+          "event-007",
+          "event-010",
+          "event-014",
+          "event-017",
+          "event-018"
+        ],
+        "unknowns": [
+          "Landlord's contractor and the scope of work",
+          "Whether the pest-control report exists",
+          "Whether any openings have been sealed",
+          "Which openings are meant: under the sink, the wall area or the external drain"
+        ],
+        "options": [
+          "Wait for the landlord's reply",
+          "Place a call to the landlord if there is no reply in 48 hours",
+          "Escalate to the property manager to propose an agency inspection with landlord approval"
+        ],
+        "unrelated_issues": [],
+        "amount_gbp": null
+      },
+      "result": {
+        "status": "accepted"
+      }
+    }
+  ],
+  "consistency": {
+    "status": "ok",
+    "model": "jev-1.13.0",
+    "checks": [],
+    "dropped": 0
+  },
+  "answer": "",
+  "red_flags": [],
+  "details": {
+    "schema": "case-card/1",
+    "case": {
+      "id": "18",
+      "title": null,
+      "source_role": "Tenant",
+      "status": null,
+      "request": "The tenant reports rat activity in the kitchen after returning from a short trip and asks for the issue to be addressed. They mention earlier pest-control visits and possible openings near the kitchen drain."
+    },
+    "property": {
+      "address": "14 Mosswold Crescent, Brindlewick, ZZ1 1ZZ",
+      "address_variants": [
+        {
+          "value": "14 Mosswold Crescent, Brindlewick, ZZ1 1ZZ",
+          "refs": [
+            "index"
+          ]
+        }
+      ],
+      "references": []
+    },
+    "tenant": {
+      "name": null,
+      "names": [],
+      "phones": [],
+      "emails": []
+    },
+    "landlord": {
+      "name": null,
+      "names": [],
+      "phones": [
+        {
+          "value": "07700 900184",
+          "refs": [
+            "event-004"
+          ]
+        }
+      ],
+      "emails": []
+    },
+    "agency": {
+      "name": "Tara Wren (Property Manager, Northbridge Lettings)",
+      "phones": [],
+      "emails": [],
+      "staff": []
+    },
+    "provider": {
+      "name": null,
+      "assigned_ref": null,
+      "phones": [],
+      "emails": []
+    },
+    "money": {
+      "quotes": [],
+      "invoices": [],
+      "approval": {
+        "amount_gbp": null,
+        "ref": null,
+        "covers": "unknown"
+      },
+      "payments": [],
+      "deposit": []
+    },
+    "appointments": [
+      {
+        "when_text": "Says pest-control visits are ongoing, with a final visit expected the following Monday.",
+        "ref": "event-010"
+      }
+    ],
+    "timeline": {
+      "events": 19,
+      "first": "2025-08-14T11:05:29+00:00",
+      "last": "2025-09-11T14:30:00+00:00",
+      "waiting_on": null,
+      "channels": {
+        "Portal": 1,
+        "Email": 7,
+        "Call": 4,
+        "Note": 4,
+        "Update": 3
+      }
+    },
+    "attachments": [],
+    "decision": {
+      "action": "ESCALATE",
+      "priority": "P2",
+      "confidence": 0.75,
+      "decided_by": "model",
+      "cause": null,
+      "as_of": "2025-09-11T14:30:00+00:00",
+      "evidence_refs": [
+        "event-007",
+        "event-010",
+        "event-014",
+        "event-017",
+        "event-018"
+      ]
+    },
+    "calls": [],
+    "warnings": []
+  },
+  "mismatches": [],
+  "calls": []
+}

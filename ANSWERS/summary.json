@@ -1,0 +1,35 @@
+{
+  "total": 30,
+  "written": 30,
+  "missing": [],
+  "by_action": {
+    "ESCALATE": 17,
+    "ASK_PROVIDER": 4,
+    "WAIT": 3,
+    "ASK_TENANT": 5,
+    "ROUTE_FOR_APPROVAL": 1
+  },
+  "fallbacks": {},
+  "escalated": 17,
+  "passes": [
+    {
+      "written": 30,
+      "skipped": 0,
+      "by_action": {
+        "ESCALATE": 17,
+        "WAIT": 3,
+        "ASK_TENANT": 5,
+        "ASK_PROVIDER": 4,
+        "ROUTE_FOR_APPROVAL": 1
+      },
+      "fallbacks": {},
+      "seconds": 56.52
+    }
+  ],
+  "seconds": 56.55,
+  "track": "Property Management",
+  "backend": "claude",
+  "stt": "off",
+  "finished_at": "2026-10-10T16:02:55.430325+00:00",
+  "reconciled": true
+}

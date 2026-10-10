@@ -1,0 +1,345 @@
+{
+  "case_id": "6",
+  "action": "ASK_TENANT",
+  "reason": "The landlord (event-001) only asked for the current solar readings. This is an information request with no fault, no contractor and no spend. We have asked the tenant four times (events 6, 10, 13, 16) and found no reading in the case. The tenant replied in event-17 saying the readings were supplied about two weeks earlier by his wife by phone and email. He gave no figures or image. That claim is unverified: nothing in this case's correspondence shows it (events 9, 12 and 15 record no reply). I am not chasing, because the tenant has now replied. I am not escalating, because there is no danger, dispute or authority issue; this is a single missing fact the tenant holds. I staged a polite request for the figure or a photo, and for the approximate date of the wife's contact so the office can check other inboxes and call logs. The landlord has not been updated and has had no reading since 3 Sept. Follow-up is set for 72 hours. If office records show the readings were received, pass them to the landlord instead.",
+  "source": "model",
+  "message": "Dear Ivo, thank you for your reply, and apologies for the repeated messages. We cannot see the readings against this request, so they may have been filed elsewhere. Could you please reply with the current kWh figure from the generation meter or inverter display, or a photo of the screen? If your wife can also tell us roughly when she phoned or emailed, we will check our records. Kind regards, Maya Chen, Northbridge Lettings",
+  "unknowns": [
+    "Whether the tenant's wife actually phoned or emailed the readings",
+    "The actual kWh reading",
+    "Whether the readings sit in another inbox or case"
+  ],
+  "options": [
+    "Wait for the tenant's figure or photo",
+    "Check office call logs and inboxes for the wife's contact",
+    "Update the landlord on progress"
+  ],
+  "confidence": 0.8,
+  "hazard": false,
+  "waiting_on": null,
+  "waiting_days": null,
+  "events_seen": 17,
+  "gate_notes": [],
+  "proposed_action": null,
+  "cause": null,
+  "idempotency_key": "bc28f718d70a9812",
+  "decided_at": "2025-09-18T17:42:00+00:00",
+  "warnings": [],
+  "priority": "P3",
+  "title": "",
+  "request": "The landlord asked for the current solar generation readings for the property.",
+  "as_of": "2025-09-18T17:42:00+00:00",
+  "model": "claude-sonnet-5-5",
+  "steps": 3,
+  "tokens": 38756,
+  "evidence_refs": [
+    "event-001",
+    "event-016",
+    "event-017",
+    "event-015"
+  ],
+  "unrelated_issues": [],
+  "actions": [
+    {
+      "id": "message-1",
+      "kind": "message",
+      "idempotency_key": "fe9ef0da0a2e",
+      "state": "committed",
+      "to": "tenant",
+      "purpose": "request_info",
+      "priority": "P3",
+      "body": "Dear Ivo, thank you for your reply, and apologies for the repeated messages. We cannot see the readings against this request, so they may have been filed elsewhere. Could you please reply with the current kWh figure from the generation meter or inverter display, or a photo of the screen? If your wife can also tell us roughly when she phoned or emailed, we will check our records. Kind regards, Maya Chen, Northbridge Lettings",
+      "evidence_refs": [
+        "event-017",
+        "event-016",
+        "event-009",
+        "event-012"
+      ],
+      "note": "Recorded in the local outbox (no external delivery connected)."
+    },
+    {
+      "id": "followup-2",
+      "kind": "followup",
+      "idempotency_key": "b4112b58bfcd",
+      "state": "held_for_review",
+      "review_at": "2025-09-21T17:42:00+00:00",
+      "waiting_on": "tenant",
+      "reason": "Awaiting solar reading/photo from tenant; also check office records for earlier phone/email from tenant's wife and update landlord.",
+      "note": "Held: not part of the final action ASK_TENANT; a person can release it."
+    }
+  ],
+  "blocked": [],
+  "trace": [
+    {
+      "step": 0,
+      "tool": "consistency_check",
+      "result": {
+        "status": "ok",
+        "checks": [
+          "landlord_name:flag",
+          "tenant_name:flag"
+        ],
+        "dropped": 0,
+        "error": null
+      }
+    },
+    {
+      "step": 1,
+      "tool": "search_case",
+      "args": {
+        "query": "reading"
+      },
+      "result": {
+        "status": "ok",
+        "hits": "10 item(s)"
+      }
+    },
+    {
+      "step": 1,
+      "tool": "check_policy",
+      "args": {
+        "topic": "chasing,communication,scope,data"
+      },
+      "result": {
+        "status": "ok"
+      }
+    },
+    {
+      "step": 2,
+      "tool": "send_message",
+      "args": {
+        "to": "tenant",
+        "purpose": "request_info",
+        "body": "Dear Ivo, thank you for your reply, and apologies for the repeated messages. We cannot see the readings against this request, so they may have been filed elsewhere. Could you please reply with the current kWh figure from the generation meter or inverter display, or a photo of the screen? If your wife can also tell us roughly when she phoned or emailed, we will check our records. Kind regards, Maya Chen, Northbridge Lettings",
+        "evidence_refs": [
+          "event-017",
+          "event-016",
+          "event-009",
+          "event-012"
+        ],
+        "priority": "P3"
+      },
+      "result": {
+        "status": "staged",
+        "id": "message-1",
+        "note": "Staged. Committed only if the final decision passes code checks."
+      }
+    },
+    {
+      "step": 2,
+      "tool": "schedule_followup",
+      "args": {
+        "after_hours": 72,
+        "waiting_on": "tenant",
+        "reason": "Awaiting solar reading/photo from tenant; also check office records for earlier phone/email from tenant's wife and update landlord."
+      },
+      "result": {
+        "status": "staged",
+        "id": "followup-2",
+        "note": "Staged. Committed only if the final decision passes code checks."
+      }
+    },
+    {
+      "step": 3,
+      "tool": "submit_decision",
+      "args": {
+        "action": "ASK_TENANT",
+        "priority": "P3",
+        "reason": "The landlord (event-001) only asked for the current solar readings. This is an information request with no fault, no contractor and no spend. We have asked the tenant four times (events 6, 10, 13, 16) and found no reading in the case. The tenant replied in event-17 saying the readings were supplied about two weeks earlier by his wife by phone and email. He gave no figures or image. That claim is unverified: nothing in this case's correspondence shows it (events 9, 12 and 15 record no reply). I am not chasing, because the tenant has now replied. I am not escalating, because there is no danger, dispute or authority issue; this is a single missing fact the tenant holds. I staged a polite request for the figure or a photo, and for the approximate date of the wife's contact so the office can check other inboxes and call logs. The landlord has not been updated and has had no reading since 3 Sept. Follow-up is set for 72 hours. If office records show the readings were received, pass them to the landlord instead.",
+        "confidence": 0.8,
+        "evidence_refs": [
+          "event-001",
+          "event-016",
+          "event-017",
+          "event-015"
+        ],
+        "unknowns": [
+          "Whether the tenant's wife actually phoned or emailed the readings",
+          "The actual kWh reading",
+          "Whether the readings sit in another inbox or case"
+        ],
+        "options": [
+          "Wait for the tenant's figure or photo",
+          "Check office call logs and inboxes for the wife's contact",
+          "Update the landlord on progress"
+        ],
+        "unrelated_issues": [],
+        "amount_gbp": null
+      },
+      "result": {
+        "status": "accepted"
+      }
+    }
+  ],
+  "consistency": {
+    "status": "ok",
+    "model": "jev-1.13.0",
+    "checks": [
+      {
+        "field": "landlord_name",
+        "values": [
+          "Edwin Vale",
+          "Edwin"
+        ],
+        "refs": [
+          [
+            "event-001"
+          ],
+          [
+            "event-001",
+            "event-005",
+            "event-006",
+            "event-013"
+          ]
+        ],
+        "score": 0.663,
+        "confidence": 0.96,
+        "tier": "flag"
+      },
+      {
+        "field": "tenant_name",
+        "values": [
+          "Ivo Mercer",
+          "Ivo"
+        ],
+        "refs": [
+          [
+            "event-004",
+            "event-006",
+            "event-010",
+            "event-013",
+            "event-014",
+            "event-016",
+            "event-017"
+          ],
+          [
+            "event-006",
+            "event-017"
+          ]
+        ],
+        "score": 0.673,
+        "confidence": 0.97,
+        "tier": "flag"
+      }
+    ],
+    "dropped": 0
+  },
+  "answer": "",
+  "red_flags": [],
+  "details": {
+    "schema": "case-card/1",
+    "case": {
+      "id": "6",
+      "title": null,
+      "source_role": "Landlord",
+      "status": null,
+      "request": "The landlord asked for the current solar generation readings for the property."
+    },
+    "property": {
+      "address": "14 Brindlefern Walk, Larkmere, ZZ1 1ZZ",
+      "address_variants": [
+        {
+          "value": "14 Brindlefern Walk, Larkmere, ZZ1 1ZZ",
+          "refs": [
+            "index"
+          ]
+        }
+      ],
+      "references": []
+    },
+    "tenant": {
+      "name": null,
+      "names": [],
+      "phones": [],
+      "emails": []
+    },
+    "landlord": {
+      "name": null,
+      "names": [],
+      "phones": [],
+      "emails": []
+    },
+    "agency": {
+      "name": "Maya Chen (Property Manager, Northbridge Lettings)",
+      "phones": [],
+      "emails": [],
+      "staff": []
+    },
+    "provider": {
+      "name": null,
+      "assigned_ref": null,
+      "phones": [],
+      "emails": []
+    },
+    "money": {
+      "quotes": [],
+      "invoices": [],
+      "approval": {
+        "amount_gbp": null,
+        "ref": null,
+        "covers": "unknown"
+      },
+      "payments": [],
+      "deposit": []
+    },
+    "appointments": [],
+    "timeline": {
+      "events": 17,
+      "first": "2025-09-03T09:10:00+00:00",
+      "last": "2025-09-18T17:42:00+00:00",
+      "waiting_on": null,
+      "channels": {
+        "Call": 1,
+        "Note": 4,
+        "Update": 5,
+        "Email": 6,
+        "SMS": 1
+      }
+    },
+    "attachments": [],
+    "decision": {
+      "action": "ASK_TENANT",
+      "priority": "P3",
+      "confidence": 0.8,
+      "decided_by": "model",
+      "cause": null,
+      "as_of": "2025-09-18T17:42:00+00:00",
+      "evidence_refs": [
+        "event-001",
+        "event-016",
+        "event-017",
+        "event-015"
+      ]
+    },
+    "calls": [],
+    "warnings": []
+  },
+  "mismatches": [
+    {
+      "kind": "document consistency",
+      "severity": "flag",
+      "refs": [
+        "event-001",
+        "event-005",
+        "event-006",
+        "event-013"
+      ],
+      "summary": "landlord name differs between documents: 'Edwin Vale' vs 'Edwin' (similarity 0.663)."
+    },
+    {
+      "kind": "document consistency",
+      "severity": "flag",
+      "refs": [
+        "event-004",
+        "event-006",
+        "event-010",
+        "event-013",
+        "event-014",
+        "event-016",
+        "event-017"
+      ],
+      "summary": "tenant name differs between documents: 'Ivo Mercer' vs 'Ivo' (similarity 0.673)."
+    }
+  ],
+  "calls": []
+}

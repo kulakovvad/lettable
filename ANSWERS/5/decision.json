@@ -1,0 +1,540 @@
+{
+  "case_id": "5",
+  "action": "ESCALATE",
+  "reason": "Event-019 asks us to pay invoice NBL-005-INV-71 to new bank details (11-11-11 / 11111111). These differ from the details on the invoice itself (00-00-00 / 00000000, event-018 and the PDF), and the email gives no independent verification. Policy treats this as suspected payment redirection: escalate P1 to accounts, do not reply to the requester and do not pay. The invoice otherwise matches the job. Property, provider and amount are right: £95 + VAT = £114, which equals the landlord's approval of the diagnostic visit (event-008). Even so, the claim is unverified. The job sheet was requested three times and not supplied (events 12, 14, 17, 20). The £460 + VAT repair was never approved (event-016), and the diagnostic invoice does not include it. Waiting or asking Rowan would send a query to the possibly compromised channel, so a person should verify through a known contact. No reply to the requester is staged. The tenant reported no danger (events 1, 4, 13) and there is no hazard, so the P1 comes from the payment fraud flag. Whether the event-019 email is genuine would change the decision.",
+  "source": "model",
+  "message": "",
+  "unknowns": [
+    "Whether event-019 is genuine",
+    "Which bank details are correct",
+    "Whether a job sheet exists",
+    "Current heating status"
+  ],
+  "options": [
+    "Verify the bank change via a phone number already on file, then pay only once confirmed",
+    "Hold payment on the original details and check for mailbox compromise",
+    "Inform the landlord of the invoice, the bank change request and the unapproved £460 + VAT repair"
+  ],
+  "confidence": 0.93,
+  "hazard": false,
+  "waiting_on": null,
+  "waiting_days": null,
+  "events_seen": 20,
+  "gate_notes": [],
+  "proposed_action": null,
+  "cause": null,
+  "idempotency_key": "754b795a31837d19",
+  "decided_at": "2025-05-13T16:40:00+00:00",
+  "warnings": [],
+  "priority": "P1",
+  "title": "",
+  "request": "The heating has stopped working at 18 Brindlewick Row. Please arrange an inspection and let me know when someone can attend.",
+  "as_of": "2025-05-13T16:40:00+00:00",
+  "model": "claude-sonnet-5-5",
+  "steps": 3,
+  "tokens": 53132,
+  "evidence_refs": [
+    "event-018",
+    "event-019",
+    "event-008",
+    "event-016",
+    "event-020",
+    "invoice-NBL-005-INV-71.pdf"
+  ],
+  "unrelated_issues": [
+    "Repair estimate £460 + VAT is still unapproved: the landlord asked for a breakdown and attendance record (event-016)",
+    "Tenant asked whether the heating will stay on and has had no answer (event-013)"
+  ],
+  "actions": [
+    {
+      "id": "escalation-1",
+      "kind": "escalation",
+      "idempotency_key": "b107f8db1eaf",
+      "state": "committed",
+      "priority": "P1",
+      "route": "accounts",
+      "summary": "Suspected payment redirection on Hearthline Heating invoice NBL-005-INV-71 (£114 inc VAT) for 18 Brindlewick Row. Two days after sending the invoice, the sender asked for payment to different bank details (11-11-11 / 11111111) from those printed on it (00-00-00 / 00000000), with no independent verification. Do not pay on either set of details until verified by a person through a known contact.",
+      "known": [
+        "Hearthline Heating (Rowan Pike) is the assigned provider for NBL-005-184; the invoice matches the property address and the approved £95 + VAT diagnostic visit of 7 May (£114 inc VAT) (event-008, event-018, invoice PDF).",
+        "Invoice dated 12 May, due 19 May, lists remittance 00-00-00 / 00000000 (event-018).",
+        "Event-019 (13 May 15:51) asks for payment to 11-11-11 / 11111111 instead, with no independent contact or verification, and offers a revised invoice.",
+        "Landlord approved the diagnostic visit only, up to £95 + VAT, and asked to be contacted before any repair (event-008). The £460 + VAT repair estimate was not approved (event-016).",
+        "Job sheet / written attendance record requested on 7 May, 8 May and 9 May and still not supplied (event-12, event-14, event-17, event-20).",
+        "No payment instruction has been entered (event-020).",
+        "Property: 18 Brindlewick Row, Vellmere, ZZ1 1ZZ (index)",
+        "Request: The heating has stopped working at 18 Brindlewick Row. Please arrange an inspection and let me know when someone can attend. (request)"
+      ],
+      "unknowns": [
+        "Whether event-019 genuinely came from Hearthline or from a compromised or spoofed mailbox.",
+        "Which bank details are genuine.",
+        "Whether the job sheet exists.",
+        "Heating status: it was temporarily restored by a reset and the fault could recur (event-014); the tenant has not updated since event-013.",
+        "Whether event-019 is genuine",
+        "Which bank details are correct",
+        "Whether a job sheet exists",
+        "Current heating status"
+      ],
+      "tried": [
+        "No reply sent to the requester, deliberately, per policy.",
+        "Job sheet requested three times without result.",
+        "Agent proposed ESCALATE"
+      ],
+      "options": [
+        "Recommended: Verify the bank change by phoning Hearthline on a number already held on file (not one from event-019). Pay the £114 only after confirmation, the job sheet is received and accounts agrees.",
+        "Hold payment and keep the original remittance details. Ask Hearthline to confirm via a known contact. Check Rowan's mailbox for compromise.",
+        "Tell the landlord about the invoice and the bank change request. Separately, the landlord still needs to decide on the £460 + VAT repair once an itemised breakdown arrives."
+      ],
+      "evidence_refs": [
+        "event-008",
+        "event-016",
+        "event-018",
+        "event-019",
+        "event-020",
+        "invoice-NBL-005-INV-71.pdf"
+      ],
+      "note": "Recorded in the local outbox (no external delivery connected).",
+      "respond_by": "2025-05-13T20:40:00+00:00",
+      "conflicts": [
+        {
+          "field": "property_address",
+          "values": [
+            {
+              "value": "18 Brindlewick Row, Vellmere, ZZ1 1ZZ",
+              "refs": [
+                "index",
+                "invoice-NBL-005-INV-71.pdf"
+              ]
+            },
+            {
+              "value": "18 Brindlewick Row",
+              "refs": [
+                "index"
+              ]
+            }
+          ]
+        },
+        {
+          "field": "tenant_name",
+          "values": [
+            {
+              "value": "Iris Bell",
+              "refs": [
+                "event-001",
+                "event-002",
+                "event-003",
+                "event-004",
+                "event-010"
+              ]
+            },
+            {
+              "value": "Iris",
+              "refs": [
+                "event-010"
+              ]
+            }
+          ]
+        },
+        {
+          "field": "reference_number",
+          "values": [
+            {
+              "value": "NBL-005-184",
+              "refs": [
+                "event-002"
+              ]
+            },
+            {
+              "value": "NBL-005-INV-71",
+              "refs": [
+                "invoice-NBL-005-INV-71.pdf"
+              ]
+            }
+          ]
+        }
+      ],
+      "failed": [],
+      "recommended": "Recommended: Verify the bank change by phoning Hearthline on a number already held on file (not one from event-019). Pay the £114 only after confirmation, the job sheet is received and accounts agrees."
+    }
+  ],
+  "blocked": [],
+  "trace": [
+    {
+      "step": 0,
+      "tool": "consistency_check",
+      "result": {
+        "status": "ok",
+        "checks": [
+          "property_address:flag",
+          "tenant_name:flag",
+          "reference_number:flag"
+        ],
+        "dropped": 8,
+        "error": null
+      }
+    },
+    {
+      "step": 1,
+      "tool": "check_policy",
+      "args": {
+        "topic": "verify_claims,amounts,escalation"
+      },
+      "result": {
+        "status": "ok"
+      }
+    },
+    {
+      "step": 2,
+      "tool": "escalate_to_human",
+      "args": {
+        "priority": "P1",
+        "route": "accounts",
+        "summary": "Suspected payment redirection on Hearthline Heating invoice NBL-005-INV-71 (£114 inc VAT) for 18 Brindlewick Row. Two days after sending the invoice, the sender asked for payment to different bank details (11-11-11 / 11111111) from those printed on it (00-00-00 / 00000000), with no independent verification. Do not pay on either set of details until verified by a person through a known contact.",
+        "known": [
+          "Hearthline Heating (Rowan Pike) is the assigned provider for NBL-005-184; the invoice matches the property address and the approved £95 + VAT diagnostic visit of 7 May (£114 inc VAT) (event-008, event-018, invoice PDF).",
+          "Invoice dated 12 May, due 19 May, lists remittance 00-00-00 / 00000000 (event-018).",
+          "Event-019 (13 May 15:51) asks for payment to 11-11-11 / 11111111 instead, with no independent contact or verification, and offers a revised invoice.",
+          "Landlord approved the diagnostic visit only, up to £95 + VAT, and asked to be contacted before any repair (event-008). The £460 + VAT repair estimate was not approved (event-016).",
+          "Job sheet / written attendance record requested on 7 May, 8 May and 9 May and still not supplied (event-12, event-14, event-17, event-20).",
+          "No payment instruction has been entered (event-020)."
+        ],
+        "unknowns": [
+          "Whether event-019 genuinely came from Hearthline or from a compromised or spoofed mailbox.",
+          "Which bank details are genuine.",
+          "Whether the job sheet exists.",
+          "Heating status: it was temporarily restored by a reset and the fault could recur (event-014); the tenant has not updated since event-013."
+        ],
+        "tried": [
+          "No reply sent to the requester, deliberately, per policy.",
+          "Job sheet requested three times without result."
+        ],
+        "options": [
+          "Verify the bank change by phoning Hearthline on a number already held on file (not one from event-019). Pay the £114 only after confirmation, the job sheet is received and accounts agrees.",
+          "Hold payment and keep the original remittance details. Ask Hearthline to confirm via a known contact. Check Rowan's mailbox for compromise.",
+          "Tell the landlord about the invoice and the bank change request. Separately, the landlord still needs to decide on the £460 + VAT repair once an itemised breakdown arrives."
+        ],
+        "evidence_refs": [
+          "event-008",
+          "event-016",
+          "event-018",
+          "event-019",
+          "event-020",
+          "invoice-NBL-005-INV-71.pdf"
+        ]
+      },
+      "result": {
+        "status": "staged",
+        "id": "escalation-1",
+        "note": "Staged. Committed only if the final decision passes code checks."
+      }
+    },
+    {
+      "step": 3,
+      "tool": "submit_decision",
+      "args": {
+        "action": "ESCALATE",
+        "priority": "P1",
+        "reason": "Event-019 asks us to pay invoice NBL-005-INV-71 to new bank details (11-11-11 / 11111111). These differ from the details on the invoice itself (00-00-00 / 00000000, event-018 and the PDF), and the email gives no independent verification. Policy treats this as suspected payment redirection: escalate P1 to accounts, do not reply to the requester and do not pay. The invoice otherwise matches the job. Property, provider and amount are right: £95 + VAT = £114, which equals the landlord's approval of the diagnostic visit (event-008). Even so, the claim is unverified. The job sheet was requested three times and not supplied (events 12, 14, 17, 20). The £460 + VAT repair was never approved (event-016), and the diagnostic invoice does not include it. Waiting or asking Rowan would send a query to the possibly compromised channel, so a person should verify through a known contact. No reply to the requester is staged. The tenant reported no danger (events 1, 4, 13) and there is no hazard, so the P1 comes from the payment fraud flag. Whether the event-019 email is genuine would change the decision.",
+        "confidence": 0.93,
+        "evidence_refs": [
+          "event-018",
+          "event-019",
+          "event-008",
+          "event-016",
+          "event-020",
+          "invoice-NBL-005-INV-71.pdf"
+        ],
+        "unknowns": [
+          "Whether event-019 is genuine",
+          "Which bank details are correct",
+          "Whether a job sheet exists",
+          "Current heating status"
+        ],
+        "options": [
+          "Verify the bank change via a phone number already on file, then pay only once confirmed",
+          "Hold payment on the original details and check for mailbox compromise",
+          "Inform the landlord of the invoice, the bank change request and the unapproved £460 + VAT repair"
+        ],
+        "unrelated_issues": [
+          "Repair estimate £460 + VAT is still unapproved: the landlord asked for a breakdown and attendance record (event-016)",
+          "Tenant asked whether the heating will stay on and has had no answer (event-013)"
+        ],
+        "amount_gbp": 114
+      },
+      "result": {
+        "status": "accepted"
+      }
+    }
+  ],
+  "consistency": {
+    "status": "ok",
+    "model": "jev-1.13.0",
+    "checks": [
+      {
+        "field": "property_address",
+        "values": [
+          "18 Brindlewick Row, Vellmere, ZZ1 1ZZ",
+          "18 Brindlewick Row"
+        ],
+        "refs": [
+          [
+            "index",
+            "invoice-NBL-005-INV-71.pdf"
+          ],
+          [
+            "index"
+          ]
+        ],
+        "score": 0.667,
+        "confidence": 0.99,
+        "tier": "flag"
+      },
+      {
+        "field": "tenant_name",
+        "values": [
+          "Iris Bell",
+          "Iris"
+        ],
+        "refs": [
+          [
+            "event-001",
+            "event-002",
+            "event-003",
+            "event-004",
+            "event-010"
+          ],
+          [
+            "event-010"
+          ]
+        ],
+        "score": 0.667,
+        "confidence": 0.99,
+        "tier": "flag"
+      },
+      {
+        "field": "reference_number",
+        "values": [
+          "NBL-005-184",
+          "NBL-005-INV-71"
+        ],
+        "refs": [
+          [
+            "event-002"
+          ],
+          [
+            "invoice-NBL-005-INV-71.pdf"
+          ]
+        ],
+        "score": 0.28,
+        "confidence": 0.4,
+        "tier": "flag"
+      }
+    ],
+    "dropped": 8
+  },
+  "answer": "",
+  "red_flags": [
+    {
+      "category": "payment",
+      "force": true,
+      "ref": "event-019",
+      "excerpt": "Says Hearthline Heating has changed bank accounts and asks that the invoice be paid using 11-11-11 / 11111111",
+      "guidance": "Suspected payment redirection. Do not reply to the requester, do not change bank details, and do not pay. Escalate P1 to accounts.",
+      "route": "accounts",
+      "priority": "P1"
+    }
+  ],
+  "details": {
+    "schema": "case-card/1",
+    "case": {
+      "id": "5",
+      "title": null,
+      "source_role": "Tenant",
+      "status": null,
+      "request": "The heating has stopped working at 18 Brindlewick Row. Please arrange an inspection and let me know when someone can attend."
+    },
+    "property": {
+      "address": "18 Brindlewick Row, Vellmere, ZZ1 1ZZ",
+      "address_variants": [
+        {
+          "value": "18 Brindlewick Row, Vellmere, ZZ1 1ZZ",
+          "refs": [
+            "index"
+          ]
+        }
+      ],
+      "references": []
+    },
+    "tenant": {
+      "name": null,
+      "names": [],
+      "phones": [],
+      "emails": []
+    },
+    "landlord": {
+      "name": null,
+      "names": [],
+      "phones": [],
+      "emails": []
+    },
+    "agency": {
+      "name": "Maya Chen (Property Manager, Northbridge Lettings)",
+      "phones": [],
+      "emails": [],
+      "staff": []
+    },
+    "provider": {
+      "name": null,
+      "assigned_ref": null,
+      "phones": [],
+      "emails": []
+    },
+    "money": {
+      "quotes": [
+        {
+          "amount_gbp": 95.0,
+          "vat": "excl",
+          "from": "provider",
+          "ref": "event-006"
+        },
+        {
+          "amount_gbp": 460.0,
+          "vat": "excl",
+          "from": "provider",
+          "ref": "event-011"
+        }
+      ],
+      "invoices": [
+        {
+          "amount_gbp": 114.0,
+          "from": "provider",
+          "ref": "event-018"
+        },
+        {
+          "amount_gbp": 95.0,
+          "from": "attachment",
+          "ref": "invoice-NBL-005-INV-71.pdf"
+        },
+        {
+          "amount_gbp": 19.0,
+          "from": "attachment",
+          "ref": "invoice-NBL-005-INV-71.pdf"
+        },
+        {
+          "amount_gbp": 114.0,
+          "from": "attachment",
+          "ref": "invoice-NBL-005-INV-71.pdf"
+        }
+      ],
+      "approval": {
+        "amount_gbp": null,
+        "ref": null,
+        "covers": "unknown"
+      },
+      "payments": [
+        {
+          "kind": "payment",
+          "text": "The invoice lists remittance details 00-00-00 / 00000000 and a payment due date of 19 May.",
+          "ref": "event-018"
+        },
+        {
+          "kind": "payment",
+          "text": "Says Hearthline Heating has changed bank accounts and asks that the invoice be paid using 11-11-11 / 11111111 instead of the details on the invoice.",
+          "ref": "event-019"
+        },
+        {
+          "kind": "payment",
+          "text": "No payment instruction has been entered.",
+          "ref": "event-020"
+        }
+      ],
+      "deposit": []
+    },
+    "appointments": [
+      {
+        "when_text": "Offers an appointment window of 09:00–11:00 on 7 May.",
+        "ref": "event-009"
+      }
+    ],
+    "timeline": {
+      "events": 20,
+      "first": "2025-05-06T08:12:00+00:00",
+      "last": "2025-05-13T16:40:00+00:00",
+      "waiting_on": null,
+      "channels": {
+        "Portal": 2,
+        "Update": 1,
+        "Email": 12,
+        "Note": 2,
+        "SMS": 2,
+        "Call": 1
+      }
+    },
+    "attachments": [
+      {
+        "name": "invoice-NBL-005-INV-71.pdf",
+        "available": true,
+        "kind": "pdf"
+      }
+    ],
+    "decision": {
+      "action": "ESCALATE",
+      "priority": "P1",
+      "confidence": 0.93,
+      "decided_by": "model",
+      "cause": null,
+      "as_of": "2025-05-13T16:40:00+00:00",
+      "evidence_refs": [
+        "event-018",
+        "event-019",
+        "event-008",
+        "event-016",
+        "event-020",
+        "invoice-NBL-005-INV-71.pdf"
+      ]
+    },
+    "calls": [],
+    "warnings": []
+  },
+  "mismatches": [
+    {
+      "kind": "document consistency",
+      "severity": "flag",
+      "refs": [
+        "index",
+        "invoice-NBL-005-INV-71.pdf"
+      ],
+      "summary": "property address differs between documents: '18 Brindlewick Row, Vellmere, ZZ1 1ZZ' vs '18 Brindlewick Row' (similarity 0.667)."
+    },
+    {
+      "kind": "document consistency",
+      "severity": "flag",
+      "refs": [
+        "event-001",
+        "event-002",
+        "event-003",
+        "event-004",
+        "event-010"
+      ],
+      "summary": "tenant name differs between documents: 'Iris Bell' vs 'Iris' (similarity 0.667)."
+    },
+    {
+      "kind": "document consistency",
+      "severity": "flag",
+      "refs": [
+        "event-002",
+        "invoice-NBL-005-INV-71.pdf"
+      ],
+      "summary": "reference number differs between documents: 'NBL-005-184' vs 'NBL-005-INV-71' (similarity 0.28)."
+    },
+    {
+      "kind": "amount",
+      "severity": "info",
+      "refs": [
+        "event-006",
+        "event-011"
+      ],
+      "summary": "The provider gave different quotes: GBP 95.00 (event-006); GBP 460.00 (event-011)."
+    }
+  ],
+  "calls": []
+}

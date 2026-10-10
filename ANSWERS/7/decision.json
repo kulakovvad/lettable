@@ -1,0 +1,270 @@
+{
+  "case_id": "7",
+  "action": "ROUTE_FOR_APPROVAL",
+  "reason": "The electrician (Rian Sol, Bracken Spark Services) proposed 29 September after 15:00 (event-019). That date is within the tenant's availability (event-016). The landlord's only written approval is \"Please sort it\" (event-003). It answered a request about the TV alone (event-002) and did not cover the downstairs light, which the tenant raised (event-001) and we added to the record (event-005). The landlord is also unsure the TV is theirs, and the tenant is open to it being discarded (event-015). No instruction on disposal or repair was ever given, and no spending limit was set (event-004). The landlord's last reply was an out-of-office message (event-007). I did not instruct or confirm the appointment, because the approval does not clearly cover the combined scope. I did not escalate, because the landlord is the right party to decide and is reachable. I did not wait, because the proposed slot needs a decision. No quote exists, so no amount is routed. Priority is P3: the TV is unplugged, the tenant is using a lamp and can manage without the light (event-015), and no hazard is reported beyond the tenant-reported light flicker and pop. Unrelated issue: the rear-door handle came off. It was raised on the call only, and the tenant has agreed to submit it as a separate request (events 015 and 018). The case should not close until that is done. What would change the decision: if the landlord approves the scope, we instruct Bracken Spark and confirm the slot with the tenant. If the light worsens, for example visible sparking or burning smells, treat it as P0.",
+  "source": "model",
+  "message": "",
+  "unknowns": [
+    "Whether the landlord approves the electrician attending for the downstairs light",
+    "Whether the TV belongs to the landlord, and whether to repair, leave or remove it",
+    "Exact arrival time from the electrician",
+    "Cost of any visit or quote"
+  ],
+  "options": [
+    "Landlord approves the combined visit, then we instruct Bracken Spark and confirm 29 September with the tenant",
+    "Landlord approves the light only, and the TV is handled separately",
+    "Landlord does not respond: chase or escalate to the property manager"
+  ],
+  "confidence": 0.72,
+  "hazard": false,
+  "waiting_on": null,
+  "waiting_days": null,
+  "events_seen": 19,
+  "gate_notes": [],
+  "proposed_action": null,
+  "cause": null,
+  "idempotency_key": "74bd7b3360018840",
+  "decided_at": "2025-09-17T09:04:05+00:00",
+  "warnings": [],
+  "priority": "P3",
+  "title": "",
+  "request": "The tenant reports that a Samsung television in an upstairs bedroom has an electrical fault and trips a fuse when plugged in; it is currently unplugged. They also report a downstairs bedroom light that flickers and makes a popping sound when switched on. Please arrange any property access in advance because a dog is at the property.",
+  "as_of": "2025-09-17T09:04:05+00:00",
+  "model": "claude-sonnet-5-5",
+  "steps": 3,
+  "tokens": 44885,
+  "evidence_refs": [
+    "event-001",
+    "event-002",
+    "event-003",
+    "event-004",
+    "event-005",
+    "event-007",
+    "event-015",
+    "event-016",
+    "event-018",
+    "event-019"
+  ],
+  "unrelated_issues": [
+    "Rear-door handle has come off: the tenant should submit a separate request; no handyman is assigned (events 015 and 018)"
+  ],
+  "actions": [
+    {
+      "id": "approval_request-1",
+      "kind": "approval_request",
+      "idempotency_key": "6d054f566bb9",
+      "state": "committed",
+      "to": "landlord",
+      "amount_gbp": null,
+      "scope": "Bracken Spark Services electrician visit at 8 Vellum Court: downstairs bedroom light (flickering/popping) plus tenant-reported TV fault; proposed slot 29 September after 15:00",
+      "body": "Hi Corin, Bracken Spark Services (electrician) has proposed attending 8 Vellum Court on 29 September after 15:00, which fits the tenant's availability. Two points need your decision before we confirm. (1) Your earlier \"Please sort it\" covered the TV only. The tenant also reported a downstairs bedroom light that flickers and pops when switched on. Please confirm you approve the electrician attending for the light as well. No quote or cost has been received yet, and we will come back to you for approval of any quote. (2) You said you don't remember leaving a TV. The tenant now believes the TV's main board has failed and is open to it being removed or discarded. Please tell us whether the TV is yours and whether you want it repaired, left, or removed, or whether the electrician should only look at the light and the circuit. Thanks, Oren Pike, Northbridge Lettings",
+      "evidence_refs": [
+        "event-003",
+        "event-005",
+        "event-015",
+        "event-016",
+        "event-019"
+      ],
+      "above_limit": false,
+      "note": "Recorded in the local outbox (no external delivery connected)."
+    }
+  ],
+  "blocked": [],
+  "trace": [
+    {
+      "step": 0,
+      "tool": "consistency_check",
+      "result": {
+        "status": "ok",
+        "checks": [],
+        "dropped": 0,
+        "error": null
+      }
+    },
+    {
+      "step": 1,
+      "tool": "check_policy",
+      "args": {
+        "topic": "verify_claims,amounts,authority,safety,scope"
+      },
+      "result": {
+        "status": "ok"
+      }
+    },
+    {
+      "step": 2,
+      "tool": "route_for_approval",
+      "args": {
+        "amount_gbp": null,
+        "scope": "Bracken Spark Services electrician visit at 8 Vellum Court: downstairs bedroom light (flickering/popping) plus tenant-reported TV fault; proposed slot 29 September after 15:00",
+        "body": "Hi Corin, Bracken Spark Services (electrician) has proposed attending 8 Vellum Court on 29 September after 15:00, which fits the tenant's availability. Two points need your decision before we confirm. (1) Your earlier \"Please sort it\" covered the TV only. The tenant also reported a downstairs bedroom light that flickers and pops when switched on. Please confirm you approve the electrician attending for the light as well. No quote or cost has been received yet, and we will come back to you for approval of any quote. (2) You said you don't remember leaving a TV. The tenant now believes the TV's main board has failed and is open to it being removed or discarded. Please tell us whether the TV is yours and whether you want it repaired, left, or removed, or whether the electrician should only look at the light and the circuit. Thanks, Oren Pike, Northbridge Lettings",
+        "evidence_refs": [
+          "event-003",
+          "event-005",
+          "event-15",
+          "event-016",
+          "event-019"
+        ]
+      },
+      "result": {
+        "status": "staged",
+        "id": "approval_request-1",
+        "note": "Staged. Committed only if the final decision passes code checks."
+      }
+    },
+    {
+      "step": 3,
+      "tool": "submit_decision",
+      "args": {
+        "action": "ROUTE_FOR_APPROVAL",
+        "priority": "P3",
+        "reason": "The electrician (Rian Sol, Bracken Spark Services) proposed 29 September after 15:00 (event-019). That date is within the tenant's availability (event-016). The landlord's only written approval is \"Please sort it\" (event-003). It answered a request about the TV alone (event-002) and did not cover the downstairs light, which the tenant raised (event-001) and we added to the record (event-005). The landlord is also unsure the TV is theirs, and the tenant is open to it being discarded (event-015). No instruction on disposal or repair was ever given, and no spending limit was set (event-004). The landlord's last reply was an out-of-office message (event-007). I did not instruct or confirm the appointment, because the approval does not clearly cover the combined scope. I did not escalate, because the landlord is the right party to decide and is reachable. I did not wait, because the proposed slot needs a decision. No quote exists, so no amount is routed. Priority is P3: the TV is unplugged, the tenant is using a lamp and can manage without the light (event-015), and no hazard is reported beyond the tenant-reported light flicker and pop. Unrelated issue: the rear-door handle came off. It was raised on the call only, and the tenant has agreed to submit it as a separate request (events 015 and 018). The case should not close until that is done. What would change the decision: if the landlord approves the scope, we instruct Bracken Spark and confirm the slot with the tenant. If the light worsens, for example visible sparking or burning smells, treat it as P0.",
+        "confidence": 0.72,
+        "evidence_refs": [
+          "event-001",
+          "event-002",
+          "event-003",
+          "event-004",
+          "event-005",
+          "event-007",
+          "event-015",
+          "event-016",
+          "event-018",
+          "event-019"
+        ],
+        "unknowns": [
+          "Whether the landlord approves the electrician attending for the downstairs light",
+          "Whether the TV belongs to the landlord, and whether to repair, leave or remove it",
+          "Exact arrival time from the electrician",
+          "Cost of any visit or quote"
+        ],
+        "options": [
+          "Landlord approves the combined visit, then we instruct Bracken Spark and confirm 29 September with the tenant",
+          "Landlord approves the light only, and the TV is handled separately",
+          "Landlord does not respond: chase or escalate to the property manager"
+        ],
+        "unrelated_issues": [
+          "Rear-door handle has come off: the tenant should submit a separate request; no handyman is assigned (events 015 and 018)"
+        ],
+        "amount_gbp": null
+      },
+      "result": {
+        "status": "accepted"
+      }
+    }
+  ],
+  "consistency": {
+    "status": "ok",
+    "model": "jev-1.13.0",
+    "checks": [],
+    "dropped": 0
+  },
+  "answer": "",
+  "red_flags": [],
+  "details": {
+    "schema": "case-card/1",
+    "case": {
+      "id": "7",
+      "title": null,
+      "source_role": "Tenant",
+      "status": null,
+      "request": "The tenant reports that a Samsung television in an upstairs bedroom has an electrical fault and trips a fuse when plugged in; it is currently unplugged. They also report a downstairs bedroom light that flickers and makes a popping sound when switched on. Please arrange any property access in advance"
+    },
+    "property": {
+      "address": "8 Vellum Court, Brindlewick, ZZ1 1ZZ",
+      "address_variants": [
+        {
+          "value": "8 Vellum Court, Brindlewick, ZZ1 1ZZ",
+          "refs": [
+            "index"
+          ]
+        }
+      ],
+      "references": []
+    },
+    "tenant": {
+      "name": null,
+      "names": [],
+      "phones": [],
+      "emails": []
+    },
+    "landlord": {
+      "name": null,
+      "names": [],
+      "phones": [],
+      "emails": []
+    },
+    "agency": {
+      "name": "Oren Pike (Maintenance Coordinator, Northbridge Lettings)",
+      "phones": [],
+      "emails": [],
+      "staff": []
+    },
+    "provider": {
+      "name": null,
+      "assigned_ref": null,
+      "phones": [],
+      "emails": []
+    },
+    "money": {
+      "quotes": [],
+      "invoices": [],
+      "approval": {
+        "amount_gbp": null,
+        "ref": null,
+        "covers": "unknown"
+      },
+      "payments": [],
+      "deposit": []
+    },
+    "appointments": [
+      {
+        "when_text": "Provided availability for an electrical visit: 23 September after 15:00, 24 September after 15:00, 25 September after 12:30, 29 September after 15:00, 30 Septem",
+        "ref": "event-016"
+      },
+      {
+        "when_text": "Proposed attending on 29 September after 15:00.",
+        "ref": "event-019"
+      }
+    ],
+    "timeline": {
+      "events": 19,
+      "first": "2025-09-04T13:05:32+00:00",
+      "last": "2025-09-17T09:04:05+00:00",
+      "waiting_on": null,
+      "channels": {
+        "Portal": 1,
+        "Email": 10,
+        "Note": 3,
+        "Update": 2,
+        "SMS": 2,
+        "Call": 1
+      }
+    },
+    "attachments": [],
+    "decision": {
+      "action": "ROUTE_FOR_APPROVAL",
+      "priority": "P3",
+      "confidence": 0.72,
+      "decided_by": "model",
+      "cause": null,
+      "as_of": "2025-09-17T09:04:05+00:00",
+      "evidence_refs": [
+        "event-001",
+        "event-002",
+        "event-003",
+        "event-004",
+        "event-005",
+        "event-007",
+        "event-015",
+        "event-016",
+        "event-018",
+        "event-019"
+      ]
+    },
+    "calls": [],
+    "warnings": []
+  },
+  "mismatches": [],
+  "calls": []
+}

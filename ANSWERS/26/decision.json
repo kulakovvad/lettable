@@ -1,0 +1,442 @@
+{
+  "case_id": "26",
+  "action": "ESCALATE",
+  "reason": "The core request is a damp inspection (event-001). The provider missed the 2025-03-06 slot because of a breakdown and offered 2025-03-07 after 13:00, subject to confirmation (event-019). That is routine rebooking. The case also holds an unresolved personal-data incident. Our own confirmation email (event-013) disclosed another tenant's name, address, arrears amount and payment arrangement to Iris. The privacy lead has asked questions (event-017) but has made no assessment or notification decision (event-016, event-018). The other tenant has not been contacted, and Iris still holds the email and asks what to do with it (event-020). Arrears are a never-touch topic and a privacy decision belongs to a person. Asking or waiting would not resolve this. I escalated to the property manager at P1, which is not a P0 danger. I staged a holding update to Iris that says no inspection has happened, tomorrow's slot is being confirmed, and she should not share or delete the email yet. No spend or approval is involved: the owner approved the inspection fee only (event-011) and I did not instruct any work. Damp is reported with no health impact or vulnerable occupant. There is no dripping and no electrical symptom, though the stain is darker and near the socket (event-009, event-020), so I advised her to report any such symptom. The address in the index and the events differs only by postcode, which I treated as a formatting difference. I will change course if an electrical symptom or water appears, or if the privacy lead gives other direction.",
+  "source": "model",
+  "message": "",
+  "unknowns": [
+    "Privacy lead's decision and any notification",
+    "Whether Iris is available on 2025-03-07 after 13:00",
+    "Whether the owner's approval covers the rebooked visit"
+  ],
+  "options": [
+    "Privacy lead assesses the incident and directs what Iris does with the email and whether the other tenant is contacted",
+    "Property manager confirms the rebooked 2025-03-07 slot with Owen Pike and Iris",
+    "Re-rate as urgent if electrical symptoms or water appear"
+  ],
+  "confidence": 0.8,
+  "hazard": false,
+  "waiting_on": null,
+  "waiting_days": null,
+  "events_seen": 20,
+  "gate_notes": [],
+  "proposed_action": null,
+  "cause": null,
+  "idempotency_key": "d6290e50176dbf35",
+  "decided_at": "2025-03-06T16:40:00+00:00",
+  "warnings": [],
+  "priority": "P1",
+  "title": "",
+  "request": "There is damp staining below the kitchen window and the paint is beginning to lift. Please arrange an inspection and let me know when someone can attend.",
+  "as_of": "2025-03-06T16:40:00+00:00",
+  "model": "claude-sonnet-5-5",
+  "steps": 3,
+  "tokens": 46194,
+  "evidence_refs": [
+    "event-013",
+    "event-014",
+    "event-016",
+    "event-017",
+    "event-018",
+    "event-019",
+    "event-020",
+    "event-011"
+  ],
+  "unrelated_issues": [
+    "Misdirected email disclosing another tenant's arrears and personal data (privacy incident)"
+  ],
+  "actions": [
+    {
+      "id": "escalation-1",
+      "kind": "escalation",
+      "idempotency_key": "0de4e50c02fc",
+      "state": "committed",
+      "priority": "P1",
+      "route": "property_manager",
+      "summary": "Open personal-data incident on case NBL-4821 (18 Juniper Fold). Our appointment confirmation (event-013) sent to tenant Iris Bell included another tenant's name, address, rent arrears amount and payment arrangement. Privacy lead Elena Frost has asked for details (event-017) but has made no assessment or notification decision (event-016, event-018). The other tenant has not been contacted. Iris still holds the email and now asks what to do with it (event-020). The arrears content is a never-touch topic for this agent. The damp inspection also missed its slot today and needs rebooking.",
+      "known": [
+        "event-013: confirmation email to iris.bell@example.com contained another tenant's name, address, arrears amount and payment arrangement; no attachment (event-018)",
+        "event-014/015: Iris says she has not forwarded it; she was asked not to share it; she has not deleted it",
+        "event-016/017/018: incident logged with privacy lead; Elena asked for facts; Maya replied; no notification decision; other tenant not contacted",
+        "event-020: Iris asks whether to keep the email and whether the inspection is still happening",
+        "event-019: Owen Pike (Brindle Survey & Drying) missed the 2025-03-06 slot because of a vehicle breakdown and offered 2025-03-07 after 13:00, subject to confirmation; no inspection has taken place",
+        "event-011: the owner approved the inspection fee only; any repair needs separate approval",
+        "Damp: stain darker today, cool, not wet, no dripping, faint musty smell, nearest the socket under the window, no heat, sparks or tripped breaker (event-004, event-009, event-020). No health impact or vulnerable occupant reported. No hazard flagged by code.",
+        "Property: 18 Juniper Fold, Velden Quay, ZZ1 1ZZ (index)",
+        "Request: There is damp staining below the kitchen window and the paint is beginning to lift. Please arrange an inspection and let me know when someone can attend. (request)"
+      ],
+      "unknowns": [
+        "Privacy lead's assessment and any notification decision, and whether the other tenant is to be told",
+        "What Iris should do with the misdirected email (keep, delete or return)",
+        "Whether Iris is available on 2025-03-07 after 13:00 (she gave weekday afternoons after 13:00)",
+        "Whether the owner's inspection approval still covers a rebooked visit and whether the fee is unchanged",
+        "Whether any occupant has a health vulnerability affecting the damp assessment (not reported)",
+        "Privacy lead's decision and any notification",
+        "Whether Iris is available on 2025-03-07 after 13:00",
+        "Whether the owner's approval covers the rebooked visit"
+      ],
+      "tried": [
+        "Called Iris and asked her not to forward or share the email (event-015)",
+        "Recorded the incident with the privacy lead and answered her questions (event-016, event-018)",
+        "Staged a holding update to Iris: no sharing, no deleting yet, inspection being rebooked",
+        "Agent proposed ESCALATE"
+      ],
+      "options": [
+        "Recommended: Privacy lead decides on the incident assessment and notification, and on what Iris is told about deleting the email. Then the other tenant is contacted as the privacy lead directs. A person handles anything about the arrears.",
+        "Property manager confirms the 2025-03-07 after 13:00 slot with Owen Pike. Confirm the tenant's access and that the owner's inspection-only approval covers the rebooked visit. Keep intrusive work out of scope.",
+        "If the stain keeps worsening or any electrical symptom is reported near the socket, re-rate it as urgent and advise the tenant on electrical safety."
+      ],
+      "evidence_refs": [
+        "event-013",
+        "event-014",
+        "event-016",
+        "event-017",
+        "event-018",
+        "event-019",
+        "event-020",
+        "event-011"
+      ],
+      "note": "Recorded in the local outbox (no external delivery connected).",
+      "respond_by": "2025-03-06T20:40:00+00:00",
+      "conflicts": [
+        {
+          "field": "property_address",
+          "values": [
+            {
+              "value": "18 Juniper Fold, Velden Quay, ZZ1 1ZZ",
+              "refs": [
+                "index"
+              ]
+            },
+            {
+              "value": "18 Juniper Fold",
+              "refs": [
+                "event-001",
+                "event-003",
+                "event-004",
+                "event-005",
+                "event-008",
+                "event-009",
+                "event-010",
+                "event-011",
+                "event-013",
+                "event-014",
+                "event-015",
+                "event-020"
+              ]
+            }
+          ]
+        }
+      ],
+      "failed": [],
+      "recommended": "Recommended: Privacy lead decides on the incident assessment and notification, and on what Iris is told about deleting the email. Then the other tenant is contacted as the privacy lead directs. A person handles anything about the arrears."
+    },
+    {
+      "id": "message-2",
+      "kind": "message",
+      "idempotency_key": "732841a55858",
+      "state": "held_for_review",
+      "to": "tenant",
+      "purpose": "update",
+      "priority": "P2",
+      "body": "Hello Iris, thank you for your message. The contractor could not attend today because of a vehicle breakdown, so no inspection has taken place. He has offered tomorrow, 2025-03-07, after 13:00, and we are confirming that with him now. We will confirm the booking to you once it is settled. Please let us know if you can't be home then. About the email containing another person's information: please do not forward, copy or share it. Please also don't delete it just yet, as our privacy team is checking the matter and we will tell you what to do with it. We are sorry this happened. If the stain spreads quickly, or you notice any water, heat, sparks or a tripped breaker near the socket, tell us straight away. Kind regards, Maya Chen, Northbridge Lettings",
+      "evidence_refs": [
+        "event-019",
+        "event-020",
+        "event-014"
+      ],
+      "note": "Held: not part of the final action ESCALATE; a person can release it."
+    }
+  ],
+  "blocked": [],
+  "trace": [
+    {
+      "step": 0,
+      "tool": "consistency_check",
+      "result": {
+        "status": "ok",
+        "checks": [
+          "property_address:flag"
+        ],
+        "dropped": 0,
+        "error": null
+      }
+    },
+    {
+      "step": 1,
+      "tool": "check_policy",
+      "args": {
+        "topic": "data,damp_mould,escalation,safety,never_touch,communication"
+      },
+      "result": {
+        "status": "ok"
+      }
+    },
+    {
+      "step": 2,
+      "tool": "escalate_to_human",
+      "args": {
+        "priority": "P1",
+        "route": "property_manager",
+        "summary": "Open personal-data incident on case NBL-4821 (18 Juniper Fold). Our appointment confirmation (event-013) sent to tenant Iris Bell included another tenant's name, address, rent arrears amount and payment arrangement. Privacy lead Elena Frost has asked for details (event-017) but has made no assessment or notification decision (event-016, event-018). The other tenant has not been contacted. Iris still holds the email and now asks what to do with it (event-020). The arrears content is a never-touch topic for this agent. The damp inspection also missed its slot today and needs rebooking.",
+        "known": [
+          "event-013: confirmation email to iris.bell@example.com contained another tenant's name, address, arrears amount and payment arrangement; no attachment (event-018)",
+          "event-014/015: Iris says she has not forwarded it; she was asked not to share it; she has not deleted it",
+          "event-016/017/018: incident logged with privacy lead; Elena asked for facts; Maya replied; no notification decision; other tenant not contacted",
+          "event-020: Iris asks whether to keep the email and whether the inspection is still happening",
+          "event-019: Owen Pike (Brindle Survey & Drying) missed the 2025-03-06 slot because of a vehicle breakdown and offered 2025-03-07 after 13:00, subject to confirmation; no inspection has taken place",
+          "event-011: the owner approved the inspection fee only; any repair needs separate approval",
+          "Damp: stain darker today, cool, not wet, no dripping, faint musty smell, nearest the socket under the window, no heat, sparks or tripped breaker (event-004, event-009, event-020). No health impact or vulnerable occupant reported. No hazard flagged by code."
+        ],
+        "unknowns": [
+          "Privacy lead's assessment and any notification decision, and whether the other tenant is to be told",
+          "What Iris should do with the misdirected email (keep, delete or return)",
+          "Whether Iris is available on 2025-03-07 after 13:00 (she gave weekday afternoons after 13:00)",
+          "Whether the owner's inspection approval still covers a rebooked visit and whether the fee is unchanged",
+          "Whether any occupant has a health vulnerability affecting the damp assessment (not reported)"
+        ],
+        "tried": [
+          "Called Iris and asked her not to forward or share the email (event-015)",
+          "Recorded the incident with the privacy lead and answered her questions (event-016, event-018)",
+          "Staged a holding update to Iris: no sharing, no deleting yet, inspection being rebooked"
+        ],
+        "options": [
+          "Privacy lead decides on the incident assessment and notification, and on what Iris is told about deleting the email. Then the other tenant is contacted as the privacy lead directs. A person handles anything about the arrears.",
+          "Property manager confirms the 2025-03-07 after 13:00 slot with Owen Pike. Confirm the tenant's access and that the owner's inspection-only approval covers the rebooked visit. Keep intrusive work out of scope.",
+          "If the stain keeps worsening or any electrical symptom is reported near the socket, re-rate it as urgent and advise the tenant on electrical safety."
+        ],
+        "evidence_refs": [
+          "event-013",
+          "event-014",
+          "event-016",
+          "event-017",
+          "event-018",
+          "event-019",
+          "event-020",
+          "event-011"
+        ]
+      },
+      "result": {
+        "status": "staged",
+        "id": "escalation-1",
+        "note": "Staged. Committed only if the final decision passes code checks."
+      }
+    },
+    {
+      "step": 2,
+      "tool": "send_message",
+      "args": {
+        "to": "tenant",
+        "purpose": "update",
+        "body": "Hello Iris, thank you for your message. The contractor could not attend today because of a vehicle breakdown, so no inspection has taken place. He has offered tomorrow, 2025-03-07, after 13:00, and we are confirming that with him now. We will confirm the booking to you once it is settled. Please let us know if you can't be home then. About the email containing another person's information: please do not forward, copy or share it. Please also don't delete it just yet, as our privacy team is checking the matter and we will tell you what to do with it. We are sorry this happened. If the stain spreads quickly, or you notice any water, heat, sparks or a tripped breaker near the socket, tell us straight away. Kind regards, Maya Chen, Northbridge Lettings",
+        "evidence_refs": [
+          "event-019",
+          "event-020",
+          "event-014"
+        ],
+        "priority": "P2"
+      },
+      "result": {
+        "status": "staged",
+        "id": "message-2",
+        "note": "Staged. Committed only if the final decision passes code checks."
+      }
+    },
+    {
+      "step": 3,
+      "tool": "submit_decision",
+      "args": {
+        "action": "ESCALATE",
+        "priority": "P1",
+        "reason": "The core request is a damp inspection (event-001). The provider missed the 2025-03-06 slot because of a breakdown and offered 2025-03-07 after 13:00, subject to confirmation (event-019). That is routine rebooking. The case also holds an unresolved personal-data incident. Our own confirmation email (event-013) disclosed another tenant's name, address, arrears amount and payment arrangement to Iris. The privacy lead has asked questions (event-017) but has made no assessment or notification decision (event-016, event-018). The other tenant has not been contacted, and Iris still holds the email and asks what to do with it (event-020). Arrears are a never-touch topic and a privacy decision belongs to a person. Asking or waiting would not resolve this. I escalated to the property manager at P1, which is not a P0 danger. I staged a holding update to Iris that says no inspection has happened, tomorrow's slot is being confirmed, and she should not share or delete the email yet. No spend or approval is involved: the owner approved the inspection fee only (event-011) and I did not instruct any work. Damp is reported with no health impact or vulnerable occupant. There is no dripping and no electrical symptom, though the stain is darker and near the socket (event-009, event-020), so I advised her to report any such symptom. The address in the index and the events differs only by postcode, which I treated as a formatting difference. I will change course if an electrical symptom or water appears, or if the privacy lead gives other direction.",
+        "confidence": 0.8,
+        "evidence_refs": [
+          "event-013",
+          "event-014",
+          "event-016",
+          "event-017",
+          "event-018",
+          "event-019",
+          "event-020",
+          "event-011"
+        ],
+        "unknowns": [
+          "Privacy lead's decision and any notification",
+          "Whether Iris is available on 2025-03-07 after 13:00",
+          "Whether the owner's approval covers the rebooked visit"
+        ],
+        "options": [
+          "Privacy lead assesses the incident and directs what Iris does with the email and whether the other tenant is contacted",
+          "Property manager confirms the rebooked 2025-03-07 slot with Owen Pike and Iris",
+          "Re-rate as urgent if electrical symptoms or water appear"
+        ],
+        "unrelated_issues": [
+          "Misdirected email disclosing another tenant's arrears and personal data (privacy incident)"
+        ],
+        "amount_gbp": null
+      },
+      "result": {
+        "status": "accepted"
+      }
+    }
+  ],
+  "consistency": {
+    "status": "ok",
+    "model": "jev-1.13.0",
+    "checks": [
+      {
+        "field": "property_address",
+        "values": [
+          "18 Juniper Fold, Velden Quay, ZZ1 1ZZ",
+          "18 Juniper Fold"
+        ],
+        "refs": [
+          [
+            "index"
+          ],
+          [
+            "event-001",
+            "event-003",
+            "event-004",
+            "event-005",
+            "event-008",
+            "event-009",
+            "event-010",
+            "event-011",
+            "event-013",
+            "event-014",
+            "event-015",
+            "event-020"
+          ]
+        ],
+        "score": 0.67,
+        "confidence": 0.94,
+        "tier": "flag"
+      }
+    ],
+    "dropped": 0
+  },
+  "answer": "",
+  "red_flags": [],
+  "details": {
+    "schema": "case-card/1",
+    "case": {
+      "id": "26",
+      "title": null,
+      "source_role": "Tenant",
+      "status": null,
+      "request": "There is damp staining below the kitchen window and the paint is beginning to lift. Please arrange an inspection and let me know when someone can attend."
+    },
+    "property": {
+      "address": "18 Juniper Fold, Velden Quay, ZZ1 1ZZ",
+      "address_variants": [
+        {
+          "value": "18 Juniper Fold, Velden Quay, ZZ1 1ZZ",
+          "refs": [
+            "index"
+          ]
+        }
+      ],
+      "references": []
+    },
+    "tenant": {
+      "name": null,
+      "names": [],
+      "phones": [],
+      "emails": []
+    },
+    "landlord": {
+      "name": null,
+      "names": [],
+      "phones": [],
+      "emails": []
+    },
+    "agency": {
+      "name": "Maya Chen (Property Manager, Northbridge Lettings)",
+      "phones": [],
+      "emails": [],
+      "staff": []
+    },
+    "provider": {
+      "name": null,
+      "assigned_ref": null,
+      "phones": [],
+      "emails": []
+    },
+    "money": {
+      "quotes": [],
+      "invoices": [],
+      "approval": {
+        "amount_gbp": null,
+        "ref": "event-011",
+        "covers": "visit"
+      },
+      "payments": [
+        {
+          "kind": "payment",
+          "text": "The message body also included another tenant's name, address, rent arrears amount, and a note about a payment arrangement.",
+          "ref": "event-013"
+        }
+      ],
+      "deposit": []
+    },
+    "appointments": [],
+    "timeline": {
+      "events": 20,
+      "first": "2025-03-04T08:15:00+00:00",
+      "last": "2025-03-06T16:40:00+00:00",
+      "waiting_on": null,
+      "channels": {
+        "Portal": 1,
+        "Update": 2,
+        "Email": 13,
+        "Call": 3,
+        "Note": 1
+      }
+    },
+    "attachments": [],
+    "decision": {
+      "action": "ESCALATE",
+      "priority": "P1",
+      "confidence": 0.8,
+      "decided_by": "model",
+      "cause": null,
+      "as_of": "2025-03-06T16:40:00+00:00",
+      "evidence_refs": [
+        "event-013",
+        "event-014",
+        "event-016",
+        "event-017",
+        "event-018",
+        "event-019",
+        "event-020",
+        "event-011"
+      ]
+    },
+    "calls": [],
+    "warnings": []
+  },
+  "mismatches": [
+    {
+      "kind": "document consistency",
+      "severity": "flag",
+      "refs": [
+        "event-001",
+        "event-003",
+        "event-004",
+        "event-005",
+        "event-008",
+        "event-009",
+        "event-010",
+        "event-011",
+        "event-013",
+        "event-014",
+        "event-015",
+        "event-020",
+        "index"
+      ],
+      "summary": "property address differs between documents: '18 Juniper Fold, Velden Quay, ZZ1 1ZZ' vs '18 Juniper Fold' (similarity 0.67)."
+    }
+  ],
+  "calls": []
+}

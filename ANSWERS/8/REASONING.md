@@ -1,0 +1,120 @@
+# Reasoning for case 8
+
+- Decided by: the model, checked by code
+- Events seen: 24
+- Model: claude-sonnet-5-5, 3 turn(s), 49332 tokens
+- Evidence cited: event-002, event-012, event-016, event-017, event-018, event-019, event-020, event-022, event-023, event-024
+- Model confidence: 0.90
+
+## 1. Decision and next action
+
+- **Final action:** Escalate to a person (ESCALATE)
+- **Priority:** P0
+- **As of:** 2025-06-18T12:55:00+00:00
+- **Request received:** Water is entering the flat below from an unidentified source. Please help coordinate an inspection and next steps.
+
+## 2. Why
+
+Active water is coming through a ceiling light fitting in Flat 2, with a bulge that is getting larger (event-002, event-012, event-017, event-023). Electrical isolation is unverified. A wall switch being off proves nothing, and the electrician considers the fitting unsafe (event-018). Water near electrics is P0 under the safety policy, and a reported danger is treated as real until verified. The code did not flag urgent_by_code, but the case itself reports the danger. Plumber and building manager visits found no source and no isolation point (event-016, event-021). Flat 3 is the suspected but unconfirmed source. Yara refuses entry (event-009, event-020), Niko has not authorised it (event-011, event-019), and the duty manager found no documented agency authority to override her refusal (event-022). That is a conflict over access, and a decision on emergency action and possible emergency services needs a person. Waiting or asking would not resolve it, because nobody we can reach can authorise entry without the full tenancy agreement and a director decision. We cannot instruct further work because there is no landlord approval or quote. The tenant name mismatch flagged by the check is just two different flats' tenants. The case contains no instructions trying to change our process. The electrician's arrival and findings in the 12:30-13:15 window are unknown and could change the picture. I have staged a P0 handover to on_call_emergency with options. Event-024 is our own internal summary and adds no new facts.
+
+Facts the decision rests on:
+
+- Flat 2 (Bevin Orlo): water dripping from the bedroom ceiling light fitting, dripping faster with a new brown patch (event-002, event-012). A bulge appeared (event-017) and appears larger at 12:38 (event-023). No sparks, smoke or fallen material reported. Bevin is outside the bedroom and has been told not to touch the fitting or the consumer unit (event-003, event-004).
+- The wall switch being off does not prove the fitting is isolated. Runa Elt (Vellum Electrical) considers the fitting not safe on that basis. Attendance window 12:30-13:15 subject to access (event-014, event-018). Nothing in the case confirms she has arrived; the window is open at 12:55.
+- Daro Fen (Brindle Flow Plumbing) and Selka Venn (building manager) attended Flat 2 and the common riser. No source or confirmed isolation point was found, no valve was operated, and Flat 3 was inaccessible (event-016, event-021).
+- Yara Mallow (Flat 3 tenant) does not consent to entry before she returns (about 17:30) and asked that no key be used (event-009, event-020). She has asked for the plumber's name and proposed work in writing, and Daro's name has been given (event-020).
+- Niko Pell (landlord, Flat 3) is away, has no key, has not authorised entry, and does not authorise forced or unaccompanied entry. He asked to be updated before any non-routine access (event-006, event-011, event-019).
+- Duty Manager Devra Senn found no documented delegated authority to override the refusal. The full tenancy wording has not been checked. The route is the full agreement plus a decision from the agency director, and emergency services if there is immediate danger to life or property (event-022).
+- The tenant name mismatch flagged by the document check is not a data error. Yara Mallow is the Flat 3 tenant and Bevin Orlo is the Flat 2 tenant.
+- Property: Flat 3, 8 Tallowmere Row, Ossin Vale, ZZ1 1ZZ (index)
+- Request: Water is entering the flat below from an unidentified source. Please help coordinate an inspection and next steps. (request)
+
+Evidence cited by the model: event-002, event-012, event-016, event-017, event-018, event-019, event-020, event-022, event-023, event-024
+
+## 3. Missing information and conflicting facts
+
+Not known:
+
+- Whether the circuit is isolated
+- Whether the electrician has arrived and what was found
+- Source of the leak
+- Whether the tenancy permits emergency entry
+- Ceiling collapse risk
+
+Conflicting facts:
+
+- tenant_name: Yara Mallow (event-001, event-020) vs Bevin Orlo (event-002, event-003, event-015, event-017, event-012, event-023)
+
+### Inconsistencies and mismatches
+
+- **document consistency** (flag): tenant name differs between documents: 'Yara Mallow' vs 'Bevin Orlo' (similarity 0.017). [event-001, event-002, event-003, event-012, event-015, event-017, event-020, event-023]
+
+Checked: addresses, invoice amounts against quotes and approval, completion against later reports, contact details; document consistency check on.
+
+## Document consistency check
+
+- tenant_name [flag, similarity 0.02, confidence 0.97]: 'Yara Mallow' (event-001, event-020); 'Bevin Orlo' (event-002, event-003, event-015, event-017, event-012, event-023)
+
+Input warnings:
+
+- none
+
+## 4. Actions taken, results and failures
+
+EXECUTED means the action was committed. PROPOSED, NOT SENT means it was staged and then held because the final decision changed or a person must approve it first.
+
+- **EXECUTED**: Escalation ticket P0 to on_call_emergency `escalation-1`. Recorded in the local outbox (no external delivery connected).
+
+What was tried before this decision:
+
+- Safety instructions given to Bevin by phone (event-003, event-015, event-017).
+- Building manager asked about an isolation point; none confirmed (event-005, event-010, event-021).
+- Plumber attended Flat 2 and the riser; no source found (event-016).
+- Electrician booked for 12:30-13:15 (event-014, event-018).
+- Landlord contacted three times; he has not authorised entry (event-006, event-011, event-019).
+- Tenant of Flat 3 asked for consent twice and declined (event-009, event-020).
+- Duty Manager asked about emergency access authority; none documented (event-022).
+- Agent proposed ESCALATE
+
+Checks applied by code:
+
+- none
+
+Failures and refused actions:
+
+- none
+
+## 5. Handover to a person
+
+- **Route:** on_call_emergency, priority P0, respond by 2025-06-18T13:55:00+00:00
+- **Summary:** Active water ingress through the ceiling light fitting in Flat 2 (water near electrics), with an enlarging ceiling bulge. Electrical safety is unverified. Source is unidentified and the suspected source flat (Flat 3) is inaccessible: the tenant refuses entry, the landlord has not authorised it, and no agency entry authority is documented. A decision on emergency action is needed now.
+
+Options for the person:
+
+- Recommended: Decide now whether to call emergency services or the fire service for the water and electrical risk, given the enlarging bulge and unverified circuit. Tell Bevin to leave the room and to call 999 if there are sparks, smoke or sagging or falling material. Ask the electrician to isolate the circuit on arrival.
+- Obtain the full tenancy agreement and an urgent agency director decision on emergency entry to Flat 3. Update Niko before any non-routine access, as he asked. Do not enter without a documented authority.
+- Phone Yara again (she offered a call at about noon) with Daro's name and the written scope of work, to ask her to consent to a supervised, accompanied attendance or to reconsider before 17:30. Keep Niko updated.
+
+Recommended: Decide now whether to call emergency services or the fire service for the water and electrical risk, given the enlarging bulge and unverified circuit. Tell Bevin to leave the room and to call 999 if there are sparks, smoke or sagging or falling material. Ask the electrician to isolate the circuit on arrival.
+
+## Uncertainty
+
+- Model confidence: 0.90
+- Open questions: 5
+- Code overrides: none
+- Safety hazard flagged: no
+
+## Logs and traces
+
+- Full decision record: `decision.json` in this folder
+- Run-level log: `../trace.jsonl` and `../manifest.json`
+- Idempotency key: `9d102f3d722e43e0`
+
+## Tool trace
+
+Every tool call the agent made, in order, with the code's response.
+
+0. `consistency_check(null)` -> `{"status": "ok", "checks": ["tenant_name:flag"], "dropped": 5, "error": null}`
+1. `check_policy({"topic": "safety,escalation,authority,communication"})` -> `{"status": "ok"}`
+2. `escalate_to_human({"priority": "P0", "route": "on_call_emergency", "summary": "Active water ingress through the ceiling light fitting in Flat 2 (water near electrics), with an enlarging ceiling bulge. Electrical safety is unverified. Source is unidentified and the suspected source flat (Flat 3) is inaccessible: the tenant refuses entry, the landlord has not authorised it, and no agency entry authority is documented. A decision on emergency action is needed now.", "known": ["Flat 2 (Bevin Orlo): water dripping from the bedroom ceiling light fitting, dripping faster with a new brown patch (event-002, event-012). A bulge appeared (event-017) and appears larger at 12:38 (event-023). No sparks, smoke or fallen material reported. Bevin is outside the bedroom and has been told not to touch the fitting or the consu)` -> `{"status": "staged", "id": "escalation-1", "note": "Staged. Committed only if the final decision passes code checks."}`
+3. `submit_decision({"action": "ESCALATE", "priority": "P0", "reason": "Active water is coming through a ceiling light fitting in Flat 2, with a bulge that is getting larger (event-002, event-012, event-017, event-023). Electrical isolation is unverified. A wall switch being off proves nothing, and the electrician considers the fitting unsafe (event-018). Water near electrics is P0 under the safety policy, and a reported danger is treated as real until verified. The code did not flag urgent_by_code, but the case itself reports the danger. Plumber and building manager visits found no source and no isolation point (event-016, event-021). Flat 3 is the suspected but unconfirmed source. Yara refuses entry (event-009, event-020), Niko has not authorised it (event-011, event-019), and the duty manager found no docu)` -> `{"status": "accepted"}`

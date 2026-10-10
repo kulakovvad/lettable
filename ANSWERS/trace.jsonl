@@ -1,0 +1,30 @@
+{"case_id": "18", "seconds": 19.8, "source": "model", "action": "ESCALATE", "cause": null, "gate_notes": ["model wants to chase the landlord but the timeline is not waiting on them"], "write_error": null}
+{"case_id": "12", "seconds": 22.51, "source": "model", "action": "ASK_TENANT", "cause": null, "gate_notes": [], "write_error": null}
+{"case_id": "19", "seconds": 22.56, "source": "model", "action": "ASK_PROVIDER", "cause": null, "gate_notes": [], "write_error": null}
+{"case_id": "22", "seconds": 22.64, "source": "model", "action": "ESCALATE", "cause": null, "gate_notes": [], "write_error": null}
+{"case_id": "21", "seconds": 23.13, "source": "model", "action": "ASK_TENANT", "cause": null, "gate_notes": [], "write_error": null}
+{"case_id": "20", "seconds": 23.54, "source": "model", "action": "ESCALATE", "cause": null, "gate_notes": [], "write_error": null}
+{"case_id": "10", "seconds": 24.16, "source": "model", "action": "WAIT", "cause": null, "gate_notes": [], "write_error": null}
+{"case_id": "16", "seconds": 24.97, "source": "model", "action": "ESCALATE", "cause": null, "gate_notes": [], "write_error": null}
+{"case_id": "15", "seconds": 24.98, "source": "model", "action": "ESCALATE", "cause": null, "gate_notes": [], "write_error": null}
+{"case_id": "17", "seconds": 25.04, "source": "model", "action": "WAIT", "cause": null, "gate_notes": [], "write_error": null}
+{"case_id": "13", "seconds": 25.48, "source": "model", "action": "ASK_PROVIDER", "cause": null, "gate_notes": [], "write_error": null}
+{"case_id": "11", "seconds": 25.65, "source": "model", "action": "ESCALATE", "cause": null, "gate_notes": [], "write_error": null}
+{"case_id": "1", "seconds": 27.01, "source": "model", "action": "ESCALATE", "cause": null, "gate_notes": ["documents disagree on property_address ('4 Thistlewick Rise, Larkcombe, ZZ1 1ZZ' vs '8 Wrenfold Mews, Brindlewick, ZZ1 1ZZ'); a person must confirm which is right"], "write_error": null}
+{"case_id": "2", "seconds": 28.88, "source": "model", "action": "ESCALATE", "cause": null, "gate_notes": [], "write_error": null}
+{"case_id": "14", "seconds": 39.05, "source": "model", "action": "ESCALATE", "cause": null, "gate_notes": ["possible open hazard ('smell of gas'); a person must decide"], "write_error": null}
+{"case_id": "25", "seconds": 16.57, "source": "model", "action": "ASK_PROVIDER", "cause": null, "gate_notes": [], "write_error": null}
+{"case_id": "23", "seconds": 39.71, "source": "model", "action": "ESCALATE", "cause": null, "gate_notes": [], "write_error": null}
+{"case_id": "3", "seconds": 17.24, "source": "model", "action": "ASK_PROVIDER", "cause": null, "gate_notes": [], "write_error": null}
+{"case_id": "6", "seconds": 16.41, "source": "model", "action": "ASK_TENANT", "cause": null, "gate_notes": [], "write_error": null}
+{"case_id": "24", "seconds": 23.96, "source": "model", "action": "ESCALATE", "cause": null, "gate_notes": [], "write_error": null}
+{"case_id": "27", "seconds": 22.52, "source": "model", "action": "ESCALATE", "cause": null, "gate_notes": ["amount GBP 3865.68 is above the approval limit GBP 300.00"], "write_error": null}
+{"case_id": "4", "seconds": 21.81, "source": "model", "action": "WAIT", "cause": null, "gate_notes": [], "write_error": null}
+{"case_id": "30", "seconds": 22.97, "source": "model", "action": "ASK_TENANT", "cause": null, "gate_notes": [], "write_error": null}
+{"case_id": "5", "seconds": 22.91, "source": "model", "action": "ESCALATE", "cause": null, "gate_notes": [], "write_error": null}
+{"case_id": "7", "seconds": 23.35, "source": "model", "action": "ROUTE_FOR_APPROVAL", "cause": null, "gate_notes": [], "write_error": null}
+{"case_id": "9", "seconds": 21.18, "source": "model", "action": "ESCALATE", "cause": null, "gate_notes": ["documents disagree on property_address ('24 Bramblewick Lane, Alderfen, ZZ1 1ZZ' vs '8 Thistledown Mews, Vellumby, ZZ1 1ZZ'); a person must confirm which is right"], "write_error": null}
+{"case_id": "28", "seconds": 27.04, "source": "model", "action": "ESCALATE", "cause": null, "gate_notes": [], "write_error": null}
+{"case_id": "8", "seconds": 25.4, "source": "model", "action": "ESCALATE", "cause": null, "gate_notes": [], "write_error": null}
+{"case_id": "29", "seconds": 29.12, "source": "model", "action": "ASK_TENANT", "cause": null, "gate_notes": [], "write_error": null}
+{"case_id": "26", "seconds": 33.96, "source": "model", "action": "ESCALATE", "cause": null, "gate_notes": [], "write_error": null}

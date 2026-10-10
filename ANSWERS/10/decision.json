@@ -1,0 +1,300 @@
+{
+  "case_id": "10",
+  "action": "WAIT",
+  "reason": "The landlord was sent the full-kitchen figures only minutes ago (event-025), so a reply is not due; the chase threshold is 3 days. The recorded approval covers only the original laminate-repair scope (event-006). The landlord's later messages requested estimates, not approval (event-004, event-016). The contractor's quote (event-024) is £4,850 + VAT supply, £3,800 + VAT fitting and £230 + VAT waste, with an electrical estimate of £380 + VAT. It is far above the £300 limit, and the commission basis, cap and VAT-inclusive total are unconfirmed (event-022, event-023). So I cannot instruct the contractor, and I cannot say the work is approved. The cupboards-and-doors-only estimate is still missing, and the landlord already knows this (event-025). I am not routing the quote for approval again because the forwarded email already asked for the landlord's decision, and the quote is incomplete: it has no doors-only option and no confirmed total. I am not escalating because there is no safety hazard (the cuts are minor, and no active danger is reported), no dispute and no fraud. The landlord is reachable and has not yet had time to reply. I have staged a holding update to the tenant. The tenant has had no update since 9 September, and the offered visit dates passed (event-021). I did not instruct the contractor or promise approval. If there is no landlord reply in 3 days, chase. If the contractor stays silent on the doors-only estimate, ask the contractor for it. A person should settle the commission and VAT basis. I made a verbal instruction about it in event-023 without any authority to set it.",
+  "source": "model",
+  "message": "",
+  "unknowns": [
+    "Landlord decision on the full-kitchen quote",
+    "Cupboards-and-doors-only estimate not received",
+    "Commission basis, cap, VAT-inclusive total unconfirmed",
+    "Electrical work estimate needs checking",
+    "No access appointment or dog arrangements"
+  ],
+  "options": [
+    "Wait for the landlord's reply, then chase after 3 days",
+    "Ask the contractor for the doors-only estimate and a confirmed VAT-inclusive total"
+  ],
+  "confidence": 0.8,
+  "hazard": false,
+  "waiting_on": null,
+  "waiting_days": null,
+  "events_seen": 26,
+  "gate_notes": [],
+  "proposed_action": null,
+  "cause": null,
+  "idempotency_key": "12b402d93e71ec1f",
+  "decided_at": "2025-09-24T14:36:22+00:00",
+  "warnings": [],
+  "priority": "P3",
+  "title": "",
+  "request": "Tenant reports peeling laminate on kitchen cabinets, with sharp edges that have caused cuts, and several cabinet doors that do not close properly. Two dogs are at the property, so access needs to be arranged in advance.",
+  "as_of": "2025-09-24T14:36:22+00:00",
+  "model": "claude-sonnet-5-5",
+  "steps": 3,
+  "tokens": 49605,
+  "evidence_refs": [
+    "event-006",
+    "event-016",
+    "event-021",
+    "event-022",
+    "event-023",
+    "event-024",
+    "event-025"
+  ],
+  "unrelated_issues": [
+    "Contractor commission basis, cap and VAT query (event-022): the agency's commercial terms need a person to settle them"
+  ],
+  "actions": [
+    {
+      "id": "message-1",
+      "kind": "message",
+      "idempotency_key": "f113d15f4111",
+      "state": "held_for_review",
+      "to": "tenant",
+      "purpose": "update",
+      "priority": "P3",
+      "body": "Hello Elowen, an update on the kitchen cabinets. The 16-18 September windows you offered passed without a visit, and I am sorry for the delay. The contractor has now sent us figures for replacing the kitchen. I passed them to the landlord today and we are waiting for their decision. No visit or work is booked yet and nothing is approved. Once we know the next step we will contact you to arrange a date and how to secure the dogs. In the meantime, please take care around the peeling edges. If you can, cover them with strong tape. Let us know if anything gets worse or anyone is hurt. Northbridge Lettings (Nia Calder)",
+      "evidence_refs": [
+        "event-001",
+        "event-010",
+        "event-021",
+        "event-024",
+        "event-025"
+      ],
+      "note": "Held: not part of the final action WAIT; a person can release it."
+    },
+    {
+      "id": "followup-2",
+      "kind": "followup",
+      "idempotency_key": "64077af5375e",
+      "state": "committed",
+      "review_at": "2025-09-27T14:36:22+00:00",
+      "waiting_on": "landlord",
+      "reason": "Full-kitchen figures forwarded to landlord (event-025); no reply yet. Chase if no response after 3 days. Still need doors-only estimate and commission/VAT basis from contractor.",
+      "note": "Recorded in the local outbox (no external delivery connected)."
+    }
+  ],
+  "blocked": [],
+  "trace": [
+    {
+      "step": 0,
+      "tool": "consistency_check",
+      "result": {
+        "status": "ok",
+        "checks": [],
+        "dropped": 5,
+        "error": null
+      }
+    },
+    {
+      "step": 1,
+      "tool": "check_policy",
+      "args": {
+        "topic": "verify_claims,amounts,authority,escalation,chasing,safety"
+      },
+      "result": {
+        "status": "ok"
+      }
+    },
+    {
+      "step": 2,
+      "tool": "send_message",
+      "args": {
+        "to": "tenant",
+        "purpose": "update",
+        "body": "Hello Elowen, an update on the kitchen cabinets. The 16-18 September windows you offered passed without a visit, and I am sorry for the delay. The contractor has now sent us figures for replacing the kitchen. I passed them to the landlord today and we are waiting for their decision. No visit or work is booked yet and nothing is approved. Once we know the next step we will contact you to arrange a date and how to secure the dogs. In the meantime, please take care around the peeling edges. If you can, cover them with strong tape. Let us know if anything gets worse or anyone is hurt. Northbridge Lettings (Nia Calder)",
+        "evidence_refs": [
+          "event-001",
+          "event-010",
+          "event-021",
+          "event-024",
+          "event-025"
+        ],
+        "priority": "P3"
+      },
+      "result": {
+        "status": "staged",
+        "id": "message-1",
+        "note": "Staged. Committed only if the final decision passes code checks."
+      }
+    },
+    {
+      "step": 2,
+      "tool": "schedule_followup",
+      "args": {
+        "after_hours": 72,
+        "waiting_on": "landlord",
+        "reason": "Full-kitchen figures forwarded to landlord (event-025); no reply yet. Chase if no response after 3 days. Still need doors-only estimate and commission/VAT basis from contractor."
+      },
+      "result": {
+        "status": "staged",
+        "id": "followup-2",
+        "note": "Staged. Committed only if the final decision passes code checks."
+      }
+    },
+    {
+      "step": 3,
+      "tool": "submit_decision",
+      "args": {
+        "action": "WAIT",
+        "priority": "P3",
+        "reason": "The landlord was sent the full-kitchen figures only minutes ago (event-025), so a reply is not due; the chase threshold is 3 days. The recorded approval covers only the original laminate-repair scope (event-006). The landlord's later messages requested estimates, not approval (event-004, event-016). The contractor's quote (event-024) is £4,850 + VAT supply, £3,800 + VAT fitting and £230 + VAT waste, with an electrical estimate of £380 + VAT. It is far above the £300 limit, and the commission basis, cap and VAT-inclusive total are unconfirmed (event-022, event-023). So I cannot instruct the contractor, and I cannot say the work is approved. The cupboards-and-doors-only estimate is still missing, and the landlord already knows this (event-025). I am not routing the quote for approval again because the forwarded email already asked for the landlord's decision, and the quote is incomplete: it has no doors-only option and no confirmed total. I am not escalating because there is no safety hazard (the cuts are minor, and no active danger is reported), no dispute and no fraud. The landlord is reachable and has not yet had time to reply. I have staged a holding update to the tenant. The tenant has had no update since 9 September, and the offered visit dates passed (event-021). I did not instruct the contractor or promise approval. If there is no landlord reply in 3 days, chase. If the contractor stays silent on the doors-only estimate, ask the contractor for it. A person should settle the commission and VAT basis. I made a verbal instruction about it in event-023 without any authority to set it.",
+        "confidence": 0.8,
+        "evidence_refs": [
+          "event-006",
+          "event-016",
+          "event-021",
+          "event-022",
+          "event-023",
+          "event-024",
+          "event-025"
+        ],
+        "unknowns": [
+          "Landlord decision on the full-kitchen quote",
+          "Cupboards-and-doors-only estimate not received",
+          "Commission basis, cap, VAT-inclusive total unconfirmed",
+          "Electrical work estimate needs checking",
+          "No access appointment or dog arrangements"
+        ],
+        "options": [
+          "Wait for the landlord's reply, then chase after 3 days",
+          "Ask the contractor for the doors-only estimate and a confirmed VAT-inclusive total"
+        ],
+        "unrelated_issues": [
+          "Contractor commission basis, cap and VAT query (event-022): the agency's commercial terms need a person to settle them"
+        ],
+        "amount_gbp": null
+      },
+      "result": {
+        "status": "accepted"
+      }
+    }
+  ],
+  "consistency": {
+    "status": "ok",
+    "model": "jev-1.13.0",
+    "checks": [],
+    "dropped": 5
+  },
+  "answer": "",
+  "red_flags": [],
+  "details": {
+    "schema": "case-card/1",
+    "case": {
+      "id": "10",
+      "title": null,
+      "source_role": "Tenant",
+      "status": null,
+      "request": "Tenant reports peeling laminate on kitchen cabinets, with sharp edges that have caused cuts, and several cabinet doors that do not close properly. Two dogs are at the property, so access needs to be arranged in advance."
+    },
+    "property": {
+      "address": "42 Brackenveil Row, Oakhollow, ZZ1 1ZZ",
+      "address_variants": [
+        {
+          "value": "42 Brackenveil Row, Oakhollow, ZZ1 1ZZ",
+          "refs": [
+            "index"
+          ]
+        }
+      ],
+      "references": []
+    },
+    "tenant": {
+      "name": null,
+      "names": [],
+      "phones": [],
+      "emails": []
+    },
+    "landlord": {
+      "name": null,
+      "names": [],
+      "phones": [],
+      "emails": []
+    },
+    "agency": {
+      "name": "Nia Calder (Property Manager, Northbridge Lettings)",
+      "phones": [],
+      "emails": [],
+      "staff": []
+    },
+    "provider": {
+      "name": null,
+      "assigned_ref": null,
+      "phones": [],
+      "emails": []
+    },
+    "money": {
+      "quotes": [
+        {
+          "amount_gbp": 4850.0,
+          "vat": "excl",
+          "from": "provider",
+          "ref": "event-024"
+        },
+        {
+          "amount_gbp": 3800.0,
+          "vat": "excl",
+          "from": "provider",
+          "ref": "event-024"
+        },
+        {
+          "amount_gbp": 230.0,
+          "vat": "excl",
+          "from": "provider",
+          "ref": "event-024"
+        },
+        {
+          "amount_gbp": 380.0,
+          "vat": "excl",
+          "from": "provider",
+          "ref": "event-024"
+        }
+      ],
+      "invoices": [],
+      "approval": {
+        "amount_gbp": null,
+        "ref": null,
+        "covers": "unknown"
+      },
+      "payments": [],
+      "deposit": []
+    },
+    "appointments": [],
+    "timeline": {
+      "events": 26,
+      "first": "2025-09-04T12:08:49+00:00",
+      "last": "2025-09-24T14:36:22+00:00",
+      "waiting_on": null,
+      "channels": {
+        "Portal": 1,
+        "Email": 16,
+        "Update": 2,
+        "Call": 4,
+        "Note": 3
+      }
+    },
+    "attachments": [],
+    "decision": {
+      "action": "WAIT",
+      "priority": "P3",
+      "confidence": 0.8,
+      "decided_by": "model",
+      "cause": null,
+      "as_of": "2025-09-24T14:36:22+00:00",
+      "evidence_refs": [
+        "event-006",
+        "event-016",
+        "event-021",
+        "event-022",
+        "event-023",
+        "event-024",
+        "event-025"
+      ]
+    },
+    "calls": [],
+    "warnings": []
+  },
+  "mismatches": [],
+  "calls": []
+}
