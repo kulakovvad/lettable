@@ -69,6 +69,16 @@ class AmountTests(unittest.TestCase):
         for body in ("Invoice: GBP 120 including VAT.", "Invoice for GBP 100.", "Invoice GBP 100 net, GBP 120 gross."):
             self.assertEqual(mismatches.find(case_for([self.quote(), ev(2, "Contractor", AG, body)])), [], body)
 
+    def test_an_extra_amount_is_flagged_even_when_another_matches_the_quote(self):
+        events = [self.quote("Quote GBP 80."), ev(2, "Landlord", AG, "Approved GBP 250, go ahead."),
+                  ev(3, "Contractor", AG, "Invoice GBP 80 plus an extra GBP 200.")]
+        items = mismatches.find(case_for(events))
+        flagged = [i for i in items if i["severity"] == "flag"]
+        self.assertEqual(len(flagged), 1)
+        self.assertIn("200.00", flagged[0]["summary"])
+        self.assertIn("neither a quoted amount nor the landlord's approval", flagged[0]["summary"])
+        self.assertNotIn("80.00", flagged[0]["summary"])
+
     def test_an_invoice_above_the_landlord_approval_is_flagged(self):
         events = [self.quote("Quote GBP 100 plus VAT."), ev(2, "Landlord", AG, "Approved GBP 100, go ahead."),
                   ev(3, "Contractor", AG, "Quote revised to GBP 250."), ev(4, "Contractor", AG, "Invoice GBP 250.")]
@@ -90,9 +100,15 @@ class CompletionTests(unittest.TestCase):
         self.assertEqual((kinds(items), items[0]["refs"]), (["completion"], ["event-001", "event-002"]))
 
     def test_harmless_or_negated_follow_ups_are_not_flagged(self):
-        for later in ("Thanks again, all working now.", "No more leaks, thanks.", "Thank you!", "Can you send the invoice?"):
+        for later in ("Thanks again, all working now.", "No more leaks, thanks.", "Thank you!", "Can you send the invoice?",
+                      "It's working again, thank you.", "Please check again tomorrow.", "I may call again next week."):
             events = [ev(1, "Contractor", AG, "Job completed."), ev(2, "Tenant", AG, later, "SMS")]
             self.assertEqual(mismatches.find(case_for(events)), [], later)
+
+    def test_a_fault_that_comes_back_is_still_flagged(self):
+        for later in ("It started again.", "The problem again, I'm afraid.", "It is leaking again."):
+            events = [ev(1, "Contractor", AG, "Job completed."), ev(2, "Tenant", AG, later, "SMS")]
+            self.assertEqual(kinds(mismatches.find(case_for(events))), ["completion"], later)
 
     def test_a_problem_before_the_completion_is_not_a_mismatch(self):
         events = [ev(1, "Tenant", AG, "It is leaking again.", "SMS"), ev(2, "Contractor", AG, "Job completed.")]

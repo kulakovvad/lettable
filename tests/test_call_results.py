@@ -116,6 +116,28 @@ class CollectTests(unittest.TestCase):
             self.assertNotIn("transcript", card)  # the card refers to the transcript, it does not repeat it
             self.assertIn("## Calls", (out / "c1" / "ANSWER.md").read_text())
 
+    def test_a_stored_record_that_is_not_json_does_not_stop_the_other_calls(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "out"
+            (out / "c1" / "calls").mkdir(parents=True)
+            (out / "c1" / "calls" / "conv_bad.json").write_text("{")
+            (out / "c1" / "calls" / "conv_list.json").write_text("[1, 2]")
+            kept = {"status": "done", "success": "success", "summary": "kept", "data": {}}
+            actions = [
+                call_action(conversation_id="conv_bad", idempotency_key="b", call_result=dict(kept)),
+                call_action(id="call-2", conversation_id="conv_list", idempotency_key="l", call_result=dict(kept)),
+                call_action(id="call-3", conversation_id="conv_ok", idempotency_key="o"),
+            ]
+            (out / "c1" / "decision.json").write_text(json.dumps(decision(actions)))
+            summary = calls.collect(out, lambda: Fetcher(done()))
+            new = json.loads((out / "c1" / "decision.json").read_text())
+            by_id = {a["id"]: a for a in new["actions"]}
+            self.assertEqual(by_id["call-1"]["call_result"], kept)  # the bad file did not replace it
+            self.assertEqual(by_id["call-2"]["call_result"], kept)  # a JSON list is not a record
+            self.assertIn("transcript", by_id["call-3"]["call_result"])
+            self.assertEqual(len(summary["collected"]), 1)
+            self.assertEqual(len(summary["errors"]), 2)
+
     def test_a_result_collected_before_transcripts_were_kept_is_upgraded_from_the_stored_record(self):
         with tempfile.TemporaryDirectory() as tmp:
             out, _, _ = collect_into(tmp, [call_action()], done())

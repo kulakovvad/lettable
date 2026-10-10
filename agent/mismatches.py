@@ -24,10 +24,15 @@ _PHONE = re.compile(r"(?:\+44\s?\(?0?\)?|\b0)\d(?:[\s-]?\d){8,10}\b")
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 _INVOICE_WORD = re.compile(r"\binvoice\w*", re.I)
 _THANKS_AGAIN = re.compile(r"(?i)\b(?:thanks|thank you) again\b")
+# "again" alone is not a fault ("working again", "check again"). It counts only next to one, or as "back" / "started again".
+_FAULT = r"leak\w*|drip\w*|broken|broke|block\w*|fault|problem|issue|smell|flood\w*|damp|mould|mold"
 _PROBLEM = re.compile(
-    r"(?i)\bagain\b|\b(?:came|come|coming|is|it's|its|has) back\b|\bstill (?:not|leak\w*|broken|dripping|blocked|"
+    r"(?i)\b(?:%s)\b(?:\W+\w+){0,6}\W+again\b|\bagain\b(?:\W+\w+){0,4}\W+\b(?:%s)\b|"
+    r"\b(?:started|happening|returned)\s+again\b|"
+    r"\b(?:came|come|coming|is|it's|its|has) back\b|\bstill (?:not|leak\w*|broken|dripping|blocked|"
     r"doesn't|isn't|won't|has|have)\b|\bnot (?:been )?(?:fixed|done|sorted|working|resolved|repaired)\b|"
-    r"\b(?:isn't|is not|doesn't|won't) (?:work|working|fixed|flush|flushing|drain|draining|heating)\b|\bleak\w*|\bbroken\b|\bworse\b")
+    r"\b(?:isn't|is not|doesn't|won't) (?:work|working|fixed|flush|flushing|drain|draining|heating)\b|\bleak\w*|\bbroken\b|\bworse\b"
+    % (_FAULT, _FAULT))
 
 
 def _ref(e: Event) -> str:
@@ -94,6 +99,11 @@ def _matches_a_quote(amount: float, quotes: Set[float]) -> bool:
                or abs(amount - round(q / evidence.VAT, 2)) < 0.015 for q in quotes)
 
 
+def _matches_approval(amount: float, cap: Optional[float]) -> bool:
+    """The amount is the approved figure (same VAT basis), not merely under the cap."""
+    return cap is not None and _matches_a_quote(amount, {cap})
+
+
 def _amount(case: Case) -> List[Dict[str, Any]]:
     items: List[Dict[str, Any]] = []
     quote_events = [e for e in case.events if evidence.is_quote(e)]
@@ -107,16 +117,22 @@ def _amount(case: Case) -> List[Dict[str, Any]]:
         if evidence.role_of(e.sender) != "provider" or not _INVOICE_WORD.search(e.body) or e in quote_events:
             continue
         amounts = evidence.amounts(e.body)
-        if not amounts or any(_matches_a_quote(a, quotes) for a in amounts):
-            if amounts and cap is not None and approval is not None and max(amounts) > cap * evidence.VAT + 0.01:
-                items.append({"kind": "amount", "severity": "flag", "refs": [_ref(e), _ref(approval)],
-                              "summary": "Invoice of GBP %.2f (%s) is above the GBP %.2f the landlord approved (%s)."
-                                         % (max(amounts), _ref(e), cap, _ref(approval))})
+        if not amounts:
             continue
-        items.append({"kind": "amount", "severity": "flag", "refs": [_ref(e)] + [_ref(q) for q in quote_events],
-                      "summary": "Invoice amount GBP %s (%s) matches none of the quoted amounts (%s)." % (
-                          ", ".join("%.2f" % a for a in amounts), _ref(e),
-                          ", ".join("GBP %.2f" % q for q in sorted(quotes)))})
+        unmatched = [a for a in amounts if not _matches_a_quote(a, quotes) and not _matches_approval(a, cap)]
+        if unmatched:
+            refs = [_ref(e)] + ([_ref(approval)] if approval is not None else []) + [_ref(q) for q in quote_events]
+            shown = ", ".join("%.2f" % a for a in unmatched)
+            if any(_matches_a_quote(a, quotes) for a in amounts):
+                summary = "Invoice amount GBP %s (%s) matches neither a quoted amount nor the landlord's approval." % (shown, _ref(e))
+            else:
+                summary = "Invoice amount GBP %s (%s) matches none of the quoted amounts (%s)." % (
+                    shown, _ref(e), ", ".join("GBP %.2f" % q for q in sorted(quotes)))
+            items.append({"kind": "amount", "severity": "flag", "refs": refs, "summary": summary})
+        elif cap is not None and approval is not None and max(amounts) > cap * evidence.VAT + 0.01:
+            items.append({"kind": "amount", "severity": "flag", "refs": [_ref(e), _ref(approval)],
+                          "summary": "Invoice of GBP %.2f (%s) is above the GBP %.2f the landlord approved (%s)."
+                                     % (max(amounts), _ref(e), cap, _ref(approval))})
     primary = [(e, max(_quote_values(e))) for e in quote_events if _quote_values(e)]
     distinct: List[Tuple[Event, float]] = []
     for e, amount in primary:

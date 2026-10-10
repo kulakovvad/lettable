@@ -112,6 +112,20 @@ def _result_path(case_out: Path, conversation_id: str) -> Path:
     return case_out / "calls" / (_UNSAFE.sub("_", conversation_id) + ".json")
 
 
+def _read_record(path: Path) -> Optional[Dict[str, Any]]:
+    """The stored call record, or None when it is unreadable or not a JSON object."""
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return record if isinstance(record, dict) else None
+
+
+def _bad_record(summary: Dict[str, Any], case_id: str, conversation_id: str) -> None:
+    summary["errors"].append({"case_id": case_id, "conversation_id": conversation_id,
+                              "error": "stored call record is not a JSON object"})
+
+
 def _collect_case(case_out: Path, out_dir: Path, get_dialer, summary: Dict[str, Any], skip_dry_run: bool = False) -> None:
     f = case_out / "decision.json"
     if not f.is_file():
@@ -125,14 +139,21 @@ def _collect_case(case_out: Path, out_dir: Path, get_dialer, summary: Dict[str, 
         if a.get("call_result"):
             stored = _result_path(case_out, cid)
             if "transcript" not in a["call_result"] and stored.is_file():  # collected before transcripts were kept: upgrade it
-                a["call_result"] = call_results.shape_result(json.loads(stored.read_text(encoding="utf-8")), "calls/" + stored.name)
-                changed = True
+                record = _read_record(stored)
+                if record is None:  # leave the existing call_result and carry on with the other calls
+                    _bad_record(summary, decision["case_id"], cid)
+                else:
+                    a["call_result"] = call_results.shape_result(record, "calls/" + stored.name)
+                    changed = True
             continue
         if skip_dry_run and str(cid).startswith("dryrun-"):
             continue  # a rehearsal has nothing to fetch from the real service
         path = _result_path(case_out, cid)
         if path.is_file():
-            record = json.loads(path.read_text(encoding="utf-8"))
+            record = _read_record(path)
+            if record is None:
+                _bad_record(summary, decision["case_id"], cid)
+                continue
         else:
             try:
                 conv = get_dialer().fetch(cid)
