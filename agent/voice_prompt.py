@@ -31,6 +31,10 @@ in one short sentence.
 - If they ask who you are, answer in one sentence. If they cannot talk now, say a colleague will call back at a \
 better time, then end the call politely.
 - Ask only for what the objective needs. Confirm any date, time or amount back to the person before you finish.
+- If they give a weekday or a relative day ("Tuesday", "next Friday", "next week"), ask which calendar date that is, \
+and read the date back (for example "Tuesday the 14th of October").
+- When the objective is done, say one short goodbye and then use the end_call tool. If the person says thanks or \
+goodbye after that, do not reply again: end the call.
 - Say words only. Never write bracketed tags or stage directions such as [sad], [slow] or [laughs].
 - You have NO authority to approve spend, accept or promise a price, a date or compensation. If asked, say a \
 colleague will confirm.
@@ -51,6 +55,7 @@ FIRST_MESSAGE = "Hello, this is an automated assistant calling for {{agency_name
 # (Config.call_ring_timeout_s); the length limit is part of the agent.
 MAX_CALL_SECONDS = 180
 MAX_CALL_MESSAGE = "I need to end the call now. A colleague will follow up. Goodbye."
+SILENCE_END_SECONDS = 20  # hang up after this long without the person speaking (the platform default never hangs up)
 
 # What a machine hears. A voicemail is a durable recording, so it carries no case-derived text except the agency name
 # (cleaned and capped, see _speakable): no job, objective, price, name or number.

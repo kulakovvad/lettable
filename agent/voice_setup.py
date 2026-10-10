@@ -11,14 +11,16 @@ from typing import Any, Dict, Optional
 from agent.config import Config
 from agent.voice_elevenlabs import request
 from agent.voice_prompt import (DATA_COLLECTION, FIRST_MESSAGE, MAX_CALL_MESSAGE, MAX_CALL_SECONDS, PLACEHOLDERS, PROMPT,
-                                TTS, VOICEMAIL_MESSAGE)
+                                SILENCE_END_SECONDS, TTS, VOICEMAIL_MESSAGE)
 
 
 def agent_config(llm: Optional[str] = None) -> Dict[str, Any]:
     """Everything we set on the phone agent: what it says, how it sounds, what it extracts."""
-    prompt: Dict[str, Any] = {"prompt": PROMPT, "built_in_tools": {"voicemail_detection": {
-        "name": "voicemail_detection", "description": "",
-        "params": {"system_tool_type": "voicemail_detection", "voicemail_message": VOICEMAIL_MESSAGE}}}}
+    prompt: Dict[str, Any] = {"prompt": PROMPT, "built_in_tools": {
+        "voicemail_detection": {"name": "voicemail_detection", "description": "",
+                                "params": {"system_tool_type": "voicemail_detection", "voicemail_message": VOICEMAIL_MESSAGE}},
+        # Without this tool the agent can say goodbye but cannot hang up; the call would run to the length limit.
+        "end_call": {"name": "end_call", "description": "", "params": {"system_tool_type": "end_call"}}}}
     if llm:
         prompt["llm"] = llm
     return {
@@ -27,6 +29,7 @@ def agent_config(llm: Optional[str] = None) -> Dict[str, Any]:
                       "max_conversation_duration_message": MAX_CALL_MESSAGE,
                       "dynamic_variables": {"dynamic_variable_placeholders": dict(PLACEHOLDERS)}},
             "conversation": {"max_duration_seconds": MAX_CALL_SECONDS},
+            "turn": {"silence_end_call_timeout": SILENCE_END_SECONDS},
             "tts": dict(TTS),
         },
         "platform_settings": {"data_collection": DATA_COLLECTION},

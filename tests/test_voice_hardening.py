@@ -13,8 +13,8 @@ from agent.config import Config
 from agent.runner import run_all
 from agent.voice import CallRequest
 from agent.voice_elevenlabs import ElevenLabsDialer
-from agent.voice_prompt import (DATA_COLLECTION, FIRST_MESSAGE, MAX_CALL_SECONDS, PLACEHOLDERS, PROMPT, VARIABLES,
-                                VOICEMAIL_MESSAGE, dynamic_variables)
+from agent.voice_prompt import (DATA_COLLECTION, FIRST_MESSAGE, MAX_CALL_SECONDS, PLACEHOLDERS, PROMPT, SILENCE_END_SECONDS,
+                                VARIABLES, VOICEMAIL_MESSAGE, dynamic_variables)
 from agent.voice_setup import agent_config
 from tests.helpers import make_case
 from tests.test_calls import PROVIDER
@@ -32,6 +32,20 @@ class AgentConfigTests(unittest.TestCase):
         self.assertEqual(cc["conversation"]["max_duration_seconds"], MAX_CALL_SECONDS)
         self.assertLessEqual(MAX_CALL_SECONDS, 300)
         self.assertIn("colleague will follow up", cc["agent"]["max_conversation_duration_message"])
+
+    def test_the_agent_can_hang_up_and_silence_ends_the_call(self):
+        cc = agent_config()["conversation_config"]
+        end = cc["agent"]["prompt"]["built_in_tools"]["end_call"]
+        self.assertEqual(end["params"]["system_tool_type"], "end_call")
+        self.assertIn("voicemail_detection", cc["agent"]["prompt"]["built_in_tools"])  # added, not replaced
+        self.assertEqual(cc["turn"]["silence_end_call_timeout"], SILENCE_END_SECONDS)
+        self.assertTrue(0 < SILENCE_END_SECONDS <= 30)  # -1 (the platform default) would never hang up
+        self.assertIn("end_call tool", PROMPT)
+        self.assertIn("do not reply again", PROMPT)  # no second goodbye after the person says thanks
+
+    def test_a_relative_day_is_turned_into_a_calendar_date_by_asking(self):
+        self.assertIn("which calendar date", PROMPT)
+        self.assertIn("read the date back", PROMPT)
 
     def test_a_callback_hears_sensible_words_because_every_variable_has_a_default(self):
         placeholders = agent_config()["conversation_config"]["agent"]["dynamic_variables"]["dynamic_variable_placeholders"]
