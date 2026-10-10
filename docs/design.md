@@ -1,122 +1,221 @@
-# Case loop design
+# lettable: design
 
-Status: draft, based on the 50 public Property Management cases. Thresholds are config values and are not fixed here.
+Status: current as of `main`. Describes the shipped system in `agent/`. Thresholds live in `agent/config.py` and can be overridden per run with `--config file.json`; values quoted here are the defaults.
 
-## Idea
+Related: [output-format.md](output-format.md) (the files a run writes), [voice.md](voice.md) (phone calls and speech-to-text).
 
-Every case is a timeline of emails, calls, texts and holds. The agent reads it up to now and proposes the next action. Code decides whether that action is allowed. Anything that fails or cannot be approved becomes an escalation to a person, so no case is ever left without an output.
+## 1. Purpose
 
-## Flow for one case
+Lettings teams work repair cases that arrive as emails, calls, texts and holds, often with details missing or conflicting. Most of the work is deciding the next step and who the case is waiting on. lettable reads each case up to now, proposes the next action, checks it in code, and either records the action or hands the case to a person with what is known, what is missing and two or three options.
+
+### Goals
+
+- Every case gets an output, including when the model, the network or the input fails.
+- The model proposes; deterministic code decides. Code can make an outcome stricter (wait or escalate), never looser.
+- Anything unsafe, unclear, unapproved or above the spend limit goes to a person.
+- Every decision is explainable from the case: reasons, evidence refs (`event-NNN`, attachment names) and the gates that fired.
+- Paid and outbound features are off unless switched on by name.
+
+### Non-goals
+
+- Sending email or SMS, or writing to a CRM or ticketing system. Messages, approval requests and closures are local records (see section 9).
+- Approving spend. The agency has no spend authority of its own; amounts above the limit are routed to the landlord or a person.
+- Legal, deposit or notice advice. These cases are escalated.
+
+## 2. Architecture
 
 ```mermaid
 flowchart LR
   subgraph W["Per-case process: own timeout, own errors, nothing shared with other cases"]
     A["Case folder<br/>index.md, history.md, PDFs, audio"] -->|"audio to text, opt-in"| B["Timeline (code)<br/>ordered events, who we wait on"]
+    B --> CC["Case card + mismatches (code)"]
     B -.->|"opt-in"| K["Consistency check<br/>extraction + Jev"]
     K -.->|flags| C
+    CC --> C
     B --> C["Tool loop (model)<br/>read tools, stage actions, submit_decision"]
-    C --> D["Gates (code)<br/>authority, spend, wait time, hazard, completion"]
+    C --> D["Gates (code)<br/>hazard, red flags, authority, spend, wait time, completion"]
     D -->|"passes: commit matching actions"| E["Local outbox<br/>calls placed only if switched on"]
   end
-  E --> F["decision.json, ANSWER.md, REASONING.md"]
+  E --> F["decision.json, ANSWER.md, REASONING.md, trace.jsonl"]
   W -. "crash, timeout, or model failure" .-> G["Fallback escalation (no model call)"]
   G --> F
+  F -->|"calls collect"| H["Call results back into the case"]
   F -->|"export"| I["ANSWERS/n/"]
+  F -->|"ui"| U["Local case workspace"]
 ```
 
-This is the loop in `agent/`. `--backend claude`, `openai` and `auto` run the tool loop. `--backend fake` is the offline rules backend. `--backend anthropic-single` is the older one-call path and needs the optional `anthropic` package. The model proposes; gates and the wrapper are plain code. A bad proposal, a hung call or a crash ends as a fallback escalation, so a person can pick the case up without redoing the work. Staged messages stay in the local outbox. A phone call is the only action that can leave the machine, and only when calls are set to ElevenLabs.
+### Components
 
-## What the proposal can be
+| Module | Responsibility |
+|---|---|
+| `agent/timeline.py` | Parse a case into ordered events and attachments; work out who the case is waiting on and since when |
+| `agent/details.py` | The case card (`case-card/1`): tenant, landlord, provider, property, amounts, dates, each with refs. Code only, never guesses |
+| `agent/mismatches.py` | Conservative code detectors: addresses, invoice amounts against quotes and approval, completion against later reports, contact details |
+| `agent/consistency.py` | Opt-in document consistency check (section 5) |
+| `agent/loop.py`, `agent/tools.py`, `agent/policy.py`, `agent/chat.py` | Bounded tool loop, its read and staging tools, the operating policy, the Claude and OpenAI clients |
+| `agent/gates.py`, `agent/evidence.py`, `agent/redflags.py` | Code checks on the final decision |
+| `agent/handover.py` | Fills the escalation packet (route, priority, options) when the model leaves gaps; only moves stricter |
+| `agent/channel.py`, `agent/calls.py`, `agent/oncall.py`, `agent/voice*.py`, `agent/stt.py` | Phone policy, dialer, on-call briefing, phone agent, speech-to-text |
+| `agent/runner.py`, `agent/fallback.py` | Per-case process isolation, time limits, concurrency, resume, fallback escalation |
+| `agent/report.py`, `agent/files.py`, `agent/export.py` | Output files, atomic writes, the `ANSWERS/` exporter |
+| `agent/reality.py`, `agent/doctor.py` | Batch run over an unknown folder layout; preflight checks |
+| `agent/replay.py`, `agent/grade.py` | Evaluation without an answer key; grading against rubrics |
+| `agent/ui.py`, `agent/ui_static/` | Read-only local case workspace |
 
-The public cases are mostly repairs that sit in waiting states: for the landlord, a provider or the tenant.
+### Backends
 
-| What the timeline shows | Proposed action | Gate that must pass |
+| `--backend` | What runs | Cost |
 |---|---|---|
-| Landlord approval requested, no reply for too long | chase landlord | Wait limit reached; message uses the approved template |
-| Provider asked to quote or book, no answer, or only voicemail | chase provider | Wait limit reached; after repeated misses, offer another provider |
-| Quote or invoice arrived | route for approval | Amount against the approval limit and the quote already agreed |
-| Details missing, or an attachment is marked unavailable | ask tenant | The missing fact can actually be asked for |
-| Appointment booked | send reminder | Date and contact number come from the record, not the model |
-| Work done, invoice and key return settled | close | Completion confirmed by the provider or tenant |
-| Hazard words, conflicting facts, a dispute, or the model is unsure | escalate to person | Always allowed; never blocked by a gate |
+| `fake` (default) | Offline rules backend; no network | free |
+| `claude` | Tool loop on Claude; PDFs and images attached to the first message | paid |
+| `openai` | Tool loop on OpenAI | paid |
+| `auto` | Claude when `ANTHROPIC_API_KEY` is set, otherwise OpenAI | paid |
+| `anthropic-single` | Older one-call path; needs the `anthropic` extra | paid |
 
-## Per-case isolation
+A key in the environment does not switch on spend by itself; the backend must be named.
 
-- One case is one unit of work with a catch-all around it. No state is shared between cases.
-- Each case has its own time budget. When it runs out, or anything crashes, the fallback escalation packet is written.
-- Results are written atomically as each case finishes. `decision.json` is written last.
-- Model requests retry timeouts, HTTP 408, 429 and 5xx, up to `max_retries`. A live phone call is not retried after a timeout or 5xx: the call ledger keeps it pending so it is not dialled twice. Staged messages are local records, not deliveries.
+## 3. Decision flow for one case
 
-## Testing without an answer key
+1. **Load.** The runner starts a child process for the case with its own time budget (`case_timeout_s`, 240 s). The recorded summary and outcome in `index.md` are never loaded, so a case's ending cannot leak into the decision.
+2. **Build the timeline.** Events are ordered; audio is transcribed when `--stt` is on; PDFs are read with `pypdf`. Files over `max_file_bytes` and unknown types become warnings, not crashes.
+3. **Code facts.** The case card, mismatches, hazard hits and red flags are computed before the model sees the case.
+4. **Tool loop.** The model calls read tools (events, search, attachments, case files, policy) and stages actions through gated tools, then calls `submit_decision` once.
+   - Nothing leaves the case during the loop. Each staging tool is checked by code first; a refusal goes back to the model with a reason and a hint.
+   - Bounded by `loop_max_steps` (12) and repeated-call detection. Token use is recorded on the decision and never stops a case or skips later cases.
+   - A turn without a tool call gets a nudge. The Claude client uses `tool_choice: auto` because the configured model rejects forced tool use.
+   - If the model never submits, the case escalates with its trace; no extra model call.
+5. **Gates.** `gates.apply` checks the proposal (section 4). If a gate changes the action, every staged action except escalations and safety advice is held for a person instead of committed.
+6. **Commit.** Staged actions that match the final action are written to the local outbox. Phone calls go through the dialer only when calls are switched on and the phone policy allows them.
+7. **Write.** `ANSWER.md`, `REASONING.md`, `trace.jsonl`, then `decision.json` last. Every file is written to a temp file and renamed.
 
-The cases have no labels, but each has a recorded history. Pick a point in the history, give the loop only the events up to that point, hide the summary and outcome, and compare the proposed action with what happened next. A different action is not automatically wrong, so differences are read by hand before anything is tuned.
+Waits are judged as of the latest event (`as_of = last_event`) by default, because case dates may not relate to the wall clock. `--now` or `--as-of now|later` change that for live use.
 
-Crash tests: inject a hang, a corrupt file and a model error into one case of ten, and check that the other nine finish and the broken one escalates within its time budget.
+## 4. Gates and safety model
 
-## Reuse from the old agent
+Gates run in this order on every model decision. Each can only make the outcome stricter.
 
-Keep:
-- The rule that the model proposes and code decides
-- Per-case isolation and the escalation fallback
-- Tracing, retries, idempotent actions
-- Escalation and spend-authority rules
+| Check | Effect |
+|---|---|
+| Hazard phrase in the latest `hazard_window` (5) events or attachments (gas, CO, flood, exposed wiring, fire, collapse, unsafe-to-use, threats, mould with an infant, no heating with a vulnerable occupant). Negated mentions and agency advice do not count | Escalate |
+| Forcing red flag: payment redirection (new bank details), legal (deposit, notice, claims), vulnerable occupant without heat, water or power, abuse toward staff | Escalate, with routing guidance |
+| Consistency check finds a clearly different property address or payee | Escalate |
+| Model confidence below `min_confidence` (0.5), unless the decision is a verified wait | Escalate |
+| Action that needs a message, proposed without one | Escalate |
+| Chase a party the timeline is not waiting on | Escalate |
+| Chase or new question before `chase_after_days` (3) | Wait |
+| Instruct the provider without a landlord approval dated after the latest quote | Escalate |
+| Close without confirmed completion from the provider or tenant | Escalate |
+| Amount above `approval_limit_gbp` (GBP 300) not covered by a landlord approval | Escalate |
 
-Rewrite or drop:
-- Ingest, since the input is now markdown timelines and PDFs, with no CRM
-- The one-shot nine-outcome packet and the grader upload
-- The fraud, identity and PII gates, which suit the old task more than routine repairs
+A failed earlier action (bounce, no-show, repeated voicemail) is a non-forcing red flag: it is shown to the model with recovery guidance so it can try another channel.
 
-## Bounded tool loop
+Escalation always passes; no gate blocks it. A proposal must carry a reason, and unverified evidence alone is not a reason to escalate. The handover packet is completed by code when the model leaves gaps: route and priority (P0 to P3, with target response times of 1, 4, 24 and 72 hours) only move stricter, and a payment flag becomes accounts at P1 or above.
 
-Status: shipped in `agent/loop.py`. This is what `--backend claude`, `openai` and `auto` run.
+### What the proposal can be
 
-The model may call read tools (events, search, attachments, case files, policy) and *stage* actions through gated tools before one `submit_decision`. The principle is unchanged: the model only proposes, code decides.
+| What the timeline shows | Proposed action |
+|---|---|
+| Landlord approval requested, no reply for too long | `CHASE_LANDLORD` |
+| Provider asked to quote or book, no answer or only voicemail | `CHASE_PROVIDER` |
+| Quote or invoice arrived | route for approval |
+| Landlord approved, provider not yet told | `INSTRUCT_PROVIDER` |
+| Details missing, or an attachment marked unavailable | `ASK_TENANT`, `ASK_PROVIDER`, `ASK_LANDLORD` |
+| Appointment booked | send reminder |
+| Work done, invoice and key return settled | `CLOSE` |
+| Nothing due yet | `WAIT` |
+| Hazard, conflicting facts, a dispute, or the model is unsure | `ESCALATE` |
 
-- Nothing leaves the case during the loop. Action tools only stage; each is checked by code first and a refusal is returned to the model with a reason and a hint, so it can pick a different action.
-- After `submit_decision`, the existing `gates.apply` runs as before. If it changes the decision, every staged action except escalations and safety advice is held for a person instead of committed.
-- Bounded by turns (`loop_max_steps`) and repeated-call detection. Token use is recorded on the decision and does not stop the case or skip later cases. If the model never submits, the case escalates with its trace; no extra model call.
-- Waits are judged as of the latest event (`as_of = last_event`), because synthetic case dates do not relate to the wall clock.
-- Adds one action, `INSTRUCT_PROVIDER` (landlord approved, provider not yet told to go ahead), gated on a landlord approval dated after the latest quote.
-- The Claude client uses `tool_choice: auto`. The configured model rejects forced tool use (`any`) with HTTP 400, which turned every case into a fallback escalation. A turn without a tool call gets a nudge from the loop instead.
+### Phone calls
 
-## Document consistency check (opt-in)
+The model may ask for a call; `agent/channel.py` decides whether the phone is the right channel: at least `call_after_unanswered` (2) unanswered written messages to that party with the latest at least `call_after_hours` (24) old, a bounce, or a hazard found by code. Live calls are further limited to 08:00 to 21:00 UK time, `max_calls_per_case` (1) and `max_calls_per_run` (10), a number found in the case, and the allow-list when set. A live call is never retried after a timeout or 5xx; the call ledger keeps it pending so it is not dialled twice.
 
-Status: in `agent/`, off by default (`consistency_check`). Turn on with `--config` and a JSON file containing `{"consistency_check": true}`.
+The on-call briefing is fully code-driven: when a case ends with a code-found hazard or priority P0, the runner adds one briefing call to `LETTABLE_ONCALL_NUMBER`. That number is never taken from a case or the model, and a live briefing is dialled only if the number is on `LETTABLE_CALL_ALLOWLIST`. Details: [voice.md](voice.md).
 
-The Reality Test promises conflicting information. The public cases already contain some: a forwarded email with a different address (028), a call that names other tenants and another flat (032), a quote email about a different property (005). Before the tool loop, one check looks for this:
+## 5. Document consistency check (opt-in)
 
-1. **Extract (model, one call).** The model reports every mention of the tenant and landlord names, phones and emails, the property address and reference numbers, verbatim, each with the `event-NNN`, `index` or attachment it came from. A name counts for a role only when the text makes the role explicit; agency staff and contractors are out of scope.
-2. **Verify (code).** A value that does not appear in the source it cites is dropped. Values equal after normalising (case, spacing, punctuation, `+44` phone prefix) pass without any call.
-3. **Score (Jev).** The fields that still differ go to Jev (`api.typesafe.ai`, model pinned to `jev-1.13.0`) in one request, one `score` question per field: "Do all `values` refer to the same ...?" on a four-level rubric. Jev returns a score on the 0 to 3 level scale; code divides it by 3.
-4. **Tier (code, `Config`).** At or above `jev_pass` (0.85): pass. Below `jev_escalate` (0.4) with confidence at least `jev_min_confidence` (0.6): escalate. Anything else: flag. Names, phones, emails and reference numbers are capped at flag. Only a clearly different property address, or a payee or bank-details change, can escalate.
+Off by default (`consistency_check: false`). Some cases contain conflicting identity or property details: a forwarded email with a different address, a call naming another flat, a quote for a different property.
 
-Effects:
+1. **Extract (model, one call).** Every mention of tenant and landlord names, phones and emails, the property address and reference numbers, verbatim, each with its source. A name counts for a role only when the text makes the role explicit.
+2. **Verify (code).** A value not present in the source it cites is dropped. Values equal after normalising (case, spacing, punctuation, `+44` prefix) pass.
+3. **Score (Jev).** Remaining differences go to Jev (`api.typesafe.ai`, `jev-1.13.0`) in one request, scored 0 to 3 and normalised to 0 to 1.
+4. **Tier (code).** At or above `jev_pass` (0.85): pass. Below `jev_escalate` (0.4) with confidence at least `jev_min_confidence` (0.6): escalate. Otherwise flag. Names, phones, emails and reference numbers are capped at flag; only a clearly different property address or payee can escalate.
 
-- Escalate-tier fields make `gates.apply` change the decision to `ESCALATE` with the note "documents disagree on <field> (...); a person must confirm which is right". This only makes a decision stricter, like every other gate.
-- Flagged and escalated fields are shown to the loop model in its first message, so it can weigh them, ask the right party or explain them in the handover.
-- The report is saved as `consistency` in `decision.json`, as step 0 in the trace and as a section in `REASONING.md`.
-- If the extraction or Jev fails, or `TYPESAFE_API_KEY` is not set, the report is `unavailable` and the case continues. An outage of the check must not escalate every case.
+Flags are shown to the loop model and saved under `consistency` in `decision.json`, as step 0 in the trace and in `REASONING.md`. If extraction or Jev fails, or `TYPESAFE_API_KEY` is unset, the report is `unavailable` and the case continues: an outage of the check must not escalate every case.
 
-Cost: about 2,500 to 5,000 model tokens for the extraction and one Jev call of about 500 tokens (0.3 s) per case.
+Cost: about 2,500 to 5,000 model tokens plus one Jev call (about 500 tokens, 0.3 s) per case. On a small sample it did not improve agreement, so it stays off by default.
 
-## Replay findings (dev split, 12:00 run)
+## 6. Failure handling
 
-The 50 public cases are split with a fixed seed into 25 dev and 25 holdout cases. Disagreements are read only on the dev cases; the holdout is scored at checkpoints and not read case by case, so the prompt and gates are not fitted to cases we inspected. Changes must be general rules seen in more than one case.
+| Failure | Behaviour |
+|---|---|
+| Model timeout, HTTP 408, 429, 5xx, network error | Retry up to `max_retries` (4), honouring `retry-after` up to `retry_after_cap_s` (30 s) |
+| Model returns malformed output or never submits | Fallback escalation with the trace |
+| Case exceeds `case_timeout_s` or crashes | Child process is stopped; fallback escalation written without a model call |
+| Whole run exceeds `--deadline` | Unfinished cases get fallback escalations; `reality` makes further passes over fallbacks while time allows |
+| Corrupt, oversized or unknown input file | Warning on the case; the case continues |
+| Live call times out after it may have been placed | Kept pending in the call ledger; not redialled |
+| Consistency check or speech-to-text unavailable | Feature reports `unavailable`; the case continues |
 
-First real run (15 dev cases, 2 points each, Claude tool loop):
+Invariants: one output per input case (`summary.json` checks it), no state shared between cases, and `decision.json` written last so a half-written case is never read as finished. `--resume` skips cases already decided by the model and redoes fallbacks.
+
+## 7. Data handling and security
+
+- Secrets are read from the environment only. `.env` is gitignored; `.env.example` holds names, never values. `doctor` reports whether a key is present and never prints it.
+- Case text, and with `--backend claude` the PDFs and images, are sent to the model provider that is switched on. Audio goes to ElevenLabs only with `--stt elevenlabs`. Field values go to Jev only with the consistency check on. Nothing else leaves the machine.
+- Outbound phone numbers come from the case or, for the on-call briefing, from configuration; never from model output alone. The allow-list restricts live dialling.
+- The UI binds to 127.0.0.1, ignores symlinked case folders and writes only `review.json`.
+- Output folders (`out/`, `runs/`, `results/`) and the speech-to-text cache are gitignored. Treat them as containing personal data.
+
+## 8. Operations
+
+**Preflight.** `uv run python -m agent doctor <cases> --backend claude --live` checks keys, `pypdf`, that the output folder is writable, that cases can be found, and makes one tiny model call to confirm the key and model name. A wrong model name otherwise turns every case into a fallback.
+
+**Run.** `run` for a known folder of cases; `reality` for a folder of unknown layout (finds cases at any depth, stages them, runs them with the normal runner, retries fallbacks while the deadline allows, and exports `ANSWERS/<n>/`). `reality` reads `reality.json` at the repo root by default.
+
+**Observe.** Each case writes `trace.jsonl` (every model turn, tool call, gate verdict and committed action) and the run writes `summary.json` (counts by action, fallbacks by cause, write errors, elapsed time, and `reconciled`, which is true only when every input case has an output). Token use is recorded per case in `decision.json`. `ui` shows both per case.
+
+**Recover.** Re-run with `--resume` to redo only fallbacks. `calls collect` brings finished phone calls back into `decision.json`; re-run the case to use them.
+
+**Tune.** Change thresholds through a `--config` JSON file rather than code. The values most likely to need local settings are `approval_limit_gbp`, `chase_after_days`, `call_hours`, `case_timeout_s`, `concurrency` and `hazard_patterns`.
+
+## 9. Testing and evaluation
+
+- **Unit and integration tests** (`tests/`, standard-library `unittest`, about 490 tests, offline). Fake backends cover the model, phone and speech-to-text, including chaos backends that inject hangs, crashes, corrupt files and model errors. CI runs them on Ubuntu and Windows with Python 3.9 and 3.12.
+- **Replay.** Cases have no labels but each has a recorded history. Replay cuts a finished case at a point, shows the agent only the events before it (attachments dropped, summary and outcome hidden) and compares the proposed action with what the agency did next. The "what happened next" label is a rough rule, so the result is agreement, not accuracy, and differences are read by hand before anything is tuned.
+- **Held-out hygiene.** The 50 public cases are split with a fixed seed into 25 dev and 25 holdout cases. Disagreements are read only on dev cases; the holdout is scored, not read, and changes must be general rules seen in more than one case.
+- **Grading.** `grade` checks a run against `<id>.expected.json` rubrics kept outside the case folders (acceptable actions, prohibited commits, escalation route and priority, required terms, expected red flags). An optional model judge scores the reasoning; it is advisory.
+- **Voice.** `voice-test` runs phone-free scenarios through the ElevenLabs conversation simulator.
+
+### Replay findings (dev split)
+
+First real run, 15 dev cases at 2 points each, Claude tool loop:
 
 | Run | Agree | Differ | Escalated (scored points) | Unscored | All escalations of 30 |
 |---|---|---|---|---|---|
 | Baseline | 4 | 6 | 11 | 9 | 14 |
 | With consistency check | 2 | 7 | 12 | 9 | 16 |
 
-Twenty-one points are scored, and Claude varies between runs, so these numbers are for reading rather than ranking. In the run with the check, three decisions changed because of it: 009 and 025 (real name and address conflicts) and 014, a false positive from extracting a call agent as the tenant. 014 is fixed by the role rule above. The other two changes do not mention the check and are run-to-run variation.
+Twenty-one points are scored and Claude varies between runs, so these numbers are for reading rather than ranking. Two patterns account for most differences and are tracked in section 10.
 
-Open findings, not fixed here:
+## 10. Known limitations
 
-- **First landlord approval cannot go out.** At the start of a repair the model drafts the request asking the landlord to approve sending a provider and submits `WAIT`. `route_for_approval` needs an amount already in the case, `chase` needs an earlier unanswered request, and under `WAIT` only the follow-up commits, so the request is held for review. This affected 6 of 30 points.
-- **Completed jobs escalate.** In 8 of 10 points where the agency closed next, the model escalated, mostly because the invoice position was unknown or completion was only in agency notes. Some are defensible; in 027 the `close_case` gate rejected the tenant's own "drain is now clear" three times.
+- **Completion is under-detected.** Providers that sign as a firm are not recognised as providers, and wording such as "this one is done" is missed ([#11](https://github.com/kulakovvad/lettable/issues/11)). The close gate wrongly treats "no keys held" as missing key evidence ([#6](https://github.com/kulakovvad/lettable/issues/6)). In replay, 8 of 10 points where the agency closed next were escalated.
+- **Chase timing is a fixed 3 days** rather than the hold's own "(N days)" ([#7](https://github.com/kulakovvad/lettable/issues/7)).
+- **The tenant update staged with `INSTRUCT_PROVIDER` is held** although the policy suggests sending it ([#8](https://github.com/kulakovvad/lettable/issues/8)).
+- **The first landlord approval request cannot go out.** At the start of a repair the model drafts it and submits `WAIT`; `route_for_approval` needs an amount already in the case and `chase` needs an earlier request, so the draft is held for review (6 of 30 replay points).
+- **`GBP 300` approval limit is a placeholder** until the agency sets its own.
+- **Hazard detection is pattern-based** plus the model's judgement; when unsure the agent escalates.
+- **PDFs** are read only with `pypdf`; scanned pages show as "content not available". Replay drops attachments.
+- **Voice:** no inbound calls, text-to-speech replies or voicemail drops. Dry runs skip the calling-hours check. `calls collect` rewrites `decision.json` without a lock, so do not run it concurrently with a run on the same folder.
+- **Tuning** is limited to a small replay of the public cases; there is no run on a large held-out set.
 
-## Still open
+## 11. Before go-live
 
-The output files are specified in [output-format.md](output-format.md). Messages, approval requests and closures are local records; no email, CRM or ticketing system is connected. The GBP 300 approval limit in `agent/config.py` is still a placeholder. Chase timing is a fixed 3 days, not the hold's own "(N days)".
+The decision core, isolation and safety gates are complete and tested. Putting it in front of real tenants and landlords also needs:
+
+1. A real action layer: send email and SMS, create tickets, and read the state back before retrying, with the same idempotency keys the outbox already records.
+2. The agency's own approval limit, chase timing and calling hours in a reviewed `--config` file.
+3. Fixes for #6, #7, #8 and #11, measured with replay on the holdout split.
+4. A data-processing review for every external service switched on (model provider, ElevenLabs, Twilio, Jev) and a retention policy for output folders and the speech-to-text cache.
+5. Review of the legal and safety message templates by someone qualified in UK lettings.
+6. Feeding `review.json` choices from the UI back into the case, so a person's decision closes the loop.
