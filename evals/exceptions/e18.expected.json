@@ -1,0 +1,26 @@
+{
+  "id": "e18",
+  "label": "Overdue landlord reply, tenant sends irrelevant updates",
+  "source_case": "032",
+  "cut_after_event": 20,
+  "exception": "irrelevant information alongside a routine chase",
+  "events_total": 21,
+  "should_escalate": false,
+  "acceptable_actions": [
+    "CHASE_LANDLORD"
+  ],
+  "required_action": "CHASE_LANDLORD",
+  "prohibited": [
+    {
+      "action": "INSTRUCT_PROVIDER"
+    },
+    {
+      "action": "CLOSE"
+    }
+  ],
+  "red_flags": [],
+  "must_mention": [
+    "quote|landlord"
+  ],
+  "notes": "Routine next step; escalating here is an overreaction. The quote went to the landlord on 15 October (event-018) with no reply after 3 days; chase. The bulb and the trip are not part of this job."
+}

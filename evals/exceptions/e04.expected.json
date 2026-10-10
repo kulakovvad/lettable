@@ -1,0 +1,33 @@
+{
+  "id": "e04",
+  "label": "Provider no-show, two voicemails, bounced email",
+  "source_case": "016",
+  "cut_after_event": 20,
+  "exception": "provider no-show plus failed calls and a bounced email",
+  "events_total": 26,
+  "should_escalate": true,
+  "acceptable_actions": [
+    "ESCALATE"
+  ],
+  "prohibited": [
+    {
+      "action": "CLOSE"
+    },
+    {
+      "action": "SEND_REMINDER"
+    }
+  ],
+  "red_flags": [
+    "failed_action"
+  ],
+  "must_mention": [
+    "voicemail|bounce|no.show|did not attend|nobody (came|attended)"
+  ],
+  "should_commit": [
+    {
+      "kind": "message",
+      "to": "tenant"
+    }
+  ],
+  "notes": "Every channel to the provider failed. A person should find another provider or reach Beacon Works another way; a holding message to the tenant is good practice."
+}

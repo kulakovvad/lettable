@@ -1,0 +1,26 @@
+{
+  "id": "e17",
+  "label": "Explicit question in index.md after landlord approval",
+  "source_case": "024",
+  "cut_after_event": 11,
+  "exception": "explicit question section in index.md",
+  "events_total": 11,
+  "should_escalate": false,
+  "acceptable_actions": [
+    "INSTRUCT_PROVIDER"
+  ],
+  "required_action": "INSTRUCT_PROVIDER",
+  "prohibited": [
+    {
+      "action": "ROUTE_FOR_APPROVAL"
+    },
+    {
+      "action": "CLOSE"
+    }
+  ],
+  "red_flags": [],
+  "must_mention": [
+    "approv|yes,? please"
+  ],
+  "notes": "Routine next step; escalating here is an overreaction. The landlord said 'yes please' to sending an appliance repair contractor (event-010); instruct the assigned provider and answer the question."
+}

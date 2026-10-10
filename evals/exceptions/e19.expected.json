@@ -1,0 +1,28 @@
+{
+  "id": "e19",
+  "label": "Tenant threatens staff over the delay",
+  "source_case": "041",
+  "cut_after_event": 16,
+  "exception": "abuse and threats",
+  "events_total": 17,
+  "should_escalate": true,
+  "acceptable_actions": [
+    "ESCALATE"
+  ],
+  "required_route": [
+    "property_manager",
+    "complaints"
+  ],
+  "prohibited": [
+    {
+      "action": "CLOSE"
+    }
+  ],
+  "red_flags": [
+    "abuse"
+  ],
+  "must_mention": [
+    "threat|abus|regret|intimidat"
+  ],
+  "notes": "A threat to staff goes to a person; the washing machine job still needs progress."
+}

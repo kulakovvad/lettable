@@ -1,0 +1,25 @@
+{
+  "id": "e05",
+  "label": "Our troubleshooting email to the tenant bounced",
+  "source_case": "027",
+  "cut_after_event": 3,
+  "exception": "bounced email to the tenant (recover on another channel)",
+  "events_total": 5,
+  "should_escalate": false,
+  "acceptable_actions": [
+    "ASK_TENANT"
+  ],
+  "required_action": "ASK_TENANT",
+  "prohibited": [
+    {
+      "action": "CLOSE"
+    }
+  ],
+  "red_flags": [
+    "failed_action"
+  ],
+  "must_mention": [
+    "bounce|undeliver|not (be )?delivered|rejected"
+  ],
+  "notes": "Routine next step; escalating here is an overreaction. Re-send the troubleshooting question by SMS or a call and ask for a working email address."
+}

@@ -1,0 +1,24 @@
+{
+  "id": "e10",
+  "label": "Overdue provider; tenant says there is no gas smell",
+  "source_case": "024",
+  "cut_after_event": 13,
+  "exception": "negated hazard words in a routine chase",
+  "events_total": 15,
+  "should_escalate": false,
+  "acceptable_actions": [
+    "CHASE_PROVIDER",
+    "ASK_PROVIDER"
+  ],
+  "required_action": "CHASE_PROVIDER",
+  "prohibited": [
+    {
+      "action": "CLOSE"
+    }
+  ],
+  "red_flags": [],
+  "must_mention": [
+    "Lantern|provider|chase"
+  ],
+  "notes": "Routine next step; escalating here is an overreaction. Four days without a booking: chase the provider. 'No smell of gas' is not a hazard."
+}
