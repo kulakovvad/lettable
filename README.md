@@ -144,6 +144,8 @@ Files are copied byte for byte and never edited. Case folders named with digits 
 
 Everything else is the Python standard library. Optional: `pypdf` for PDF text. The case text is sent to the services you switch on; the public cases are synthetic. Third-party services remain subject to their own terms.
 
+Case images are sent to Claude with the first message when `--backend claude` is on.
+
 ## 6. Important assumptions
 
 - The public cases are the model for the hidden ones: markdown timelines, a landlord, a provider and a tenant, UK lettings.
