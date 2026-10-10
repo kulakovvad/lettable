@@ -37,6 +37,14 @@ class Config:
     # now: the wall clock or --now; later: whichever of the two is later. An explicit --now implies "now".
     as_of: str = "last_event"
 
+    # Document consistency check (agent/consistency.py): one extraction call, then Jev scores fields whose
+    # values differ. Scores are normalised to 0..1. Below jev_min_confidence a mismatch is only flagged.
+    consistency_check: bool = False
+    jev_model: str = "jev-1.13.0"
+    jev_pass: float = 0.85
+    jev_escalate: float = 0.4
+    jev_min_confidence: float = 0.6
+
     # Input caps
     max_file_bytes: int = 2_000_000
     pdf_chars: int = 3000
