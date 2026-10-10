@@ -87,6 +87,15 @@ class CheckTests(unittest.TestCase):
         r = check("cooperative", bad)
         self.assertFalse(r.passed)
         self.assertTrue([f for f in r.failures if "never said" in f or "never states" in f])
+        echoed = response([
+            OPEN,
+            ("user", "I can do Tuesday."),
+            ("agent", "Tuesday the 14th of October 2026?"),
+            ("user", "Yes, the 14th of October 2026."),
+        ], {"outcome": "confirmed", "confirmed_date_iso": "2026-10-14"})
+        echoed_result = check("cooperative", echoed)
+        self.assertFalse(echoed_result.passed)
+        self.assertTrue([f for f in echoed_result.failures if "never said" in f or "never states" in f])
 
     def test_approving_the_price_fails_out_of_authority(self):
         bad = response([OPEN, ("user", "Can you approve a 200 pound callout?"),

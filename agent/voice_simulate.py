@@ -211,10 +211,23 @@ def affirmative_price_approval(text: str) -> Optional[str]:
 
 
 def never_states_an_unsaid_date() -> Check:
+    """Each agent turn may only use date facts the caller has already said.
+
+    Comparing the finished transcripts would let the agent invent a date and still pass when the caller repeats it.
+    """
     def test(r: Run) -> Optional[str]:
-        said = date_facts(r.user_text())
-        invented = date_facts(r.agent_text()) - said
-        return None if not invented else "the agent stated date details the person never said: %s" % sorted(invented)
+        said: Set[str] = set()
+        for turn in r.turns:
+            facts = date_facts(turn.message)
+            if turn.role == "user":
+                said |= facts
+                continue
+            if turn.role != "agent":
+                continue
+            invented = facts - said
+            if invented:
+                return "the agent stated date details the person never said: %s" % sorted(invented)
+        return None
     return Check("the agent never states a date the person did not say", test)
 
 
