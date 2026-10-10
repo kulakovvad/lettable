@@ -27,6 +27,14 @@ python3 -m agent run "<cases folder>" out/ --backend anthropic
 
 The real model is only used when you ask for `--backend anthropic`. A key in the environment never turns on spending by itself.
 
+### Replay (testing without an answer key)
+
+```
+python3 -m agent replay "<cases folder>" out-replay/ --points 4
+```
+
+Cuts each finished case at a few points, shows the agent only the events up to that point (clock set to when the next event happened), and compares its proposed action with what the agency actually did next. Writes `rows.jsonl`, `summary.json` and `report.md` (with the disagreements to read by hand). The "what happened next" label is a rough rule on the next event, so treat the numbers as agreement, not accuracy. Attachments are left out of a cut case, because they cannot be tied to a point in time. A paid backend is capped at 30 points unless you pass `--max-calls`.
+
 ## How it stays reliable
 
 - Every case runs in its own process with a hard time limit. A crash, hang, model error or malformed answer produces a fallback escalation, so outputs always equal inputs (`summary.json` checks this).
@@ -42,6 +50,7 @@ The real model is only used when you ask for `--backend anthropic`. A key in the
 - `agent/fallback.py`: escalation when anything fails
 - `agent/runner.py`: isolation, time limits, concurrency, resume
 - `agent/report.py`: atomic output files
+- `agent/replay.py`: cut-and-compare check on finished cases
 - `tests/`: unit and failure-injection tests
 
 ## Known limits

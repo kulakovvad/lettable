@@ -50,6 +50,14 @@ class TimelineTests(unittest.TestCase):
         self.assertEqual(len(case.cut(2).events), 2)
         self.assertIsNone(case.cut(2).waiting())
 
+    def test_cut_drops_attachments_so_later_documents_cannot_leak(self):
+        from dataclasses import replace
+        from agent.timeline import Attachment
+        case = load_case(make_case(self.root, "001", WAITING_LANDLORD))
+        case = replace(case, attachments=(Attachment("invoice.pdf", "Total GBP 120, paid"),))
+        self.assertEqual(case.cut(2).attachments, ())
+        self.assertNotIn("invoice", render_case(case.cut(2), 5000))
+
     def test_missing_files_do_not_raise(self):
         (self.root / "empty").mkdir()
         case = load_case(self.root / "empty")

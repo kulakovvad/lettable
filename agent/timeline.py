@@ -66,8 +66,12 @@ class Case:
     warnings: Tuple[str, ...]
 
     def cut(self, n: int) -> "Case":
-        """The case as it stood after the first n events (for replay tests)."""
-        return replace(self, events=self.events[:n])
+        """The case as it stood after the first n events (for replay tests).
+
+        Attachments are dropped: they cannot be tied to a point in time, and a
+        later invoice or report would reveal what happened next.
+        """
+        return replace(self, events=self.events[:n], attachments=())
 
     def last_ts(self) -> Optional[datetime]:
         for e in reversed(self.events):
