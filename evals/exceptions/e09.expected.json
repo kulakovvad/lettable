@@ -1,0 +1,38 @@
+{
+  "id": "e09",
+  "label": "Pregnant tenant with a baby loses hot water and heating",
+  "source_case": "034",
+  "cut_after_event": 7,
+  "exception": "vulnerable tenant with no heating or hot water",
+  "events_total": 8,
+  "should_escalate": true,
+  "acceptable_actions": [
+    "ESCALATE"
+  ],
+  "required_route": [
+    "property_manager",
+    "on_call_emergency"
+  ],
+  "min_priority": "P1",
+  "prohibited": [
+    {
+      "action": "WAIT"
+    },
+    {
+      "action": "CLOSE"
+    }
+  ],
+  "red_flags": [
+    "vulnerability"
+  ],
+  "must_mention": [
+    "pregnan|baby|vulnerab"
+  ],
+  "should_commit": [
+    {
+      "kind": "message",
+      "to": "tenant"
+    }
+  ],
+  "notes": "Loss of hot water and heating with a pregnant tenant and an infant is P1 and needs a person today."
+}

@@ -14,7 +14,8 @@ class Config:
     case_timeout_s: float = 240.0  # the tool loop makes up to loop_max_steps model calls
     run_deadline_s: Optional[float] = None
     call_timeout_s: float = 60.0
-    max_retries: int = 2
+    max_retries: int = 4  # 429 / 529 / 5xx and network errors, waiting retry-after when the server sends it
+    retry_after_cap_s: float = 30.0
     concurrency: int = 4
 
     # Decision thresholds. Starting values; tune on the public cases.
@@ -54,6 +55,8 @@ class Config:
 
     # Document consistency check (agent/consistency.py): one extraction call, then Jev scores fields whose
     # values differ. Scores are normalised to 0..1. Below jev_min_confidence a mismatch is only flagged.
+    # Name, phone and email mismatches never escalate. A Reality Test config should set this when
+    # TYPESAFE_API_KEY is present.
     consistency_check: bool = False
     jev_model: str = "jev-1.13.0"
     jev_pass: float = 0.85
@@ -63,23 +66,42 @@ class Config:
     # Input caps
     max_file_bytes: int = 2_000_000
     pdf_chars: int = 3000
+    attachment_chars: int = 4000  # preloaded .txt/.csv/.json/.eml/.md text
+    image_max_bytes: int = 1_500_000  # PNG/JPG/GIF/WEBP inlined for Claude, each
+    max_images: int = 4
 
-    # Phrases that force an escalation. Checked on the most recent events.
+    # Reality Test command (agent/reality.py): extra passes over fallbacks while the deadline allows,
+    # and the least time left that is still worth starting one.
+    reality_resume_passes: int = 1
+    reality_min_resume_s: float = 60.0
+
+    # Phrases that force an escalation. Checked on the most recent events; denied mentions ("no smell of
+    # gas") and advice or questions in agency messages do not count (agent.evidence.hazard_hits).
     hazard_patterns: Tuple[str, ...] = (
         r"smell(?:s|ing)? (?:of )?gas",
-        r"gas leak",
+        r"gas (?:leak|escape)",
         r"carbon monoxide",
         r"\bco alarm\b",
-        r"\bflood(?:ing|ed)?\b",
+        r"\bflood(?:ing|ed)\b(?! with)|\bflood (?:in|through|from|everywhere)\b|water (?:is )?(?:pouring|gushing|streaming)",
         r"burst pipe",
-        r"exposed wir",
-        r"\bsparking\b",
-        r"\bon fire\b",
-        r"\bfire\b",
+        r"exposed (?:live )?wir",
+        r"\belectric(?:al)? shock\b",
+        r"\bsmoke (?:is )?(?:pouring|billowing) (?:out of|from) (?:the |a )?(?:socket|plug)\b",
+        r"\bgas fumes?\b",
+        r"\bwater\b.{0,50}\bceiling\b.{0,40}\belectrics?\b",
+        r"\b(?:cannot|can't|can not|unable to) lock the front door\b",
+        r"\b(?:mould|mold)\b.{0,80}\b(?:baby|infant)\b.{0,40}\bcough\b"
+        r"|\b(?:baby|infant)\b.{0,40}\bcough\b.{0,80}\b(?:mould|mold)\b",
+        r"\bsparking\b|\bsparks (?:from|coming)",
+        r"\bon fire\b|\bcaught fire\b|\b(?:a|the) fire (?:in|at|broke|started|has)\b|\bfire (?:brigade|service)\b|"
+        r"\bburning smell\b|\bsmell of burning\b|\b(?:fire|smoke) alarm (?:is |keeps )?(?:going off|sounding)",
         r"ceiling (?:has )?collaps",
         r"no heating.{0,40}(?:baby|elderly|vulnerable)",
-        r"\bunsafe\b",
-        r"\bthreat",
+        r"\b(?:unsafe|dangerous) to (?:use|live|enter|stay)\b|\b(?:is|are|was|were) (?:unsafe|dangerous)\b|"
+        r"\b(?:deemed|declared|classed|marked|condemned as) (?:unsafe|dangerous)\b|\bimmediately dangerous\b|"
+        r"\bunsafe (?:gas|electrics?|electrical|wiring|appliance|boiler|structure)\b",
+        r"\bthreat(?:en(?:ed|ing|s)?)? (?:to )?(?:hurt|harm|kill|attack|assault)\b|\bthreats? of violence\b|"
+        r"\bthreatening (?:behaviou?r|me|us)\b",
     )
     hazard_window: int = 5  # how many latest events to scan
 

@@ -10,7 +10,7 @@ import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from agent import consistency, evidence
+from agent import consistency, evidence, redflags
 from agent.config import Config
 from agent.schema import (
     MAX_TEXT,
@@ -21,41 +21,126 @@ from agent.schema import (
 )
 from agent.timeline import Case, WaitState
 
-# A tenant message after a completion only keeps CLOSE open if it is short, clearly
-# positive, and has no problem or negation words. Anything else escalates.
+# A later tenant message blocks a close unless every sentence is a clear all-clear.
+# A sentence about another household subject (parking, rent, a different appliance) is a
+# side issue: policy says the case does not close while that message is unanswered.
+# A sentence saying the fault is back, or that names this job, reopens it.
 _HARMLESS_RE = re.compile(
     r"\b(thank(?:s| you)|all (?:fixed|good|fine|sorted|done)|fixed|resolved|sorted|working (?:now|fine|well)|"
-    r"works (?:now|fine)|perfect|great|happy with)\b",
+    r"works (?:now|fine)|perfect|great|happy with|(?:now )?clear)\b",
     re.I,
 )
-_PROBLEM_RE = re.compile(
-    r"\b(again|back|still|leak\w*|broken|damp|mould|smell\w*|noise|wrong|issue|problem|"
-    r"worse|another|but|however|why|when|update|chase)\b|\?|n't|\bnot\b|\bno\b",
+_REGRESSION_RE = re.compile(
+    r"\b(again|still|leak\w*|broken|damp|mould|smell\w*|worse|stopped|(?:came|come|coming|is|it's) back|not yet|"
+    r"not (?:been )?(?:fixed|done|sorted|working|resolved|repaired))\b|n't (?:been )?(?:fixed|done|sorted|working|resolved|repaired)",
     re.I,
 )
+_PROBLEM_RE = re.compile(r"\b(noise|wrong|issue|problem|another|however|why)\b|\?|n't|\bnot\b|\bno\b", re.I)
+_SETTLED_RE = re.compile(
+    r"\b(thanks again|thank you again|no (?:more |further )?(?:issues?|problems?|leaks?)|no worries|not a problem|"
+    r"nothing (?:else|further))\b", re.I)
+_TOPIC_STOP = frozenset((
+    "request", "repair", "repairs", "issue", "problem", "report", "reported", "property", "please", "thanks",
+    "hello", "tenant", "landlord", "maintenance", "check", "with", "from", "that", "this", "have", "there",
+    "their", "would", "could", "about", "been", "will", "your", "when", "what", "which", "since", "just",
+    "some", "into", "they", "them", "were", "also", "very", "still", "need", "needs", "work", "works", "job",
+    "after", "before", "come", "coming", "become", "currently", "days", "last", "make", "made", "even", "below",
+    "above", "shown", "photo", "photos", "cause", "arrived", "here", "every", "keep", "never", "over", "enough",
+    "following", "follow", "anything", "something", "does", "doesn", "other", "being", "because", "mind", "case",
+    "according", "during", "appear", "appears", "mostly", "quote", "estimate", "flat", "road", "lane", "street",
+    "thank", "dear", "regards", "kind", "morning", "afternoon", "evening", "today", "week", "should", "into",
+    "customer", "reports", "reporting", "inquiring", "enquiring", "requesting", "requests", "informs", "confirms",
+    "mentioned", "says", "asked", "asking", "wants", "like", "able", "help", "space", "register",
+))
+_SUBJECT_RE = re.compile(
+    r"\b(parking|garage|bins?|rent|deposit|council|neighbou?rs?|parcels?|broadband|internet|wifi|aerial|"
+    r"windows?|doors?|locks?|boiler|heating|radiators?|shower|bath|toilet|sink|taps?|oven|cooker|hob|fridge|"
+    r"freezer|dishwasher|washing machine|dryer|lights?|bulbs?|sockets?|fuse|garden|fence|gate|shed|gutters?|roof|"
+    r"ceiling|walls?|floor|carpets?|stairs|pests?|mice|extractor|fan|blinds?|curtains?|wardrobe|furniture|"
+    r"inventory|tenancy|renewal|viewing|inspection)\b", re.I)
 _SPEND_OK = ("ROUTE_FOR_APPROVAL", "ESCALATE")
 
 
 def _is_harmless(body: str) -> bool:
-    return len(body) <= 200 and bool(_HARMLESS_RE.search(body)) and not _PROBLEM_RE.search(body)
+    body = _SETTLED_RE.sub(" ", body)
+    return (len(body) <= 200 and bool(_HARMLESS_RE.search(body)) and not _PROBLEM_RE.search(body)
+            and not _REGRESSION_RE.search(body))
+
+
+def _words(text: str) -> set:
+    return {w.rstrip("s") for w in re.findall(r"[a-z]{4,}", text.lower()) if w not in _TOPIC_STOP}
+
+
+def _subjects(text: str) -> set:
+    return {m.lower().rstrip("s") for m in _SUBJECT_RE.findall(text)}
+
+
+def job_topic(case: Case) -> set:
+    """Content words and subjects of the job (title and the start of the request), for telling side issues apart."""
+    text = "%s %s" % (case.title, case.request[:300])
+    return _words(text) | _subjects(text)
+
+
+def followup(body: str, topic: set) -> str:
+    """How a tenant message after completion relates to the job: clear, side, or reopen.
+
+    clear: a short all-clear. side: only other household subjects, still unanswered.
+    reopen: a defect, a question about this job, or anything that does not name another subject.
+    """
+    if _is_harmless(body):
+        return "clear"
+    kind = "clear"
+    for sentence in re.split(r"(?<=[.!?])\s+|\n+", body):
+        if not sentence.strip() or _is_harmless(sentence):
+            continue
+        if _REGRESSION_RE.search(sentence):
+            return "reopen"
+        subjects = _subjects(sentence)
+        if not subjects or subjects & topic or _words(sentence) & topic:
+            return "reopen"
+        kind = "side"
+    return kind
+
+
+def reopens(body: str, topic: set) -> bool:
+    """Whether a tenant message after a completion blocks the close (see the comment above _HARMLESS_RE)."""
+    return followup(body, topic) != "clear"
+
+
+def later_followup(case: Case) -> Optional[str]:
+    """clear, side, or reopen for tenant messages after the latest completion report, or None if none exists."""
+    events = case.events
+    topic = job_topic(case)
+    for i in range(len(events) - 1, -1, -1):
+        if not evidence.reports_completion(events[i]):
+            continue
+        kind = "clear"
+        for later in events[i + 1:]:
+            if "tenant" not in later.sender.lower():
+                continue
+            step = followup(later.body, topic)
+            if step == "reopen":
+                return "reopen"
+            if step == "side":
+                kind = "side"
+        return kind
+    return None
 
 
 def confirmed_completion(case: Case) -> Optional[int]:
     """Position of the latest event in which a provider, tenant or landlord reports the job done, or None.
 
     Agency/system notes, negated mentions ("not completed") and questions ("has it
-    been completed?") do not count. A tenant writing again afterwards with anything
-    other than a short, clearly positive reply means the job may have been reopened.
+    been completed?") do not count. A later tenant message blocks the close when it
+    reopens the job or leaves a side issue unanswered.
     This is the single definition of completion; the close_case tool uses it too.
     """
+    if later_followup(case) != "clear":
+        return None
     events = case.events
     for i in range(len(events) - 1, -1, -1):
-        if not evidence.reports_completion(events[i]):
-            continue
-        reopened = any(
-            "tenant" in later.sender.lower() and not _is_harmless(later.body) for later in events[i + 1:]
-        )
-        return None if reopened else i
+        if evidence.reports_completion(events[i]):
+            return i
     return None
 
 
@@ -93,6 +178,11 @@ def apply(case: Case, proposal: Proposal, cfg: Config, now: datetime,
     if hazard and action != "ESCALATE":
         stricter("ESCALATE", "possible open hazard (%r); a person must decide" % hazard)
 
+    flags = redflags.scan(case)
+    for flag in flags:
+        if flag["force"] and action != "ESCALATE":
+            stricter("ESCALATE", "red flag %s at %s; %s" % (flag["category"], flag["ref"], flag["guidance"]))
+
     for c in consistency.escalations(consistency_report):
         if action != "ESCALATE":
             stricter("ESCALATE", "documents disagree on %s (%s); a person must confirm which is right"
@@ -122,7 +212,11 @@ def apply(case: Case, proposal: Proposal, cfg: Config, now: datetime,
         stricter("ESCALATE", "instructing the provider without a landlord approval in force (missing, negated, or older than the latest quote)")
 
     if action == "CLOSE" and confirmed_completion(case) is None:
-        stricter("ESCALATE", "close proposed but no confirmed completion (missing, negated, or a tenant follow-up that is not a clear all-clear)")
+        if later_followup(case) == "side":
+            stricter("ESCALATE", "a later message is about something else and is still unanswered; "
+                     "ask the tenant (ASK_TENANT) or hand it to a person")
+        else:
+            stricter("ESCALATE", "close proposed but no confirmed completion (missing, negated, or a tenant follow-up that is not a clear all-clear)")
 
     landlord_covered = (action == "INSTRUCT_PROVIDER" and proposal.amount_gbp is not None
                         and evidence.approval_covers(case, proposal.amount_gbp))
@@ -165,4 +259,5 @@ def apply(case: Case, proposal: Proposal, cfg: Config, now: datetime,
         idempotency_key=idempotency_key(case.case_id, len(case.events), action, message),
         decided_at=now.isoformat(),
         warnings=case.warnings,
+        red_flags=flags,
     )

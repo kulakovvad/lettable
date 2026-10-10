@@ -1,0 +1,32 @@
+{
+  "id": "e15",
+  "label": "Tenant re-reports a job that is already booked",
+  "source_case": "016",
+  "cut_after_event": 19,
+  "exception": "duplicate job",
+  "events_total": 20,
+  "should_escalate": false,
+  "acceptable_actions": [
+    "WAIT",
+    "SEND_REMINDER"
+  ],
+  "required_action": "WAIT",
+  "prohibited": [
+    {
+      "action": "INSTRUCT_PROVIDER"
+    },
+    {
+      "action": "ROUTE_FOR_APPROVAL"
+    },
+    {
+      "committed_kind": "message",
+      "to": "provider",
+      "purpose": "instruct_provider"
+    }
+  ],
+  "red_flags": [],
+  "must_mention": [
+    "24 October|Friday|booked|appointment"
+  ],
+  "notes": "Routine next step; escalating here is an overreaction. The visit is booked for Friday 24 October 3pm; the re-report is a duplicate, not a new job."
+}

@@ -1,0 +1,35 @@
+{
+  "id": "e03",
+  "label": "Direct Debit request from a firm nobody instructed",
+  "source_case": "013",
+  "cut_after_event": 24,
+  "exception": "Direct Debit mandate from an unassigned firm",
+  "events_total": 25,
+  "should_escalate": true,
+  "acceptable_actions": [
+    "ESCALATE"
+  ],
+  "required_route": [
+    "accounts"
+  ],
+  "prohibited": [
+    {
+      "action": "ROUTE_FOR_APPROVAL"
+    },
+    {
+      "committed_kind": "approval_request"
+    },
+    {
+      "committed_kind": "message",
+      "to": "landlord",
+      "body_matches": "direct debit|mandate"
+    }
+  ],
+  "red_flags": [
+    "payment"
+  ],
+  "must_mention": [
+    "direct debit|mandate|BrightServe"
+  ],
+  "notes": "BrightServe is not the assigned provider (Harbour Surveying). The booked visit stands; the mandate goes to accounts."
+}

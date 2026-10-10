@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict
 
-from agent import consistency
+from agent import consistency, redflags
 from agent.files import atomic_write  # noqa: F401 (re-exported for existing imports)
 
 _TITLES = {
@@ -40,7 +40,8 @@ def _action_line(a: Dict[str, Any]) -> str:
         if a.get("call_result"):
             head += ". Result: %s" % (a["call_result"].get("summary") or a["call_result"].get("status"))
     elif kind == "approval_request":
-        head = "Approval request to landlord for GBP %.2f (%s)" % (a.get("amount_gbp") or 0, a.get("scope", ""))
+        cost = "for GBP %.2f" % a["amount_gbp"] if a.get("amount_gbp") is not None else "to attend or quote, no cost"
+        head = "Approval request to landlord %s (%s)" % (cost, a.get("scope", ""))
     elif kind == "escalation":
         head = "Escalation ticket %s to %s" % (a.get("priority"), a.get("route"))
     elif kind == "followup":
@@ -54,8 +55,10 @@ def _action_line(a: Dict[str, Any]) -> str:
 
 
 def answer_md(d: Dict[str, Any]) -> str:
-    out = ["# Case %s%s" % (d["case_id"], ": %s" % d["title"] if d.get("title") else ""), "",
-           "**Decision:** %s" % _TITLES.get(d["action"], d["action"])]
+    out = ["# Case %s%s" % (d["case_id"], ": %s" % d["title"] if d.get("title") else ""), ""]
+    if str(d.get("answer") or "").strip():
+        out += ["## Answer", "", str(d["answer"]).strip(), ""]
+    out.append("**Decision:** %s" % _TITLES.get(d["action"], d["action"]))
     if d.get("priority"):
         out.append("**Priority:** %s" % d["priority"])
     out += [""]
@@ -74,9 +77,27 @@ def answer_md(d: Dict[str, Any]) -> str:
     escalations = [a for a in d.get("actions") or [] if a.get("kind") == "escalation"]
     if escalations:
         e = escalations[0]
-        out += ["## Handover for the person taking over", "", e.get("summary", ""), "",
-                "Known:", _bullets(e.get("known")), "", "Not known:", _bullets(e.get("unknowns")), "",
-                "Tried:", _bullets(e.get("tried")), "", "Options:", _bullets(e.get("options")), ""]
+        out += ["## Handover for the person taking over", "", e.get("summary", ""), ""]
+        if e.get("respond_by"):
+            out += ["Respond by %s (%s, route %s)." % (e["respond_by"], e.get("priority") or "?", e.get("route") or "?"), ""]
+        if e.get("conflicts"):
+            lines = []
+            for c in e["conflicts"]:
+                parts = []
+                for v in c.get("values") or []:
+                    if isinstance(v, dict):
+                        parts.append("%s (%s)" % (v.get("value"), ", ".join(v.get("refs") or []) or "no ref"))
+                    else:
+                        parts.append(str(v))
+                lines.append("%s: %s" % (c.get("field"), " vs ".join(parts)))
+            out += ["Conflicts:", _bullets(lines), ""]
+        out += ["Known:", _bullets(e.get("known")), "", "Not known:", _bullets(e.get("unknowns")), "",
+                "Tried:", _bullets(e.get("tried")), ""]
+        if e.get("failed"):
+            out += ["Failed:", _bullets(e["failed"]), ""]
+        out += ["Options:", _bullets(e.get("options")), ""]
+        if e.get("recommended"):
+            out += ["Recommended: %s" % e["recommended"], ""]
     elif d["action"] == "ESCALATE":
         out += ["## For the person taking over", "", "Not known:", _bullets(d.get("unknowns")), "",
                 "Suggested next steps:", _bullets(d.get("options")), ""]
@@ -111,6 +132,8 @@ def reasoning_md(d: Dict[str, Any]) -> str:
             "Idempotency key: `%s`" % d["idempotency_key"], ""]
     if d.get("consistency"):
         out[-2:-2] = ["## Document consistency check", "", consistency.describe(d["consistency"]), ""]
+    if d.get("red_flags"):
+        out[-2:-2] = ["## Red flags", "", redflags.describe(d["red_flags"]), ""]
     if d.get("trace"):
         out[3:3] = ["- Model: %s, %d turn(s), %d tokens" % (d.get("model") or "?", d.get("steps", 0), d.get("tokens", 0)),
                     "- Evidence cited: %s" % (", ".join(d.get("evidence_refs") or []) or "none")]

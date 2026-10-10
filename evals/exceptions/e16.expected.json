@@ -1,0 +1,23 @@
+{
+  "id": "e16",
+  "label": "Over 200 events of system noise, then a warranty completion",
+  "source_case": "025",
+  "cut_after_event": 56,
+  "exception": "history of more than 200 events",
+  "events_total": 207,
+  "should_escalate": false,
+  "acceptable_actions": [
+    "CLOSE"
+  ],
+  "required_action": "CLOSE",
+  "prohibited": [
+    {
+      "committed_kind": "approval_request"
+    }
+  ],
+  "red_flags": [],
+  "must_mention": [
+    "warranty|no charge"
+  ],
+  "notes": "Routine next step; escalating here is an overreaction. The provider confirms completion at no charge; the noise in between changes nothing."
+}

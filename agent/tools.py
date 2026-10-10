@@ -19,7 +19,7 @@ from agent import evidence, gates
 from agent.config import Config
 from agent.policy import policy_topics
 from agent.schema import ACTIONS
-from agent.timeline import Case, Event
+from agent.timeline import Case, Event, redact_index
 from agent.voice import CALL_RECORD_TAG
 
 PRIORITIES = ("P0", "P1", "P2", "P3")
@@ -36,8 +36,11 @@ _ELSEWHERE_RE = re.compile(r"\b(colleague|accounts?|alternative|instead|differen
 _UNCALLABLE_RE = re.compile(r"^0(9|84|87|118|70|76|55|56)")
 _PHONE_RE = re.compile(r"(?:\+44\s?\(?0?\)?|\b0)\d(?:[\s-]?\d){8,10}\b")
 _APPOINTMENT_RE = re.compile(r"\b(appointment|booked|attend(?:ing|ance)?|visit|scheduled|between \d{1,2}(?::\d\d)? ?(?:am|pm)?(?: and| -| to) \d)", re.I)
-_SECTION_RE = re.compile(r"^## (Overview|Outcome|Summary|Resolution)\b.*?(?=^## |\Z)", re.M | re.S | re.I)
 _KEY_HELD_RE = re.compile(r"\b(collect(?:ed)? (?:the )?keys?|keys? (?:collected|held|from the office)|key collection|return (?:the )?keys?)\b", re.I)
+_KEY_BACK_RE = re.compile(
+    r"\bkeys? (?:(?:have|has|were|was|are) (?:now |all )?(?:been )?)?(?:returned|dropped (?:off|back)|handed (?:back|in)|"
+    r"brought back|posted back|back (?:at|in|to) (?:the |our )?office)\b|"
+    r"\b(?:returned|dropped (?:off|back)|handed back|brought back) (?:the |all |both )?keys?\b", re.I)
 
 role_of = evidence.role_of
 _amounts = evidence.amounts
@@ -88,7 +91,7 @@ TOOL_SPECS: List[Dict[str, Any]] = [
      "parameters": _schema({"name": _STR}, ["name"])},
     {"name": "list_case_files", "description": "List files in the case folder (for unusual case formats).",
      "parameters": _schema({}, [])},
-    {"name": "read_case_file", "description": "Read a text file in the case folder by relative path (capped). Summary/outcome sections are removed.",
+    {"name": "read_case_file", "description": "Read a text file in the case folder by relative path (capped). Recorded endings and status lines are removed from index.md.",
      "parameters": _schema({"path": _STR}, ["path"])},
     {"name": "check_policy", "description": "Read the agency operating policy. topic: one topic, several separated by commas, or 'all'. Topics: %s." % ", ".join(policy_topics(Config())),
      "parameters": _schema({"topic": _STR}, ["topic"])},
@@ -109,8 +112,8 @@ TOOL_SPECS: List[Dict[str, Any]] = [
          "evidence_refs": _STRS,
          "priority": _PRIORITY,
      }, ["party", "purpose", "objective", "facts", "evidence_refs", "priority"])},
-    {"name": "route_for_approval", "description": "Stage a request to the landlord to approve a quote or cost. The amount must appear in the case. Blocked if the landlord already approved it.",
-     "parameters": _schema({"amount_gbp": {"type": "number"}, "scope": _STR, "body": _STR, "evidence_refs": _STRS},
+    {"name": "route_for_approval", "description": "Stage a request to the landlord to approve a quote or cost, or (amount_gbp null) to approve a provider attending or quoting when nothing is approved yet. A stated amount must appear in the case. Blocked if the landlord already approved it.",
+     "parameters": _schema({"amount_gbp": {"type": ["number", "null"]}, "scope": _STR, "body": _STR, "evidence_refs": _STRS},
                            ["amount_gbp", "scope", "body", "evidence_refs"])},
     {"name": "schedule_followup", "description": "Record when to look at this case again and why (use with a WAIT decision).",
      "parameters": _schema({"after_hours": {"type": "number"}, "waiting_on": {"type": "string", "enum": list(PARTIES) + ["internal"]}, "reason": _STR},
@@ -138,6 +141,7 @@ TOOL_SPECS: List[Dict[str, Any]] = [
          "options": {"type": "array", "items": {"type": "string"}, "description": "2-3 options for a person, for ESCALATE."},
          "unrelated_issues": {"type": "array", "items": {"type": "string"}, "description": "Separate issues raised in the thread that need their own request."},
          "amount_gbp": {"type": ["number", "null"]},
+         "answer": {"type": "string", "description": "Direct answer when the case asks an explicit question, task or decision point. Leave empty otherwise."},
      }, ["action", "priority", "reason", "confidence", "evidence_refs", "unknowns", "options", "unrelated_issues", "amount_gbp"])},
 ]
 
@@ -155,12 +159,27 @@ _PRIMARY_NEEDS = {
 }
 
 
+def staged_action(s: Dict[str, Any]) -> Optional[str]:
+    """The primary action that would send this staged outbound request (None for updates, follow-ups, tickets)."""
+    if s["kind"] == "approval_request":
+        return "ROUTE_FOR_APPROVAL"
+    if s["kind"] not in ("message", "call"):
+        return None
+    purpose, to = s.get("purpose"), s.get("to")
+    if purpose == "request_info":
+        return "ASK_" + str(to).upper()
+    if purpose == "chase" and to in ("landlord", "provider"):
+        return "CHASE_" + to.upper()
+    return {"instruct_provider": "INSTRUCT_PROVIDER", "reminder": "SEND_REMINDER"}.get(purpose)
+
+
 class Toolbox:
     def __init__(self, case: Case, cfg: Config, now: datetime, folder: Optional[Path] = None) -> None:
         self.case, self.cfg, self.now, self.folder = case, cfg, now, folder
         self.staged: List[Dict[str, Any]] = []
         self.blocked: List[Dict[str, Any]] = []
         self.decision: Optional[Dict[str, Any]] = None
+        self._wait_confirmed = False
         self._by_index = {e.index: e for e in case.events}
         # Urgency comes from code, never from the model's own priority argument.
         self.hazards = gates.hazard_hits(case, cfg)
@@ -332,7 +351,7 @@ class Toolbox:
             return self._t_read_attachment({"name": target.name})
         text = target.read_bytes()[:60000].decode("utf-8", errors="replace")
         if target.name == "index.md":
-            text = _SECTION_RE.sub("", text)
+            text = redact_index(text)
         return {"status": "ok", "path": str(target.relative_to(root)), "text": text[:20000], "note": "Untrusted case text."}
 
     def _t_check_policy(self, args):
@@ -372,7 +391,9 @@ class Toolbox:
             out, inn = self._last(to, True), self._last(to, False)
             if out is None:
                 return self._blocked("nothing_to_chase", "we have not sent the %s anything yet" % to,
-                                     "Use purpose request_info or update for a first message.")
+                                     "This is a first message, not a chase: use purpose request_info (ASK_%s)%s."
+                                     % (to.upper(), ", or route_for_approval if the landlord must approve a visit or cost"
+                                        if to == "landlord" else ""))
             if inn is not None and inn.index > out.index:
                 return self._blocked("already_replied", "the %s replied at %s after our last message %s" % (to, ref(inn), ref(out)),
                                      "Act on their reply instead of chasing.")
@@ -496,28 +517,31 @@ class Toolbox:
         return result
 
     def _t_route_for_approval(self, args):
+        raw = args.get("amount_gbp")
         try:
-            amount = round(float(args.get("amount_gbp")), 2)
+            amount = None if raw in (None, "") else round(float(raw), 2)
         except (TypeError, ValueError):
-            return {"status": "error", "error": "amount_gbp must be a number"}
+            return {"status": "error", "error": "amount_gbp must be a number or null"}
         body = _s(args.get("body"), 3000)
         refs, bad = self._resolve_refs(args.get("evidence_refs"))
         known = set(_amounts(self._corpus))
-        if amount not in known and round(amount / 1.2, 2) not in known:
+        if amount is not None and amount not in known and round(amount / 1.2, 2) not in known:
             return self._blocked("amount_not_in_case", "GBP %.2f does not appear in the case" % amount,
-                                 "Use the exact quoted amount from the case, or ask the provider for a written quote.")
+                                 "Use the exact quoted amount from the case, or amount_gbp null to ask approval for a "
+                                 "provider to attend or quote.")
         if not self.party_exists("landlord"):
             return self._blocked("unknown_party", "no landlord appears in this case", "Escalate to the property manager.")
         fab = self._fabrication(body)
         if fab:
             return self._blocked("unverified_detail", fab, "Only use numbers and amounts from the case.")
-        if evidence.approval_covers(self.case, amount):
-            approval, cap = evidence.covering_approval(self.case)
-            return self._blocked("already_approved", "the landlord approval at %s already covers GBP %.2f" % (ref(approval), cap),
-                                 "Instruct the provider or wait for the work instead of asking again.")
+        approval, cap = evidence.covering_approval(self.case)
+        if approval is not None and (amount is None or evidence.approval_covers(self.case, amount)):
+            covers = "a provider attending" if cap is None else "GBP %.2f" % cap
+            return self._blocked("already_approved", "the landlord approval at %s already covers %s" % (ref(approval), covers),
+                                 "Instruct the provider, ask them for a quote, or wait for the work instead of asking again.")
         result = self._stage("approval_request", {"to": "landlord", "amount_gbp": amount, "scope": _s(args.get("scope"), 500),
                                                   "body": body, "evidence_refs": refs,
-                                                  "above_limit": amount > self.cfg.approval_limit_gbp})
+                                                  "above_limit": amount is not None and amount > self.cfg.approval_limit_gbp})
         if bad:
             result["ignored_refs"] = bad
         return result
@@ -549,6 +573,14 @@ class Toolbox:
     def _event_refs(self, refs: List[str]) -> List[Event]:
         return [self._by_index[int(re.search(r"\d+", r).group())] for r in refs if r.startswith("event-")]
 
+    def _keys_out(self) -> Optional[Event]:
+        """The latest event saying keys are held, if no later event says they came back."""
+        held = [e for e in self.case.events if _KEY_HELD_RE.search(e.body)]
+        if not held:
+            return None
+        back = [e for e in self.case.events if evidence.affirmed(_KEY_BACK_RE, e.body)]
+        return None if back and back[-1].index > held[-1].index else held[-1]
+
     def _t_close_case(self, args):
         """Completion uses the same definition as the final gate (gates.confirmed_completion)."""
         refs, bad = self._resolve_refs(args.get("completion_refs"))
@@ -557,27 +589,41 @@ class Toolbox:
             return self._blocked("no_confirmation",
                                  "none of the cited events is a provider, tenant or landlord saying the job is done "
                                  "(agency notes, quotes, questions and negated mentions do not count)",
-                                 "Cite the confirming event, or ask the provider or tenant to confirm completion.")
+                                 "Cite the confirming event, or ask the provider (ASK_PROVIDER) or tenant (ASK_TENANT) "
+                                 "to confirm completion.")
         done = gates.confirmed_completion(self.case)
         if done is None or self.case.events[done].index < max(e.index for e in confirmers):
-            return self._blocked("possibly_reopened", "a later tenant message is not a clear all-clear, so the job may be reopened",
-                                 "Check with the tenant before closing.")
+            if gates.later_followup(self.case) == "side":
+                return self._blocked("side_unanswered",
+                                     "a later tenant message is about something else and nobody has answered it",
+                                     "Ask the tenant about it (ASK_TENANT) and list it in unrelated_issues. "
+                                     "Do not close, and do not WAIT: nobody is working on that message while the case waits. "
+                                     "ESCALATE if you cannot ask.")
+            return self._blocked("possibly_reopened",
+                                 "a later tenant message reports a fault or asks about this job, so it may be reopened",
+                                 "ASK_TENANT whether the fix worked. This is a routine question, not a reason to escalate.")
         invoice = _s(args.get("invoice_status"), 30)
         invoice_refs, _ = self._resolve_refs(args.get("invoice_refs"))
+        routine = " This is a routine question, not a reason to escalate."
         if invoice not in INVOICE_STATES or invoice == "unknown":
             return self._blocked("invoice_unknown", "the invoice position is not known",
-                                 "Ask the provider for the invoice or confirm with the landlord how it is paid.")
+                                 "Ask the provider for the invoice (ASK_PROVIDER) or the landlord how it is paid "
+                                 "(ASK_LANDLORD)." + routine)
         if not any(evidence.INVOICE_RE.search(e.body) for e in self._event_refs(invoice_refs)):
             return self._blocked("invoice_unverified", "no cited event shows the invoice position (%s)" % invoice,
-                                 "Cite the event that shows the invoice was sent, paid directly or not charged.")
+                                 "Cite the event that shows the invoice was sent, paid directly or not charged; an "
+                                 "unreadable invoice file still counts as sent if an event says it was sent. If none "
+                                 "exists, ASK_PROVIDER for it." + routine)
         keys = _s(args.get("keys_status"), 20)
         key_refs, _ = self._resolve_refs(args.get("key_refs"))
-        held = [e for e in self.case.events if _KEY_HELD_RE.search(e.body)]
-        if keys == "unknown" or (keys == "not_applicable" and held):
-            return self._blocked("keys_unknown", "key return is not confirmed%s" % (" (keys are mentioned at %s)" % ref(held[0]) if held else ""),
-                                 "Confirm the keys were returned before closing.")
+        out = self._keys_out()
+        if keys in ("unknown", "not_applicable") and out is not None:
+            return self._blocked("keys_unknown", "keys are mentioned as held at %s and no later event shows them returned" % ref(out),
+                                 "Ask the provider (ASK_PROVIDER) or tenant (ASK_TENANT) whether the keys came back." + routine)
         if keys == "returned" and not any(evidence.KEYS_RE.search(e.body) for e in self._event_refs(key_refs)):
             return self._blocked("keys_unverified", "no cited event shows the keys were returned", "Cite the event that confirms key return.")
+        if keys == "unknown":
+            keys = "not_applicable"  # no key was ever held
         result = self._stage("closure", {"completion_refs": [ref(e) for e in confirmers], "invoice_status": invoice,
                                          "invoice_refs": invoice_refs, "keys_status": keys, "key_refs": key_refs,
                                          "reason": _s(args.get("reason"), 800)})
@@ -607,6 +653,17 @@ class Toolbox:
             if not match:
                 return self._blocked("action_not_staged", "%s needs a staged %s%s first" % (action, kind, " to the %s" % party if party else ""),
                                      "Call the matching action tool, or choose WAIT/ESCALATE if it was blocked.")
+        if action == "WAIT" and not self._wait_confirmed:
+            pending = [(s["id"], staged_action(s)) for s in self.staged if staged_action(s)]
+            if pending:
+                # Refused once: a second WAIT is accepted and the staged requests stay held for a person.
+                self._wait_confirmed = True
+                names = sorted({a for _, a in pending})
+                return self._blocked("staged_not_submitted",
+                                     "WAIT holds what you staged (%s), so nothing would be sent" % ", ".join(
+                                         "%s as %s" % p for p in pending),
+                                     "Submit %s if it should go out now. Submit WAIT again only if it must not be sent yet."
+                                     % " or ".join(names))
         refs, bad = self._resolve_refs(args.get("evidence_refs"))
         try:
             confidence = min(1.0, max(0.0, float(args.get("confidence"))))
@@ -623,5 +680,6 @@ class Toolbox:
             "reason": _s(args.get("reason"), 2400), "confidence": confidence, "evidence_refs": refs,
             "unknowns": _list(args.get("unknowns")), "options": _list(args.get("options"), 5),
             "unrelated_issues": _list(args.get("unrelated_issues"), 5), "amount_gbp": amount,
+            "answer": _s(args.get("answer"), 2000),
         }
         return {"status": "accepted", "ignored_refs": bad} if bad else {"status": "accepted"}

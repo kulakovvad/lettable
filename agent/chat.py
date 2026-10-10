@@ -15,11 +15,13 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import socket
 import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
+from email.utils import parsedate_to_datetime
 from typing import Any, Dict, List, Optional
 
 from agent.config import Config
@@ -52,23 +54,40 @@ class ChatBackend:
         raise NotImplementedError
 
 
+def retry_delay(attempt: int, retry_after: Optional[str], cfg: Config) -> float:
+    """Seconds to wait before the next attempt: the server's retry-after when given, else backoff with jitter."""
+    if retry_after:
+        try:
+            return min(max(0.0, float(retry_after)), cfg.retry_after_cap_s)
+        except ValueError:
+            try:
+                when = parsedate_to_datetime(retry_after)
+                return min(max(0.0, when.timestamp() - time.time()), cfg.retry_after_cap_s)
+            except (TypeError, ValueError, OverflowError):
+                pass
+    # Jitter spreads retries out, so parallel cases that hit the same rate limit do not retry in step.
+    return min(2 ** attempt, 8) * (0.5 + random.random() / 2)
+
+
 def _post(url: str, headers: Dict[str, str], body: Dict[str, Any], cfg: Config) -> Dict[str, Any]:
     data = json.dumps(body).encode("utf-8")
     attempt = 0
     while True:
         req = urllib.request.Request(url, data=data, headers={"content-type": "application/json", **headers})
+        retry_after = None
         try:
             with urllib.request.urlopen(req, timeout=cfg.call_timeout_s) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")[:300]
-            retryable = exc.code == 429 or exc.code >= 500
+            retryable = exc.code in (408, 429) or exc.code >= 500  # 529: Anthropic is overloaded
             if not retryable or attempt >= cfg.max_retries:
                 raise ChatError("HTTP %d from model provider: %s" % (exc.code, detail))
+            retry_after = exc.headers.get("retry-after") if exc.headers else None
         except (urllib.error.URLError, socket.timeout, TimeoutError, ConnectionError) as exc:
             if attempt >= cfg.max_retries:
                 raise ChatError("model provider unreachable: %s" % exc)
-        time.sleep(min(2 ** attempt, 8))
+        time.sleep(retry_delay(attempt, retry_after, cfg))
         attempt += 1
 
 
@@ -150,7 +169,15 @@ class AnthropicChat(ChatBackend):
         out: List[Dict[str, Any]] = []
         for entry in transcript:
             if entry["role"] == "user":
-                out.append({"role": "user", "content": entry["text"]})
+                images = entry.get("images") or []
+                if images:
+                    blocks: List[Dict[str, Any]] = [{"type": "text", "text": entry.get("text") or ""}]
+                    for img in images:
+                        blocks.append({"type": "image", "source": {
+                            "type": "base64", "media_type": img["media_type"], "data": img["data"]}})
+                    out.append({"role": "user", "content": blocks})
+                else:
+                    out.append({"role": "user", "content": entry["text"]})
             elif entry["role"] == "assistant":
                 blocks: List[Dict[str, Any]] = []
                 if entry.get("text"):

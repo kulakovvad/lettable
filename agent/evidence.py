@@ -20,8 +20,17 @@ NEGATION_RE = re.compile(
     r"\b(not|never|no|yet to|still|incomplete|unfinished|hold off|cannot|won't|wouldn't|unable)\b|n't", re.I)
 DONE_RE = re.compile(
     r"\b(completed|all done|job (?:is )?(?:done|complete)|works? (?:is |are )?complete|finished the (?:work|job)|"
-    r"(?:have|has|had) (?:now )?(?:been )?(?:fixed|repaired|replaced|resolved)|is (?:now )?fixed|fixed (?:it|the)\b)",
+    r"(?:have|has|had) (?:now )?(?:been )?(?:fixed|repaired|replaced|resolved|sorted|cleared|unblocked)|"
+    r"(?:has|have) (?:now )?been (?:done|carried out)|is (?:now )?fixed|fixed (?:it|the)\b|"
+    r"(?:this|that|the) (?:one|job|work|repair) is (?:now )?(?:done|sorted|finished)|all (?:sorted|fixed|working)|"
+    r"(?:work|works|job|clean(?:ing)?|repairs?) (?:that )?(?:was|were) done|"
+    r"(?:is|are|it's|its) (?:now )?(?:clear|unblocked)\b(?! (?:that|whether|how|what|why|to)\b)|now (?:clear|unblocked)\b|"
+    r"draining (?:fine|properly|normally|well)|"
+    r"(?:is|are|it's|its) (?:now )?working (?:again|now|fine|properly)|working again|"
+    r"(?:that|this|it|plunger|fix|advice) (?:has )?worked\b)",
     re.I)
+# A completion word after one of these in its sentence is reported or asked about, not affirmed.
+UNCERTAIN_RE = re.compile(r"\b(whether|if|inquir\w*|enquir\w*|hope|hopefully|expected|should be|once)\b", re.I)
 APPROVAL_RE = re.compile(
     r"\b(go ahead|approved?|proceed|yes,? please|happy (?:for|to)|ok(?:ay)? to|fine to|authori[sz]e)\b", re.I)
 AGENCY_APPROVAL_RE = re.compile(
@@ -58,13 +67,16 @@ def amounts(text: str) -> List[float]:
     return out
 
 
-def affirmed(pattern: "re.Pattern[str]", text: str) -> Optional["re.Match[str]"]:
-    """First match that is not negated in its sentence and not part of a question."""
+def affirmed(pattern: "re.Pattern[str]", text: str,
+             hedges: Optional["re.Pattern[str]"] = None) -> Optional["re.Match[str]"]:
+    """First match that is not negated (or hedged) in its sentence and not part of a question."""
     for m in pattern.finditer(text or ""):
         start = max(text.rfind(c, 0, m.start()) for c in ".!?\n") + 1
         ends = [i for i in (text.find(c, m.end()) for c in ".!\n?") if i >= 0]
         end = min(ends) if ends else len(text)
         if NEGATION_RE.search(text[start:m.start()][-40:]):
+            continue
+        if hedges is not None and hedges.search(text[start:m.start()][-60:]):
             continue
         if end < len(text) and text[end] == "?":
             continue
@@ -74,7 +86,7 @@ def affirmed(pattern: "re.Pattern[str]", text: str) -> Optional["re.Match[str]"]
 
 def reports_completion(e: Event) -> bool:
     """A provider, tenant or landlord says the job is done. Agency/system notes do not count."""
-    return role_of(e.sender) in PARTIES and affirmed(DONE_RE, e.body) is not None
+    return role_of(e.sender) in PARTIES and affirmed(DONE_RE, e.body, UNCERTAIN_RE) is not None
 
 
 def is_approval(e: Event) -> bool:
@@ -128,19 +140,41 @@ def hazard_hits(case: Case, cfg: Config, completion_index: Optional[int]) -> Lis
     events = case.events
     window = cfg.hazard_window if cfg.hazard_window > 0 else len(events)
     split = max(0, len(events) - window)
-    sources: List[Tuple[str, str]] = [("request", case.request)]
-    sources += [(a.name, a.text) for a in case.attachments if a.text]
-    sources += [("event-%03d" % e.index, e.body) for e in events[split:]]
-    sources += [("event-%03d" % e.index, e.body) for j, e in enumerate(events[:split])
-                if completion_index is None or completion_index < j]
+    # (ref, text, advisory): agency messages and documents also give advice ("if you smell gas, call ...")
+    # and ask questions ("can you smell gas?"); in them a conditional or a question is not a report.
+    sources: List[Tuple[str, str, bool]] = [("request", case.request, False)]
+    sources += [(a.name, a.text, True) for a in case.attachments if a.text]
+    sources += [("event-%03d" % e.index, e.body, role_of(e.sender) == "agency") for j, e in enumerate(events)
+                if j >= split or completion_index is None or completion_index < j]
     hits = []
     for pattern in cfg.hazard_patterns:
-        for ref, text in sources:
+        for ref, text, advisory in sources:
             for m in re.finditer(pattern, text or "", re.I):
-                if not _is_compliance_line(text, m.start(), m.end()):
+                if not _is_compliance_line(text, m.start(), m.end()) and not _not_a_report(text, m, advisory):
                     hits.append((ref, m.group(0)))
                     break
     return hits
+
+
+# A hazard phrase right after a denial, with only filler words between ("no smell of gas", "there is no
+# sign of a leak", "not flooding"), is denied. Action negations ("can't stop the flooding", "didn't fix
+# the gas leak") are not in the list, so they still count.
+_DENIAL_RE = re.compile(
+    r"\b(?:no|not|nor|never|without|none|isn't|wasn't|aren't|weren't|don't|doesn't|ruled out|no longer|free of)"
+    r"(?:\s+(?:a|an|any|the|longer|more|real|sign|signs|evidence|trace|risk|of|smell|smelling|been|be|is|was|"
+    r"there|further|obvious|actual|apparent))*\s*$", re.I)
+_CONDITIONAL_RE = re.compile(r"\b(?:if|in case|should|whether|in the event)(?:\s+[\w']+){0,3}\s*$", re.I)
+
+
+def _not_a_report(text: str, m: "re.Match[str]", advisory: bool) -> bool:
+    start = max(text.rfind(c, 0, m.start()) for c in ".!?\n;") + 1
+    before = text[start:m.start()]
+    if _DENIAL_RE.search(before):
+        return True
+    if not advisory:
+        return False
+    ends = [i for i in (text.find(c, m.end()) for c in ".!\n?") if i >= 0]
+    return bool(_CONDITIONAL_RE.search(before)) or (bool(ends) and text[min(ends)] == "?")
 
 
 _COMPLIANCE_RE = re.compile(

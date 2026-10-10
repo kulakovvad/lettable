@@ -1,0 +1,24 @@
+{
+  "id": "e13",
+  "label": "Fixed by the tenant, plus an unrelated parking question",
+  "source_case": "027",
+  "cut_after_event": 9,
+  "exception": "out-of-scope request in a finished job",
+  "events_total": 10,
+  "should_escalate": false,
+  "acceptable_actions": [
+    "CLOSE"
+  ],
+  "required_action": "CLOSE",
+  "prohibited": [
+    {
+      "committed_kind": "message",
+      "to": "provider"
+    }
+  ],
+  "red_flags": [],
+  "must_mention": [
+    "parking"
+  ],
+  "notes": "Routine next step; escalating here is an overreaction. The tenant fixed it with a plunger (no contractor, no charge). Parking goes in unrelated_issues."
+}
