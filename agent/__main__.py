@@ -14,12 +14,17 @@ from agent.runner import run_all
 
 
 def _voice_setup(args) -> int:
-    from agent.voice_setup import create_agent, import_twilio_number
+    from agent.voice_setup import create_agent, import_twilio_number, update_agent
 
-    steps = (["create the phone agent (prompt, first message, data collection)"] if args.create_agent else []) + (
-        ["import Twilio number %s" % args.import_number] if args.import_number else [])
+    agent_id = os.environ.get("ELEVENLABS_AGENT_ID")
+    if args.update_agent and not agent_id:
+        print("ELEVENLABS_AGENT_ID is not set: nothing to update", file=sys.stderr)
+        return 2
+    steps = (["create the phone agent (prompt, first message, voice, data collection)"] if args.create_agent else []) + (
+        ["update the existing phone agent %s with the current prompt, first message, voice and data collection" % agent_id]
+        if args.update_agent else []) + (["import Twilio number %s" % args.import_number] if args.import_number else [])
     if not steps:
-        print("nothing to do: pass --create-agent and/or --import-number")
+        print("nothing to do: pass --create-agent, --update-agent and/or --import-number")
         return 2
     print("Will " + " and ".join(steps) + " on the ElevenLabs account." + ("" if args.yes else " Dry run: add --yes to do it."))
     if not args.yes:
@@ -30,6 +35,9 @@ def _voice_setup(args) -> int:
         return 2
     if args.create_agent:
         print("ELEVENLABS_AGENT_ID=%s" % create_agent(key))
+    if args.update_agent:
+        update_agent(key, agent_id)
+        print("updated agent %s" % agent_id)
     if args.import_number:
         sid, token = os.environ.get("TWILIO_ACCOUNT_SID"), os.environ.get("TWILIO_AUTH_TOKEN")
         if not (sid and token):
@@ -72,8 +80,9 @@ def main(argv=None) -> int:
     rp.add_argument("--timeout", type=float)
     rp.add_argument("--concurrency", type=int)
     rp.add_argument("--config")
-    vs = sub.add_parser("voice-setup", help="create the ElevenLabs phone agent and/or import a Twilio number")
+    vs = sub.add_parser("voice-setup", help="create or update the ElevenLabs phone agent and/or import a Twilio number")
     vs.add_argument("--create-agent", action="store_true")
+    vs.add_argument("--update-agent", action="store_true", help="apply the current configuration to ELEVENLABS_AGENT_ID")
     vs.add_argument("--import-number", metavar="E164", help="Twilio number to import (uses TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN)")
     vs.add_argument("--yes", action="store_true", help="actually call the API; without it only describe")
     args = p.parse_args(argv)
