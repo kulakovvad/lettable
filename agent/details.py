@@ -92,6 +92,13 @@ class _Bag:
 
 
 _HEADER_LINE = re.compile(r"(?i)\s*(?:address|job id|job ref(?:erence)?|reference|subject|ref)\s*:")
+_FORWARDED = re.compile(r"(?i)(?:begin forwarded|forwarded message|original message)")
+# A contact named with another role is not this party's own number ("the contractor asked me to call ...").
+_OTHER_ROLE = {
+    "tenant": re.compile(r"\b(?:contractors?|providers?|engineers?|landlords?|owners?|agenc(?:y|ies))\b", re.I),
+    "landlord": re.compile(r"\b(?:contractors?|providers?|engineers?|tenants?|agenc(?:y|ies))\b", re.I),
+    "provider": re.compile(r"\b(?:landlords?|owners?|tenants?|agenc(?:y|ies))\b", re.I),
+}
 
 
 def _greeting_name(body: str) -> Optional[str]:
@@ -121,6 +128,26 @@ def _safe(fn: Callable[[], Any], default: Any) -> Any:
         return default
 
 
+def _own_lines(body: str, party: str) -> List[str]:
+    """Lines where this party is giving their own contact, not a quote, a forward, or someone else's number."""
+    forwarded = False
+    kept: List[str] = []
+    other = _OTHER_ROLE.get(party)
+    for raw in (body or "").splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if _FORWARDED.search(line):
+            forwarded = True
+            continue
+        if forwarded or line.startswith(">"):
+            continue
+        if other is not None and other.search(line):
+            continue
+        kept.append(line)
+    return kept
+
+
 def _party_block(case: Case, party: str) -> Dict[str, Any]:
     names, phones, emails = _Bag(), _Bag(_digits), _Bag(str.lower)
     for e in case.events:
@@ -136,10 +163,11 @@ def _party_block(case: Case, party: str) -> Dict[str, Any]:
             if m.group(1).lower() == party:
                 phones.add(m.group(2), _ref(e))
         if sender == party:
-            for m in _PHONE.finditer(e.body):
-                phones.add(m.group(0), _ref(e))
-            for m in _EMAIL.finditer(e.body):
-                emails.add(m.group(0), _ref(e))
+            for line in _own_lines(e.body, party):
+                for m in _PHONE.finditer(line):
+                    phones.add(m.group(0), _ref(e))
+                for m in _EMAIL.finditer(line):
+                    emails.add(m.group(0), _ref(e))
     return {"name": names.single(), "names": names.items(), "phones": phones.items(), "emails": emails.items()}
 
 

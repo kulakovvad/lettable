@@ -94,6 +94,15 @@ class PeopleTests(unittest.TestCase):
         self.assertEqual([p["value"] for p in card["provider"]["phones"]], ["07700 900456"])
         self.assertEqual([p["value"] for p in card["landlord"]["phones"]], ["07700 900777"])
 
+    def test_a_party_relaying_someone_elses_contact_does_not_own_it(self):
+        events = [ev(1, "Tenant", AG, "The contractor asked me to call 07700 900123 or repairs@example.com."),
+                  ev(2, "Tenant", AG, "> Please email landlord@example.com\nMy number is 07700 900999.")]
+        _, card = card_for(events)
+        self.assertEqual([p["value"] for p in card["tenant"]["phones"]], ["07700 900999"])
+        self.assertEqual(card["tenant"]["emails"], [])
+        self.assertEqual(card["provider"]["phones"], [])
+        self.assertEqual(card["provider"]["emails"], [])
+
     def test_agency_staff_and_contact_and_provider_assignment(self):
         events = [ev(1, AG, "Tenant", "Please call us on 07700 900422 to reschedule.\n\nKind regards,\nMaya"),
                   ev(2, AG, "Tenant", "Our maintenance provider **Juniper Surveying** will be attending your property."),

@@ -104,6 +104,38 @@ def _matches_approval(amount: float, cap: Optional[float]) -> bool:
     return cap is not None and _matches_a_quote(amount, {cap})
 
 
+_TOTAL_RE = re.compile(r"\b(?:grand total|invoice total|amount due|balance due|total)\b", re.I)
+
+
+def _close_amount(left: float, right: float) -> bool:
+    return abs(left - right) < 0.02
+
+
+def _sums_to(parts: List[float], total: float) -> bool:
+    """A breakdown agrees with a total on the same VAT basis."""
+    if not parts:
+        return True
+    added = round(sum(parts), 2)
+    return any(_close_amount(added, candidate) for candidate in (
+        total, round(total * evidence.VAT, 2), round(total / evidence.VAT, 2)))
+
+
+def _invoice_figures(text: str) -> Tuple[List[float], List[float]]:
+    """(labelled totals, other amounts). In a total sentence the last amount is the total."""
+    totals: List[float] = []
+    parts: List[float] = []
+    for sentence in re.split(r"(?<=[.!?])\s+|\n+", text or ""):
+        found = evidence.amounts(sentence)
+        if not found:
+            continue
+        if _TOTAL_RE.search(sentence):
+            totals.append(found[-1])
+            parts.extend(found[:-1])
+        else:
+            parts.extend(found)
+    return totals, parts
+
+
 def _amount(case: Case) -> List[Dict[str, Any]]:
     items: List[Dict[str, Any]] = []
     quote_events = [e for e in case.events if evidence.is_quote(e)]
@@ -116,10 +148,18 @@ def _amount(case: Case) -> List[Dict[str, Any]]:
     for e in case.events:
         if evidence.role_of(e.sender) != "provider" or not _INVOICE_WORD.search(e.body) or e in quote_events:
             continue
-        amounts = evidence.amounts(e.body)
+        totals, parts = _invoice_figures(e.body)
+        amounts = totals + parts
         if not amounts:
             continue
-        unmatched = [a for a in amounts if not _matches_a_quote(a, quotes) and not _matches_approval(a, cap)]
+        explained = [t for t in totals if _matches_a_quote(t, quotes) or _matches_approval(t, cap)]
+        covered: List[float] = []
+        for total in explained:
+            if _sums_to(parts, total):
+                covered.extend(parts)
+                covered.append(total)
+        unmatched = [a for a in amounts if not any(_close_amount(a, c) for c in covered)
+                     and not _matches_a_quote(a, quotes) and not _matches_approval(a, cap)]
         if unmatched:
             refs = [_ref(e)] + ([_ref(approval)] if approval is not None else []) + [_ref(q) for q in quote_events]
             shown = ", ".join("%.2f" % a for a in unmatched)

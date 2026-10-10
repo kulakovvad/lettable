@@ -79,6 +79,18 @@ class AmountTests(unittest.TestCase):
         self.assertIn("neither a quoted amount nor the landlord's approval", flagged[0]["summary"])
         self.assertNotIn("80.00", flagged[0]["summary"])
 
+    def test_an_itemised_invoice_whose_total_matches_the_quote_is_not_a_mismatch(self):
+        body = "Invoice: labour GBP 200, parts GBP 100. Total GBP 300 including VAT."
+        items = mismatches.find(case_for([self.quote("Quote GBP 300 including VAT."), ev(2, "Contractor", AG, body)]))
+        self.assertEqual([i for i in items if i["kind"] == "amount" and i["severity"] == "flag"], [])
+
+    def test_a_changed_total_is_still_flagged(self):
+        body = "Invoice: labour GBP 200, parts GBP 100. Total GBP 400."
+        items = mismatches.find(case_for([self.quote("Quote GBP 300 including VAT."), ev(2, "Contractor", AG, body)]))
+        flagged = [i for i in items if i["severity"] == "flag"]
+        self.assertTrue(flagged)
+        self.assertIn("400.00", flagged[0]["summary"])
+
     def test_an_invoice_above_the_landlord_approval_is_flagged(self):
         events = [self.quote("Quote GBP 100 plus VAT."), ev(2, "Landlord", AG, "Approved GBP 100, go ahead."),
                   ev(3, "Contractor", AG, "Quote revised to GBP 250."), ev(4, "Contractor", AG, "Invoice GBP 250.")]
