@@ -22,6 +22,7 @@ ACTIONS = (
 NEEDS_MESSAGE = ("CHASE_LANDLORD", "CHASE_PROVIDER", "ASK_TENANT", "ASK_PROVIDER", "ASK_LANDLORD",
                  "INSTRUCT_PROVIDER", "SEND_REMINDER")
 MAX_TEXT = 1200
+MAX_REASON = 4000
 
 
 def _text(value: Any, limit: int = MAX_TEXT) -> str:
@@ -52,7 +53,7 @@ class Proposal:
         action = _text(data.get("action"), 40).upper()
         if action not in ACTIONS:
             raise ValueError("unknown action %r" % action)
-        reason = _text(data.get("reason"))
+        reason = _text(data.get("reason"), MAX_REASON)
         if not reason:
             raise ValueError("proposal has no reason")
         try:

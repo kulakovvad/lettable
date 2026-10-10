@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 from agent import consistency, evidence, redflags
 from agent.config import Config
 from agent.schema import (
+    MAX_REASON,
     MAX_TEXT,
     NEEDS_MESSAGE,
     Decision,
@@ -244,7 +245,7 @@ def apply(case: Case, proposal: Proposal, cfg: Config, now: datetime,
     return Decision(
         case_id=case.case_id,
         action=action,
-        reason=reason[: MAX_TEXT * 2],
+        reason=reason[: MAX_REASON + MAX_TEXT],
         source="model",
         message=message,
         unknowns=proposal.unknowns,

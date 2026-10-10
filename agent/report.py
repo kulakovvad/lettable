@@ -279,10 +279,29 @@ def answer_md(d: Dict[str, Any]) -> str:
     return "\n".join(out)
 
 
+_STATE_LABEL = {"committed": "EXECUTED", "held_for_review": "PROPOSED, NOT SENT", "staged": "PROPOSED, NOT SENT"}
+
+
+def _conflict_lines(conflicts: Any) -> list:
+    lines = []
+    for c in _l(conflicts):
+        if not isinstance(c, dict):
+            continue
+        parts = ["%s (%s)" % (v.get("value"), ", ".join(v.get("refs") or []) or "no ref") if isinstance(v, dict) else str(v)
+                 for v in c.get("values") or []]
+        lines.append("%s: %s" % (c.get("field"), " vs ".join(parts)))
+    return lines
+
+
 def reasoning_md(d: Dict[str, Any]) -> str:
-    out = ["# Reasoning for case %s" % d["case_id"], "",
+    actions = [a for a in _l(d.get("actions")) if isinstance(a, dict)]
+    escalation = next((a for a in actions if a.get("kind") == "escalation"), None)
+    out = ["# Reasoning for case %s%s" % (d["case_id"], ": %s" % d["title"] if d.get("title") else ""), "",
            "- Decided by: %s" % ("the model, checked by code" if d["source"] == "model" else "automatic fallback"),
            "- Events seen: %s" % d["events_seen"]]
+    if d.get("trace"):
+        out += ["- Model: %s, %d turn(s), %d tokens" % (d.get("model") or "?", d.get("steps", 0), d.get("tokens", 0)),
+                "- Evidence cited: %s" % (", ".join(d.get("evidence_refs") or []) or "none")]
     if d.get("waiting_on"):
         out.append("- Waiting on the %s for %s days" % (d["waiting_on"], d.get("waiting_days")))
     if d.get("confidence") is not None:
@@ -291,22 +310,89 @@ def reasoning_md(d: Dict[str, Any]) -> str:
         out.append("- Model proposed %s; code changed it to %s" % (d["proposed_action"], d["action"]))
     if d.get("cause"):
         out.append("- Fallback cause: %s" % d["cause"])
-    out += ["", "## Why", "", d["reason"], "", "## Checks applied by code", "", _bullets(d.get("gate_notes")), "",
-            "## Not known", "", _bullets(d.get("unknowns")), "", "## Input warnings", "", _bullets(d.get("warnings")), "",
-            "Idempotency key: `%s`" % d["idempotency_key"], ""]
+
+    out += ["", "## 1. Decision and next action", "",
+            "- **Final action:** %s (%s)" % (_TITLES.get(d["action"], d["action"]), d["action"]),
+            "- **Priority:** %s" % (d.get("priority") or "not set"),
+            "- **As of:** %s" % (d.get("as_of") or d.get("decided_at"))]
+    if d.get("proposed_action"):
+        out.append("- **Model's proposal:** %s, overridden by code for the reasons in section 4" % d["proposed_action"])
+    if d.get("request"):
+        out.append("- **Request received:** %s" % d["request"][:600].replace("\n", " "))
+    if str(d.get("answer") or "").strip():
+        out.append("- **Direct answer:** %s" % str(d["answer"]).strip())
+
+    out += ["", "## 2. Why", "", d["reason"], ""]
+    known = _l((escalation or {}).get("known"))
+    if known:
+        out += ["Facts the decision rests on:", "", _bullets(known), ""]
+    if d.get("evidence_refs"):
+        out += ["Evidence cited by the model: %s" % ", ".join(d["evidence_refs"]), ""]
+
+    out += ["## 3. Missing information and conflicting facts", "", "Not known:", "",
+            _bullets(_l(d.get("unknowns")) or _l((escalation or {}).get("unknowns"))), ""]
+    conflicts = _conflict_lines((escalation or {}).get("conflicts"))
+    if conflicts:
+        out += ["Conflicting facts:", "", _bullets(conflicts), ""]
+    out += [line.replace("## Inconsistencies and mismatches", "### Inconsistencies and mismatches") for line in _mismatch_section(d)]
     if d.get("consistency"):
-        out[-2:-2] = ["## Document consistency check", "", consistency.describe(d["consistency"]), ""]
+        out += ["## Document consistency check", "", consistency.describe(d["consistency"]), ""]
     if d.get("red_flags"):
-        out[-2:-2] = ["## Red flags", "", redflags.describe(d["red_flags"]), ""]
+        out += ["## Red flags", "", redflags.describe(d["red_flags"]), ""]
+    out += ["Input warnings:", "", _bullets(d.get("warnings")), ""]
+
+    out += ["## 4. Actions taken, results and failures", "",
+            "EXECUTED means the action was committed. PROPOSED, NOT SENT means it was staged and then held "
+            "because the final decision changed or a person must approve it first.", ""]
+    for a in actions:
+        line = _action_line(a)
+        label = _STATE_LABEL.get(a.get("state"))
+        out.append(line.replace("**%s**" % a.get("state", "").upper(), "**%s**" % label, 1) if label else line)
+    if not actions:
+        out.append("- No action was staged.")
+    out.append("")
+    tried = _l((escalation or {}).get("tried"))
+    if tried:
+        out += ["What was tried before this decision:", "", _bullets(tried), ""]
+    out += ["Checks applied by code:", "", _bullets(d.get("gate_notes")), ""]
+    failed = ["Tool gate refused `%s`: %s" % (b.get("tool"), b.get("why")) for b in _l(d.get("blocked")) if isinstance(b, dict)]
+    failed += [str(f) for f in _l((escalation or {}).get("failed"))]
+    if d.get("cause"):
+        failed.append("Run problem: %s" % d["cause"])
+    out += ["Failures and refused actions:", "", _bullets(failed), ""]
+
+    out += ["## 5. Handover to a person", ""]
+    if escalation:
+        out += ["- **Route:** %s, priority %s%s" % (escalation.get("route") or "?", escalation.get("priority") or "?",
+                                                    ", respond by %s" % escalation["respond_by"] if escalation.get("respond_by") else ""),
+                "- **Summary:** %s" % (escalation.get("summary") or ""), "", "Options for the person:", "",
+                _bullets(escalation.get("options")), ""]
+        if escalation.get("recommended"):
+            out += ["%s" % escalation["recommended"], ""]
+    elif d["action"] == "ESCALATE":
+        out += ["Escalated without a handover ticket. Suggested next steps:", "", _bullets(d.get("options")), ""]
+    else:
+        out += ["No person is needed for this step; the system handles it autonomously within the code checks above.", ""]
+    if d.get("unrelated_issues"):
+        out += ["Separate issues to raise as new requests:", "", _bullets(d["unrelated_issues"]), ""]
+
+    out += ["## Uncertainty", "",
+            "- Model confidence: %s" % ("%.2f" % d["confidence"] if isinstance(d.get("confidence"), (int, float)) else "not given"),
+            "- Open questions: %d" % len(_l(d.get("unknowns"))),
+            "- Code overrides: %s" % ("; ".join(d.get("gate_notes") or []) or "none"),
+            "- Safety hazard flagged: %s" % ("yes" if d.get("hazard") else "no"), ""]
+
+    out += ["## Logs and traces", "",
+            "- Full decision record: `decision.json` in this folder",
+            "- Run-level log: `../trace.jsonl` and `../manifest.json`",
+            "- Idempotency key: `%s`" % d["idempotency_key"], ""]
     if d.get("trace"):
-        out[3:3] = ["- Model: %s, %d turn(s), %d tokens" % (d.get("model") or "?", d.get("steps", 0), d.get("tokens", 0)),
-                    "- Evidence cited: %s" % (", ".join(d.get("evidence_refs") or []) or "none")]
         out += ["## Tool trace", "", "Every tool call the agent made, in order, with the code's response.", ""]
         for t in d["trace"]:
             if "thought" in t:
-                out.append("%d. _Model note:_ %s" % (t["step"], t["thought"].replace("\n", " ")[:600]))
+                out.append("%d. _Model note:_ %s" % (t["step"], t["thought"].replace("\n", " ")[:2000]))
             else:
-                out.append("%d. `%s(%s)` -> `%s`" % (t["step"], t["tool"], json.dumps(t.get("args"), ensure_ascii=False)[:500],
+                out.append("%d. `%s(%s)` -> `%s`" % (t["step"], t["tool"], json.dumps(t.get("args"), ensure_ascii=False)[:800],
                                                     json.dumps(t.get("result"), ensure_ascii=False)[:400]))
         out.append("")
     return "\n".join(out)

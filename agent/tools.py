@@ -134,7 +134,7 @@ TOOL_SPECS: List[Dict[str, Any]] = [
      "parameters": _schema({
          "action": {"type": "string", "enum": list(ACTIONS)},
          "priority": _PRIORITY,
-         "reason": {"type": "string", "description": "2-5 sentences, evidence-based, citing event refs."},
+         "reason": {"type": "string", "description": "A full argument in 5-10 sentences, citing event or attachment refs: what the evidence shows, which facts conflict and which you trusted and why, what is still missing, why this action beats the alternatives, and what would change the decision."},
          "confidence": {"type": "number", "description": "0..1 that this is the right next step."},
          "evidence_refs": _STRS,
          "unknowns": _STRS,
@@ -681,7 +681,7 @@ class Toolbox:
         priority = _s(args.get("priority"), 3)
         self.decision = {
             "action": action, "priority": priority if priority in PRIORITIES else "P2",
-            "reason": _s(args.get("reason"), 2400), "confidence": confidence, "evidence_refs": refs,
+            "reason": _s(args.get("reason"), 4000), "confidence": confidence, "evidence_refs": refs,
             "unknowns": _list(args.get("unknowns")), "options": _list(args.get("options"), 5),
             "unrelated_issues": _list(args.get("unrelated_issues"), 5), "amount_gbp": amount,
             "answer": _s(args.get("answer"), 2000),
