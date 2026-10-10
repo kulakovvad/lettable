@@ -44,18 +44,18 @@ Safety rules in code:
 Results come back by themselves: at the start of the next live run (`--calls elevenlabs`), calls placed earlier are fetched and their records added to the case (turn this off with `collect_calls: false`). You can also do it by hand:
 
 ```
-python3 -m agent calls collect out/ --backend elevenlabs
-python3 -m agent run cases/ out/ --calls elevenlabs --backend claude
+uv run python -m agent calls collect out/ --backend elevenlabs
+uv run python -m agent run cases/ out/ --calls elevenlabs --backend claude
 ```
 
 ## One-time setup (ElevenLabs + Twilio)
 
 ```
 export ELEVENLABS_API_KEY=...                      # see .env.example
-python3 -m agent voice-setup --create-agent        # describes the plan; add --yes to do it
+uv run python -m agent voice-setup --create-agent        # describes the plan; add --yes to do it
 export ELEVENLABS_AGENT_ID=<printed id>
 export TWILIO_ACCOUNT_SID=... TWILIO_AUTH_TOKEN=...
-python3 -m agent voice-setup --import-number +44...   # a Twilio number you own; add --yes
+uv run python -m agent voice-setup --import-number +44...   # a Twilio number you own; add --yes
 export ELEVENLABS_PHONE_NUMBER_ID=<printed id>
 ```
 
@@ -66,8 +66,8 @@ Needs an ElevenLabs plan that includes phone calls and a Twilio number. Never co
 The wording, the voice settings and the extracted fields live in `agent/voice_prompt.py`. After editing them, apply them to the agent you already created (its phone numbers and name are kept):
 
 ```
-python3 -m agent voice-setup --update-agent          # describes the change; needs ELEVENLABS_AGENT_ID
-python3 -m agent voice-setup --update-agent --yes    # sends it
+uv run python -m agent voice-setup --update-agent          # describes the change; needs ELEVENLABS_AGENT_ID
+uv run python -m agent voice-setup --update-agent --yes    # sends it
 ```
 
 Create and update send the same configuration. `--create-agent` and `--update-agent` cannot be combined (update would patch the old agent): create, set `ELEVENLABS_AGENT_ID` to the printed id, then update. An update sends the prompt, first message, voice model, data collection, `built_in_tools` (voicemail and end_call), the length limit, the silence timeout and the variable defaults. On a throwaway copy of the live agent, the API merged these maps and kept the voice id and every other tool and setting already on the agent.

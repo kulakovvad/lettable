@@ -42,7 +42,7 @@ class LeakProbeChat(ScriptedChat):
 
 
 class TokenWaitChat(ScriptedChat):
-    """Waits, reporting token use so the run-wide cap can trip."""
+    """Waits and reports token use. A run must still finish every case."""
     def __init__(self):
         super().__init__([
             Turn(calls=[call("schedule_followup", 1, after_hours=48, waiting_on="landlord", reason="Asked today.")], tokens=500),

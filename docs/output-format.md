@@ -26,7 +26,7 @@ Every input folder gets a `decision.json`, including crashes and timeouts. The e
 
 ## Reality Test export
 
-`python3 -m agent reality <challenge_dir> --out ANSWERS` finds case folders at any depth, stages them, and runs the same writer. It adds an index on top of the per-case files. Numeric folders are unpadded (`001` becomes `1`).
+`uv run python -m agent reality <challenge_dir> --out ANSWERS` finds case folders at any depth, stages them, and runs the same writer. It adds an index on top of the per-case files. Numeric folders are unpadded (`001` becomes `1`).
 
 ```text
 ANSWERS/
@@ -210,12 +210,10 @@ Present when `consistency_check` is on (tool loop only). Design: [design.md](des
 |---|---|---|
 | null | model | Normal finish |
 | `loop_no` | model | Loop hit its turn limit without `submit_decision`. Auto-escalated |
-| `loop_token` | model | Loop exceeded its token budget. Auto-escalated |
 | `timeout` | fallback | Case exceeded `case_timeout_s` (240 s) |
 | `crash` | fallback | Worker exited without reporting |
 | `error` | fallback | Worker raised, or returned an invalid decision |
 | `deadline` | fallback | Run deadline passed before this case started |
-| `spend_cap` | fallback | Run-wide `run_token_budget` was used up before this case started. No model call |
 | `runner` | fallback | Worker process could not be started |
 
 A fallback `reason` includes the exception type and message, truncated to 300 characters. Hide it from end users if that matters.

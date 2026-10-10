@@ -35,9 +35,7 @@ class Config:
 
     # Tool loop budgets
     loop_max_steps: int = 12  # model turns before the loop is forced to finish
-    loop_max_tokens_per_turn: int = 2500
-    loop_token_budget: int = 150_000  # whole case, across all turns
-    run_token_budget: Optional[int] = 3_000_000  # whole run; later cases fall back to escalation once spent
+    loop_max_tokens_per_turn: int = 2500  # one reply; the API requires a max. Usage is recorded, not used to stop a case or a run
     # When waits are judged. last_event: the case's latest event (synthetic dates do not relate to the clock);
     # now: the wall clock or --now; later: whichever of the two is later. An explicit --now implies "now".
     as_of: str = "last_event"
