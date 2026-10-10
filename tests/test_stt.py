@@ -9,8 +9,8 @@ from unittest import mock
 from agent import stt
 from agent.config import Config
 from agent.runner import run_all
-from agent.stt import (ElevenLabsTranscriber, FakeTranscriber, Transcriber, case_keyterms, format_words,
-                       make_transcriber, transcript_for)
+from agent.stt import (ElevenLabsTranscriber, FakeTranscriber, OpenAITranscriber, Transcriber, case_keyterms,
+                       format_words, make_transcriber, transcript_for)
 from agent.timeline import load_case, render_case
 from tests.helpers import WAITING_LANDLORD, make_case
 
@@ -179,6 +179,7 @@ class FactoryTests(SttTestCase):
             self.assertIsNone(make_transcriber(Config()))
             self.assertIsInstance(make_transcriber(Config(stt_backend="fake")), FakeTranscriber)
             self.assertIsInstance(make_transcriber(Config(stt_backend="elevenlabs")), ElevenLabsTranscriber)
+            self.assertIsInstance(make_transcriber(Config(stt_backend="openai")), OpenAITranscriber)
             with self.assertRaises(ValueError):
                 make_transcriber(Config(stt_backend="whisper-ish"))
 
