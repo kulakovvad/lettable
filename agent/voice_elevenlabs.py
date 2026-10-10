@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, Optional
 
 from agent.config import Config
-from agent.report import atomic_write
+from agent.files import atomic_write
 from agent.voice import CallRequest, CallResult, Conversation
 from agent.voice_prompt import dynamic_variables
 

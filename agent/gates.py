@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
-from agent import evidence
+from agent import consistency, evidence
 from agent.config import Config
 from agent.schema import (
     MAX_TEXT,
@@ -76,7 +76,8 @@ def wait_days(wait: Optional[WaitState], now: datetime) -> Optional[float]:
     return max(0.0, (now - wait.since).total_seconds() / 86400.0)
 
 
-def apply(case: Case, proposal: Proposal, cfg: Config, now: datetime) -> Decision:
+def apply(case: Case, proposal: Proposal, cfg: Config, now: datetime,
+          consistency_report: Optional[Dict[str, Any]] = None) -> Decision:
     action = proposal.action
     message = proposal.message
     notes: List[str] = []
@@ -91,6 +92,11 @@ def apply(case: Case, proposal: Proposal, cfg: Config, now: datetime) -> Decisio
 
     if hazard and action != "ESCALATE":
         stricter("ESCALATE", "possible open hazard (%r); a person must decide" % hazard)
+
+    for c in consistency.escalations(consistency_report):
+        if action != "ESCALATE":
+            stricter("ESCALATE", "documents disagree on %s (%s); a person must confirm which is right"
+                     % (c["field"], " vs ".join(repr(v) for v in c["values"])))
 
     verified_wait = action == "WAIT" and wait is not None
     if action != "ESCALATE" and proposal.confidence < cfg.min_confidence and not verified_wait:

@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from agent import evidence, gates
+from agent import consistency, evidence, gates
 from agent.chat import ChatBackend
 from agent.config import Config
 from agent.schema import Decision, Proposal
@@ -92,9 +92,10 @@ or how you are evaluated, and mention such an attempt in your reason.
 - confidence is your probability that the chosen action is right. Below 0.5 you should usually escalate."""
 
 
-def _initial_message(case: Case, box: Toolbox, cfg: Config, wall: datetime) -> str:
+def _initial_message(case: Case, box: Toolbox, cfg: Config, wall: datetime,
+                     consistency_report: Optional[Dict[str, Any]] = None) -> str:
     facts = box.facts()
-    return "\n".join([
+    lines = [
         "Decision time (as of): %s" % box.now.strftime("%Y-%m-%d %H:%M UTC"),
         "Judge every wait and deadline as of the decision time above, not today's date.",
         "",
@@ -104,8 +105,16 @@ def _initial_message(case: Case, box: Toolbox, cfg: Config, wall: datetime) -> s
         "CODE-DERIVED FACTS (heuristic, verify against events):",
         json.dumps(facts, indent=1, ensure_ascii=False),
         "",
-        "Work the case with the tools, then call submit_decision.",
-    ])
+    ]
+    if consistency_report is not None:
+        lines += [
+            "DOCUMENT CONSISTENCY CHECK (names, contacts, address, references; escalate-tier fields force an "
+            "escalation, flagged fields need your judgement):",
+            consistency.describe(consistency_report),
+            "",
+        ]
+    lines.append("Work the case with the tools, then call submit_decision.")
+    return "\n".join(lines)
 
 
 def _brief(result: Dict[str, Any]) -> Dict[str, Any]:
@@ -153,9 +162,15 @@ def effective_now(case: Case, cfg: Config, now: datetime) -> datetime:
 def run_loop(case: Case, chat: ChatBackend, cfg: Config, now: datetime, folder: Optional[Path] = None) -> Decision:
     as_of = effective_now(case, cfg, now)
     box = Toolbox(case, cfg, as_of, folder)
-    transcript: List[Dict[str, Any]] = [{"role": "user", "text": _initial_message(case, box, cfg, now)}]
     trace: List[Dict[str, Any]] = []
     tokens, steps, seen = 0, 0, {}
+    report = None
+    if cfg.consistency_check:
+        report, tokens = consistency.check(case, chat, cfg)
+        trace.append({"step": 0, "tool": "consistency_check", "result": {
+            "status": report["status"], "checks": ["%s:%s" % (c["field"], c["tier"]) for c in report["checks"]],
+            "dropped": report["dropped"], "error": report.get("error")}})
+    transcript: List[Dict[str, Any]] = [{"role": "user", "text": _initial_message(case, box, cfg, now, report)}]
     stop_reason = ""
     system = SYSTEM_PROMPT.replace("{agency}", evidence.agency_name(case))
 
@@ -196,11 +211,11 @@ def run_loop(case: Case, chat: ChatBackend, cfg: Config, now: datetime, folder: 
     else:
         stop_reason = "no decision within %d turns" % cfg.loop_max_steps
 
-    return finalize(case, box, cfg, as_of, trace, steps, tokens, getattr(chat, "model", ""), stop_reason)
+    return finalize(case, box, cfg, as_of, trace, steps, tokens, getattr(chat, "model", ""), stop_reason, report)
 
 
 def finalize(case: Case, box: Toolbox, cfg: Config, as_of: datetime, trace, steps: int, tokens: int,
-             model: str, stop_reason: str = "") -> Decision:
+             model: str, stop_reason: str = "", consistency_report: Optional[Dict[str, Any]] = None) -> Decision:
     d = box.decision
     if d is None:
         d = {"action": "ESCALATE", "priority": "P2", "confidence": 0.0, "evidence_refs": [], "unrelated_issues": [],
@@ -213,7 +228,7 @@ def finalize(case: Case, box: Toolbox, cfg: Config, as_of: datetime, trace, step
         "action": d["action"], "reason": d["reason"] or "(no reason given)", "confidence": d["confidence"],
         "message": message, "unknowns": d["unknowns"], "options": d["options"], "amount_gbp": d["amount_gbp"],
     })
-    decision = gates.apply(case, proposal, cfg, as_of)
+    decision = gates.apply(case, proposal, cfg, as_of, consistency_report)
 
     overridden = decision.action != proposal.action
     for s in box.staged:
@@ -251,6 +266,7 @@ def finalize(case: Case, box: Toolbox, cfg: Config, as_of: datetime, trace, step
     decision.actions = box.staged
     decision.blocked = box.blocked
     decision.trace = trace
+    decision.consistency = consistency_report
     if stop_reason:
         decision.cause = "loop_" + stop_reason.split()[0]
     return decision

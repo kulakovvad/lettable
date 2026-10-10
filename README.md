@@ -28,6 +28,15 @@ python3 -m agent run "<cases folder>" out/ --backend claude     # or: openai, au
 
 `claude`/`anthropic`, `openai` and `auto` run the bounded tool loop (`agent/loop.py`). `anthropic-single` is the original one-call backend. Model names come from `ANTHROPIC_MODEL` / `OPENAI_MODEL` or `agent/config.py`. The real model is only used when you ask for it by name; a key in the environment never turns on spending by itself.
 
+### Document consistency check (opt-in)
+
+```
+echo '{"consistency_check": true}' > jev.json      # set TYPESAFE_API_KEY too
+python3 -m agent run "<cases folder>" out/ --backend claude --config jev.json
+```
+
+Before the tool loop, one model call extracts names, contacts, the property address and references with their sources; code drops values not found in the cited source; Jev (typesafe.ai) scores the fields whose values still differ. A clear mismatch escalates, a near match is flagged to the model, and a failure of the check never stops the case. See [docs/design.md](docs/design.md#document-consistency-check-opt-in).
+
 ### Replay (testing without an answer key)
 
 ```
@@ -61,6 +70,7 @@ Audio files in a case can be transcribed (`--stt elevenlabs`), and the agent can
 - `agent/loop.py`: bounded tool loop, final gates, commit or hold staged actions
 - `agent/tools.py`: read tools and gated action tools
 - `agent/policy.py`: trusted operating policy for the model
+- `agent/consistency.py`: opt-in document consistency check (extraction + Jev)
 - `tests/`: unit and failure-injection tests
 
 ## Known limits
@@ -68,4 +78,5 @@ Audio files in a case can be transcribed (`--stt elevenlabs`), and the agent can
 - Actions are staged and committed to a local outbox only; no external messaging, CRM or ticketing system is connected.
 - PDFs are read only when `pypdf` is installed; scanned or image-only files are listed as "content not available".
 - Thresholds in `agent/config.py` are starting values, not tuned.
-- The real model path has not been run end to end.
+- The real model path has been run end to end on 15 public cases (replay, 30 decision points); results and open findings are in [docs/design.md](docs/design.md#replay-findings-dev-split-1200-run). Thresholds and prompts are not tuned beyond that.
+- The consistency check uses an external service, Jev (`api.typesafe.ai`, `jev-1.13.0`), and adds one extraction model call per case. It is off by default.

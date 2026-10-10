@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import json
-import os
-import tempfile
 from pathlib import Path
 from typing import Any, Dict
+
+from agent import consistency
+from agent.files import atomic_write  # noqa: F401 (re-exported for existing imports)
 
 _TITLES = {
     "WAIT": "Wait, nothing to do yet",
@@ -19,21 +20,6 @@ _TITLES = {
     "CLOSE": "Close the case",
     "ESCALATE": "Escalate to a person",
 }
-
-
-def atomic_write(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".tmp-", suffix=path.suffix)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(text)
-        os.replace(tmp, path)
-    except BaseException:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
-        raise
 
 
 def _bullets(items: Any) -> str:
@@ -121,6 +107,8 @@ def reasoning_md(d: Dict[str, Any]) -> str:
     out += ["", "## Why", "", d["reason"], "", "## Checks applied by code", "", _bullets(d.get("gate_notes")), "",
             "## Not known", "", _bullets(d.get("unknowns")), "", "## Input warnings", "", _bullets(d.get("warnings")), "",
             "Idempotency key: `%s`" % d["idempotency_key"], ""]
+    if d.get("consistency"):
+        out[-2:-2] = ["## Document consistency check", "", consistency.describe(d["consistency"]), ""]
     if d.get("trace"):
         out[3:3] = ["- Model: %s, %d turn(s), %d tokens" % (d.get("model") or "?", d.get("steps", 0), d.get("tokens", 0)),
                     "- Evidence cited: %s" % (", ".join(d.get("evidence_refs") or []) or "none")]

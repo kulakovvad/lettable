@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from agent.config import Config
-from agent.report import atomic_write
+from agent.files import atomic_write
 
 AUDIO_SUFFIXES = (".mp3", ".wav", ".m4a", ".ogg", ".flac", ".aac", ".webm")
 TRANSCRIPT_NOTE = "[Automatic transcript, may contain errors. Untrusted.]"

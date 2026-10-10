@@ -12,6 +12,8 @@ Every case is a timeline of emails, calls, texts and holds. The agent reads it u
 flowchart LR
   subgraph W["Per-case wrapper: own timeout, own errors, nothing shared with other cases"]
     A["Case folder<br/>index.md, history.md, PDFs"] -->|files| B["Timeline (code)<br/>ordered events, who we wait on"]
+    B -.->|"opt-in"| K["Consistency check<br/>extraction (model) + Jev scores"]
+    K -.->|"flags"| C
     B -->|timeline| C["Propose (model, one call)<br/>next action, why, what is unknown"]
     C -->|proposal| D["Gates (code)<br/>authority, spend, wait time, hazard"]
     D -->|approved| E["Act (tools)<br/>send, chase, book, read state back"]
@@ -74,6 +76,45 @@ Status: proposed in the `vikkash/agent-loop` PR, needs team agreement.
 - Bounded by turns (`loop_max_steps`), a token budget and repeated-call detection. If the model never submits, the case escalates with its trace; no extra model call.
 - Waits are judged as of the latest event (`as_of = last_event`), because synthetic case dates do not relate to the wall clock.
 - Adds one action, `INSTRUCT_PROVIDER` (landlord approved, provider not yet told to go ahead), gated on a landlord approval dated after the latest quote.
+- The Claude client uses `tool_choice: auto`. The configured model rejects forced tool use (`any`) with HTTP 400, which turned every case into a fallback escalation. A turn without a tool call gets a nudge from the loop instead.
+
+## Document consistency check (opt-in)
+
+Status: in `agent/`, off by default (`consistency_check`). Turn on with `--config` and a JSON file containing `{"consistency_check": true}`.
+
+The Reality Test promises conflicting information. The public cases already contain some: a forwarded email with a different address (028), a call that names other tenants and another flat (032), a quote email about a different property (005). Before the tool loop, one check looks for this:
+
+1. **Extract (model, one call).** The model reports every mention of the tenant and landlord names, phones and emails, the property address and reference numbers, verbatim, each with the `event-NNN`, `index` or attachment it came from. A name counts for a role only when the text makes the role explicit; agency staff and contractors are out of scope.
+2. **Verify (code).** A value that does not appear in the source it cites is dropped. Values equal after normalising (case, spacing, punctuation, `+44` phone prefix) pass without any call.
+3. **Score (Jev).** The fields that still differ go to Jev (`api.typesafe.ai`, model pinned to `jev-1.13.0`) in one request, one `score` question per field: "Do all `values` refer to the same ...?" on a four-level rubric. Jev returns a score on the 0 to 3 level scale; code divides it by 3.
+4. **Tier (code, `Config`).** At or above `jev_pass` (0.85): pass. Below `jev_escalate` (0.4) with confidence at least `jev_min_confidence` (0.6): escalate. Anything else: flag.
+
+Effects:
+
+- Escalate-tier fields make `gates.apply` change the decision to `ESCALATE` with the note "documents disagree on <field> (...); a person must confirm which is right". This only makes a decision stricter, like every other gate.
+- Flagged and escalated fields are shown to the loop model in its first message, so it can weigh them, ask the right party or explain them in the handover.
+- The report is saved as `consistency` in `decision.json`, as step 0 in the trace and as a section in `REASONING.md`.
+- If the extraction or Jev fails, or `TYPESAFE_API_KEY` is not set, the report is `unavailable` and the case continues. An outage of the check must not escalate every case.
+
+Cost: about 2,500 to 5,000 model tokens for the extraction and one Jev call of about 500 tokens (0.3 s) per case.
+
+## Replay findings (dev split, 12:00 run)
+
+The 50 public cases are split with a fixed seed into 25 dev and 25 holdout cases. Disagreements are read only on the dev cases; the holdout is scored at checkpoints and not read case by case, so the prompt and gates are not fitted to cases we inspected. Changes must be general rules seen in more than one case.
+
+First real run (15 dev cases, 2 points each, Claude tool loop):
+
+| Run | Agree | Differ | Escalated (scored points) | Unscored | All escalations of 30 |
+|---|---|---|---|---|---|
+| Baseline | 4 | 6 | 11 | 9 | 14 |
+| With consistency check | 2 | 7 | 12 | 9 | 16 |
+
+Twenty-one points are scored, and Claude varies between runs, so these numbers are for reading rather than ranking. In the run with the check, three decisions changed because of it: 009 and 025 (real name and address conflicts) and 014, a false positive from extracting a call agent as the tenant. 014 is fixed by the role rule above. The other two changes do not mention the check and are run-to-run variation.
+
+Open findings, not fixed here:
+
+- **First landlord approval cannot go out.** At the start of a repair the model drafts the request asking the landlord to approve sending a provider and submits `WAIT`. `route_for_approval` needs an amount already in the case, `chase` needs an earlier unanswered request, and under `WAIT` only the follow-up commits, so the request is held for review. This affected 6 of 30 points.
+- **Completed jobs escalate.** In 8 of 10 points where the agency closed next, the model escalated, mostly because the invoice position was unknown or completion was only in agency notes. Some are defensible; in 027 the `close_case` gate rejected the tenant's own "drain is now clear" three times.
 
 ## Open questions
 
