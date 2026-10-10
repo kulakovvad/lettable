@@ -37,6 +37,19 @@ class Config:
     # now: the wall clock or --now; later: whichever of the two is later. An explicit --now implies "now".
     as_of: str = "last_event"
 
+    # Speech-to-text for audio files in a case ("off" | "fake" | "elevenlabs"). Paid, so off by default.
+    stt_backend: str = "off"
+    stt_model: str = "scribe_v2"
+    stt_cache_dir: str = ".cache/stt"
+    stt_timeout_s: float = 120.0
+    stt_max_audio_bytes: int = 50_000_000
+
+    # Phone calls ("dry_run" records the call and dials nothing | "elevenlabs" places it)
+    call_backend: str = "dry_run"
+    call_hours: Tuple[int, int] = (8, 21)  # UK local hours in which a live call may be placed
+    max_calls_per_case: int = 1
+    max_calls_per_run: int = 10
+
     # Input caps
     max_file_bytes: int = 2_000_000
     pdf_chars: int = 3000
@@ -67,8 +80,9 @@ class Config:
     def from_dict(cls, data: Dict[str, Any]) -> "Config":
         known = {f.name for f in fields(cls)}
         clean = {k: v for k, v in data.items() if k in known}
-        if "hazard_patterns" in clean:
-            clean["hazard_patterns"] = tuple(clean["hazard_patterns"])
+        for name in ("hazard_patterns", "call_hours"):
+            if name in clean:
+                clean[name] = tuple(clean[name])
         return cls(**clean)
 
     @classmethod
